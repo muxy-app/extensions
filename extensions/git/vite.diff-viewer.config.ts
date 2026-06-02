@@ -8,6 +8,9 @@ const WORKER_SRC = resolve(
 );
 
 export default defineConfig({
+  resolve: {
+    alias: { "@": resolve(__dirname, "src") },
+  },
   define: {
     "process.env.NODE_ENV": JSON.stringify("production"),
   },

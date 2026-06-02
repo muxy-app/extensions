@@ -6,6 +6,9 @@ import {
   type FileDiffMetadata,
 } from "@pierre/diffs";
 import { getOrCreateWorkerPoolSingleton } from "@pierre/diffs/worker";
+import type { GitStatus } from "@pierre/trees";
+import type { DiffTreeFile } from "./diff-tree";
+import { DiffSidebar, type DiffViewMode } from "./diff-sidebar";
 import "./diff-viewer.css";
 
 const viewerRoot = document.querySelector<HTMLElement>("#viewer")!;
@@ -199,20 +202,12 @@ function summarize(files: FileDiff[]) {
   );
 }
 
-function statusForFile(file: FileDiff): string {
-  if (file.type === "new") return "A";
-  if (file.type === "deleted") return "D";
-  if (file.type.startsWith("rename")) return "R";
-  return "M";
+function gitStatusForFile(file: FileDiff): GitStatus {
+  if (file.type === "new") return "added";
+  if (file.type === "deleted") return "deleted";
+  if (file.type.startsWith("rename")) return "renamed";
+  return "modified";
 }
-
-function statusClass(letter: string): string {
-  if (letter === "A" || letter === "U") return "s-add";
-  if (letter === "D") return "s-del";
-  return "s-mod";
-}
-
-const DOC_ICON = `<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6"/><path d="M9 17h6"/></svg>`;
 
 function renderStats(stats: { files: number; additions: number; deletions: number }) {
   fileCountNode.textContent = String(stats.files);
@@ -298,13 +293,23 @@ async function waitForItemAtTop(itemId: string) {
 let activeItemId = "";
 let suppressScrollSync = false;
 
+let viewMode = readPref<DiffViewMode>("view", "tree");
+
+const sidebar = new DiffSidebar(
+  fileListNode,
+  (itemId) => {
+    suppressScrollSync = true;
+    setActiveItem(itemId);
+    void waitForItemAtTop(itemId).then(() => {
+      suppressScrollSync = false;
+    });
+  },
+  viewMode,
+);
+
 function setActiveItem(itemId: string, shouldScroll = true) {
   activeItemId = itemId;
-  for (const row of fileListNode.querySelectorAll<HTMLElement>(".file-row")) {
-    const active = row.dataset.itemId === itemId;
-    row.classList.toggle("active", active);
-    if (active && !shouldScroll) row.scrollIntoView({ block: "nearest" });
-  }
+  sidebar.setActive(itemId);
 
   if (shouldScroll && itemId) {
     viewer.scrollTo({ type: "item", id: itemId, align: "start", offset: 8, behavior: "smooth-auto" });
@@ -331,52 +336,15 @@ viewer.subscribeToScroll(() => {
   if (id && id !== activeItemId) setActiveItem(id, false);
 });
 
-function escapeHTML(value: string) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
-
 function renderFileList(files: FileDiff[], items: DiffItem[], focusId: string) {
-  fileListNode.replaceChildren();
-  const fragment = document.createDocumentFragment();
-
-  files.forEach((file, index) => {
-    const stats = fileStats(file);
-    const item = items[index];
-    const letter = statusForFile(file);
-    const cls = statusClass(letter);
-    const row = document.createElement("button");
-    row.type = "button";
-    row.className = "file-row";
-    row.dataset.itemId = item.id;
-    row.innerHTML = `
-      <span class="status ${cls}">${letter}</span>
-      <span class="doc ${cls}">${DOC_ICON}</span>
-      <span class="name" title="${escapeHTML(file.name)}">${escapeHTML(file.name)}</span>
-      <span class="delta added">+${stats.additions}</span>
-      <span class="delta deleted">-${stats.deletions}</span>
-    `;
-    fragment.append(row);
-  });
-
-  fileListNode.append(fragment);
+  const treeFiles: DiffTreeFile[] = files.map((file, index) => ({
+    path: file.name,
+    itemId: items[index].id,
+    status: gitStatusForFile(file),
+  }));
+  sidebar.render(treeFiles);
   setActiveItem(focusId || items[0]?.id || "", false);
 }
-
-fileListNode.addEventListener("click", (event) => {
-  const row = (event.target as HTMLElement).closest<HTMLElement>(".file-row");
-  if (!row?.dataset.itemId) return;
-  const itemId = row.dataset.itemId;
-  suppressScrollSync = true;
-  setActiveItem(itemId);
-  void waitForItemAtTop(itemId).then(() => {
-    suppressScrollSync = false;
-  });
-});
 
 async function setViewerItems(items: DiffItem[]) {
   if (!largeDiffMode) {
@@ -408,7 +376,7 @@ function clearDiff(message: string) {
   currentItems = [];
   largeDiffMode = false;
   viewer.setItems([]);
-  fileListNode.replaceChildren();
+  sidebar.clear();
   emptyState.classList.remove("hidden");
   fileCountNode.textContent = "0";
   statFilesNode.textContent = "0";
@@ -525,6 +493,55 @@ const zoomLevelNode = document.querySelector<HTMLElement>("#zoom-reset")!;
 const toggleStyleButton = document.querySelector<HTMLButtonElement>("#toggle-style")!;
 const collapseAllButton = document.querySelector<HTMLButtonElement>("#collapse-all")!;
 const expandAllButton = document.querySelector<HTMLButtonElement>("#expand-all")!;
+const toggleViewButton = document.querySelector<HTMLButtonElement>("#toggle-view")!;
+const railResize = document.querySelector<HTMLElement>("#rail-resize")!;
+
+const RAIL_MIN = 180;
+const RAIL_MAX = 520;
+
+function syncViewButton() {
+  toggleViewButton.dataset.mode = viewMode;
+  toggleViewButton.title = viewMode === "tree" ? "View as flat list" : "View as tree";
+}
+
+function toggleView() {
+  viewMode = viewMode === "tree" ? "flat" : "tree";
+  writePref("view", viewMode);
+  syncViewButton();
+  sidebar.setMode(viewMode);
+}
+
+function applyRailWidth(width: number) {
+  const clamped = Math.min(RAIL_MAX, Math.max(RAIL_MIN, Math.round(width)));
+  document.documentElement.style.setProperty("--rail-width", `${clamped}px`);
+  return clamped;
+}
+
+applyRailWidth(Number(readPref("rail", "260")) || 260);
+
+railResize.addEventListener("pointerdown", (event) => {
+  event.preventDefault();
+  railResize.setPointerCapture(event.pointerId);
+  railResize.classList.add("dragging");
+  document.body.classList.add("resizing");
+  const startX = event.clientX;
+  const startWidth = railResize.parentElement!.getBoundingClientRect().width;
+
+  const onMove = (move: PointerEvent) => {
+    applyRailWidth(startWidth + (move.clientX - startX));
+  };
+  const onUp = () => {
+    railResize.classList.remove("dragging");
+    document.body.classList.remove("resizing");
+    railResize.releasePointerCapture(event.pointerId);
+    railResize.removeEventListener("pointermove", onMove);
+    railResize.removeEventListener("pointerup", onUp);
+    const width = railResize.parentElement!.getBoundingClientRect().width;
+    writePref("rail", String(Math.round(width)));
+  };
+  railResize.addEventListener("pointermove", onMove);
+  railResize.addEventListener("pointerup", onUp);
+});
 
 function applyZoom() {
   document.documentElement.style.setProperty("--diff-zoom", String(zoom));
@@ -590,6 +607,7 @@ zoomInButton.addEventListener("click", () => setZoom(zoom + ZOOM_STEP));
 zoomOutButton.addEventListener("click", () => setZoom(zoom - ZOOM_STEP));
 zoomResetButton.addEventListener("click", () => setZoom(1));
 toggleStyleButton.addEventListener("click", toggleStyle);
+toggleViewButton.addEventListener("click", toggleView);
 collapseAllButton.addEventListener("click", () => setAllCollapsed(true));
 expandAllButton.addEventListener("click", () => setAllCollapsed(false));
 
@@ -618,4 +636,5 @@ window.muxy?.onDataChange?.(() => void loadGitDiff());
 
 applyZoom();
 syncStyleButton();
+syncViewButton();
 void loadGitDiff();

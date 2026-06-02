@@ -17,6 +17,10 @@
             <strong>Diff Files</strong>
             <span id="file-count" class="count-pill">0</span>
           </div>
+          <button id="toggle-view" class="tool-button" type="button" title="View as flat list" aria-label="Toggle tree or flat view">
+            <svg class="view-icon-tree" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h8"/><path d="M7 5v14"/><path d="M7 12h6"/><path d="M7 19h6"/></svg>
+            <svg class="view-icon-flat" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg>
+          </button>
         </header>
         <nav id="file-list" class="file-list" aria-label="Files in diff"></nav>
         <footer class="rail-footer">
@@ -24,6 +28,7 @@
           <div><span>Additions</span><strong id="stat-additions" class="added">+0</strong></div>
           <div><span>Deletions</span><strong id="stat-deletions" class="deleted">-0</strong></div>
         </footer>
+        <div id="rail-resize" class="rail-resize" role="separator" aria-orientation="vertical" aria-label="Resize sidebar" tabindex="0"></div>
       </aside>
 
       <section class="diff-workbench">

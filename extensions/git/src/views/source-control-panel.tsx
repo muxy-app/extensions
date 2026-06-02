@@ -82,7 +82,7 @@ export function SourceControlPanel({
             onPush={() => sync(["push"], "Pushed")}
           />
 
-          <main className="flex-1 overflow-auto">
+          <main className="flex min-h-0 flex-1 flex-col overflow-auto">
             <FileSection
               id="staged"
               title="Staged Changes"
