@@ -1,5 +1,5 @@
 import { defineConfig } from "vite";
-import { copyFileSync } from "node:fs";
+import { copyFileSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 
 const WORKER_SRC = resolve(
@@ -30,6 +30,11 @@ export default defineConfig({
       name: "copy-diffs-worker",
       writeBundle() {
         copyFileSync(WORKER_SRC, resolve(__dirname, "dist/diffs-worker.js"));
+        mkdirSync(resolve(__dirname, "dist/panel"), { recursive: true });
+        copyFileSync(
+          resolve(__dirname, "panel/diff-viewer.html"),
+          resolve(__dirname, "dist/panel/diff-viewer.html"),
+        );
       },
     },
   ],

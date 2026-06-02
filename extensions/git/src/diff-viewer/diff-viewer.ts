@@ -10,6 +10,8 @@ import "./diff-viewer.css";
 
 const viewerRoot = document.querySelector<HTMLElement>("#viewer")!;
 const emptyState = document.querySelector<HTMLElement>("#empty-state")!;
+const loadingState = document.querySelector<HTMLElement>("#loading-state")!;
+const loadingLabel = document.querySelector<HTMLElement>("#loading-label")!;
 const fileListNode = document.querySelector<HTMLElement>("#file-list")!;
 const sourceLabelNode = document.querySelector<HTMLElement>("#source-label")!;
 const summaryNode = document.querySelector<HTMLElement>("#summary")!;
@@ -30,6 +32,29 @@ const LARGE_DIFF_FILE_LIMIT = 80;
 const LARGE_DIFF_LINE_LIMIT = 4500;
 const LARGE_DIFF_BYTE_LIMIT = 1_500_000;
 const LARGE_DIFF_ITEM_CHUNK_SIZE = 24;
+
+const ZOOM_MIN = 0.7;
+const ZOOM_MAX = 1.8;
+const ZOOM_STEP = 0.1;
+
+function readPref<T extends string>(key: string, fallback: T): T {
+  try {
+    return (localStorage.getItem(`muxy.git.diff.${key}`) as T) || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writePref(key: string, value: string) {
+  try {
+    localStorage.setItem(`muxy.git.diff.${key}`, value);
+  } catch {
+    void 0;
+  }
+}
+
+let diffStyle: "split" | "unified" = readPref<"split" | "unified">("style", "split");
+let zoom = Number(readPref("zoom", "1")) || 1;
 
 const THEME_COLORS = {
   foreground: "#d5d0c8",
@@ -73,7 +98,7 @@ function resolveThemeType(): "light" | "dark" {
 function createWorkerPool() {
   if (typeof Worker === "undefined") return undefined;
 
-  const workerUrl = new URL("../dist/diffs-worker.js", document.baseURI);
+  const workerUrl = new URL("../diffs-worker.js", document.baseURI);
   const hardwareConcurrency = navigator.hardwareConcurrency || 4;
   const poolSize = Math.max(2, Math.min(4, Math.floor(hardwareConcurrency / 2)));
 
@@ -104,23 +129,48 @@ void workerPool?.initialize().catch((error) => {
   console.warn("Diff worker pool failed to initialize.", error);
 });
 
-const viewer = new CodeView(
-  {
-    diffStyle: "split",
-    diffIndicators: "classic",
-    hunkSeparators: "metadata",
-    lineDiffType: "word",
-    maxLineDiffLength: 900,
-    tokenizeMaxLineLength: 800,
-    tokenizeMaxLength: 450000,
-    overflow: "wrap",
-    stickyHeaders: true,
+const CHEVRON_SVG = `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>`;
+
+const HEADER_CSS = [
+  `[data-diffs-header]{cursor:pointer;box-sizing:border-box;height:36px;padding:0 12px;border-bottom:1px solid var(--diffs-bg-separator);font-size:13px;line-height:36px;}`,
+  `[data-diffs-header]:hover{background:var(--diffs-bg-buffer);}`,
+  `[data-diffs-header] [data-title]{cursor:pointer;}`,
+].join("");
+
+function headerPrefix(file: { name: string; prevName?: string }): HTMLElement {
+  const item = currentItems.find(
+    (i) => i.fileDiff.name === file.name && i.fileDiff.prevName === file.prevName,
+  );
+  const span = document.createElement("span");
+  span.className = "file-chevron";
+  span.dataset.collapsed = item?.collapsed ? "true" : "false";
+  span.innerHTML = CHEVRON_SVG;
+  return span;
+}
+
+function viewerOptions() {
+  return {
+    diffStyle,
+    diffIndicators: "classic" as const,
+    hunkSeparators: "metadata" as const,
+    lineDiffType: largeDiffMode ? ("none" as const) : ("word" as const),
+    maxLineDiffLength: largeDiffMode ? 120 : 900,
+    tokenizeMaxLineLength: largeDiffMode ? 300 : 800,
+    tokenizeMaxLength: largeDiffMode ? 120000 : 450000,
+    overflow: largeDiffMode ? ("scroll" as const) : ("wrap" as const),
+    stickyHeaders: false,
     pointerEventsOnScroll: true,
     theme: { dark: "muxy-diff", light: "muxy-diff" },
     themeType: resolveThemeType(),
-    itemMetrics: { lineHeight: 20, diffHeaderHeight: 44, spacing: 8 },
-    layout: { paddingTop: 10, paddingBottom: 16, gap: 8 },
-  },
+    itemMetrics: { lineHeight: Math.round(20 * zoom), diffHeaderHeight: 36, spacing: 8 },
+    layout: { paddingTop: 0, paddingBottom: 16, gap: 0 },
+    renderHeaderPrefix: headerPrefix as never,
+    unsafeCSS: HEADER_CSS,
+  };
+}
+
+const viewer = new CodeView(
+  viewerOptions(),
   workerPool,
 );
 
@@ -193,22 +243,8 @@ function shouldUseLargeDiffMode(files: FileDiff[], patch: string) {
   );
 }
 
-function currentViewerOptions() {
-  return {
-    theme: { dark: "muxy-diff", light: "muxy-diff" },
-    themeType: resolveThemeType(),
-    diffStyle: "split" as const,
-    overflow: largeDiffMode ? ("scroll" as const) : ("wrap" as const),
-    stickyHeaders: !largeDiffMode,
-    lineDiffType: largeDiffMode ? ("none" as const) : ("word" as const),
-    maxLineDiffLength: largeDiffMode ? 120 : 900,
-    tokenizeMaxLineLength: largeDiffMode ? 300 : 800,
-    tokenizeMaxLength: largeDiffMode ? 120000 : 450000,
-  };
-}
-
 async function applyViewerOptions() {
-  const options = currentViewerOptions();
+  const options = viewerOptions();
   viewer.setOptions(options);
 
   try {
@@ -297,7 +333,18 @@ async function setViewerItems(items: DiffItem[]) {
   }
 }
 
+function showLoading(label: string) {
+  loadingLabel.textContent = label;
+  loadingState.classList.remove("hidden");
+  emptyState.classList.add("hidden");
+}
+
+function hideLoading() {
+  loadingState.classList.add("hidden");
+}
+
 function clearDiff(message: string) {
+  hideLoading();
   currentItems = [];
   largeDiffMode = false;
   viewer.setItems([]);
@@ -337,6 +384,7 @@ async function renderPatch(patch: string, focusPath: string) {
 
   await applyViewerOptions();
   await setViewerItems(currentItems);
+  hideLoading();
   emptyState.classList.add("hidden");
   renderFileList(files, currentItems, focusId);
   renderStats(summarize(files));
@@ -348,7 +396,13 @@ async function renderPatch(patch: string, focusPath: string) {
 }
 
 function diffData() {
-  return (window.muxy?.data ?? {}) as { focusPath?: string };
+  return (window.muxy?.data ?? {}) as {
+    focusPath?: string;
+    source?: "pr";
+    prNumber?: number;
+    prTitle?: string;
+    cwd?: string;
+  };
 }
 
 async function loadGitDiff() {
@@ -357,11 +411,31 @@ async function loadGitDiff() {
     return;
   }
 
+  const data = diffData();
   summaryNode.textContent = "Loading diff…";
-  sourceLabelNode.textContent = "Working Tree";
 
-  const base = ["git", "diff", "--no-ext-diff", "--no-color"];
   try {
+    if (data.source === "pr" && data.prNumber) {
+      sourceLabelNode.textContent = data.prTitle
+        ? `PR #${data.prNumber} · ${data.prTitle}`
+        : `PR #${data.prNumber}`;
+      showLoading(`Loading diff for PR #${data.prNumber}…`);
+      const result = await window.muxy.exec(
+        ["gh", "pr", "diff", String(data.prNumber), "--color", "never"],
+        { timeoutMs: 30000, cwd: data.cwd },
+      );
+      if (result.exitCode !== 0 || !result.stdout.trim()) {
+        const reason = (result.stderr || "").trim().split("\n")[0];
+        clearDiff(reason || `gh pr diff exited with ${result.exitCode}`);
+        return;
+      }
+      await renderPatch(result.stdout, data.focusPath ?? "");
+      return;
+    }
+
+    sourceLabelNode.textContent = "Working Tree";
+    showLoading("Loading changes…");
+    const base = ["git", "diff", "--no-ext-diff", "--no-color"];
     let result = await window.muxy.exec([...base, "HEAD"], { timeoutMs: 15000 });
     if (result.exitCode !== 0) {
       result = await window.muxy.exec(base, { timeoutMs: 15000 });
@@ -370,17 +444,110 @@ async function loadGitDiff() {
       throw new Error(result.stderr || `git diff exited with ${result.exitCode}`);
     }
 
-    await renderPatch(result.stdout, diffData().focusPath ?? "");
+    await renderPatch(result.stdout, data.focusPath ?? "");
   } catch (error) {
     clearDiff(error instanceof Error ? error.message : String(error));
   }
 }
 
+const zoomInButton = document.querySelector<HTMLButtonElement>("#zoom-in")!;
+const zoomOutButton = document.querySelector<HTMLButtonElement>("#zoom-out")!;
+const zoomResetButton = document.querySelector<HTMLButtonElement>("#zoom-reset")!;
+const zoomLevelNode = document.querySelector<HTMLElement>("#zoom-reset")!;
+const toggleStyleButton = document.querySelector<HTMLButtonElement>("#toggle-style")!;
+const collapseAllButton = document.querySelector<HTMLButtonElement>("#collapse-all")!;
+const expandAllButton = document.querySelector<HTMLButtonElement>("#expand-all")!;
+
+function applyZoom() {
+  document.documentElement.style.setProperty("--diff-zoom", String(zoom));
+  zoomLevelNode.textContent = `${Math.round(zoom * 100)}%`;
+  zoomOutButton.disabled = zoom <= ZOOM_MIN + 1e-6;
+  zoomInButton.disabled = zoom >= ZOOM_MAX - 1e-6;
+}
+
+function setZoom(next: number) {
+  zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(next * 100) / 100));
+  writePref("zoom", String(zoom));
+  applyZoom();
+  if (currentItems.length) void applyViewerOptions();
+}
+
+function syncStyleButton() {
+  toggleStyleButton.classList.toggle("active", diffStyle === "split");
+  toggleStyleButton.title = diffStyle === "split" ? "Switch to unified view" : "Switch to split view";
+}
+
+function toggleStyle() {
+  diffStyle = diffStyle === "split" ? "unified" : "split";
+  writePref("style", diffStyle);
+  syncStyleButton();
+  if (currentItems.length) void applyViewerOptions();
+}
+
+function setAllCollapsed(collapsed: boolean) {
+  if (!currentItems.length) return;
+  version += 1;
+  currentItems = currentItems.map((item) => ({ ...item, collapsed, version }));
+  viewer.setItems(currentItems);
+}
+
+function toggleItemCollapsed(itemId: string) {
+  const index = currentItems.findIndex((item) => item.id === itemId);
+  if (index < 0) return;
+  version += 1;
+  const next = {
+    ...currentItems[index],
+    collapsed: !currentItems[index].collapsed,
+    version,
+  };
+  currentItems[index] = next;
+  viewer.updateItem(next);
+}
+
+viewerRoot.addEventListener("click", (event) => {
+  const header = event
+    .composedPath()
+    .find(
+      (node): node is HTMLElement =>
+        node instanceof HTMLElement && node.hasAttribute("data-diffs-header"),
+    );
+  if (!header) return;
+  const title = header.querySelector<HTMLElement>("[data-title]")?.textContent?.trim();
+  if (!title) return;
+  const item = currentItems.find((i) => i.fileDiff.name === title || i.fileDiff.prevName === title);
+  if (item) toggleItemCollapsed(item.id);
+});
+
+zoomInButton.addEventListener("click", () => setZoom(zoom + ZOOM_STEP));
+zoomOutButton.addEventListener("click", () => setZoom(zoom - ZOOM_STEP));
+zoomResetButton.addEventListener("click", () => setZoom(1));
+toggleStyleButton.addEventListener("click", toggleStyle);
+collapseAllButton.addEventListener("click", () => setAllCollapsed(true));
+expandAllButton.addEventListener("click", () => setAllCollapsed(false));
+
+window.addEventListener("keydown", (event) => {
+  if (!(event.metaKey || event.ctrlKey)) return;
+  if (event.key === "=" || event.key === "+") {
+    event.preventDefault();
+    setZoom(zoom + ZOOM_STEP);
+  } else if (event.key === "-" || event.key === "_") {
+    event.preventDefault();
+    setZoom(zoom - ZOOM_STEP);
+  } else if (event.key === "0") {
+    event.preventDefault();
+    setZoom(1);
+  }
+});
+
 reloadButton.addEventListener("click", () => void loadGitDiff());
 
 window.muxy?.onThemeChange?.(() => {
-  viewer.setOptions({ themeType: resolveThemeType() });
+  viewer.setOptions(viewerOptions());
   viewer.onThemeChange();
 });
 
+window.muxy?.onDataChange?.(() => void loadGitDiff());
+
+applyZoom();
+syncStyleButton();
 void loadGitDiff();

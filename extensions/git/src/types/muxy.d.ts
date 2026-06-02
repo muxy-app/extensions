@@ -25,7 +25,15 @@ interface MuxyToastOptions {
 
 interface MuxyOpenExtensionTab {
   kind: "extensionWebView";
-  extension: { id: string; tabType: string; data?: Record<string, unknown> };
+  extension: { id: string; tabType: string; singleton?: boolean; data?: Record<string, unknown> };
+}
+
+interface MuxyWorktree {
+  id: string;
+  name: string;
+  path: string;
+  branch?: string | null;
+  isPrimary: boolean;
 }
 
 interface MuxyTheme {
@@ -38,9 +46,21 @@ interface MuxyBridge {
   data?: Record<string, unknown>;
   theme?: MuxyTheme;
   onThemeChange?(handler: (theme: MuxyTheme) => void): void;
+  onDataChange?(handler: (data: Record<string, unknown>) => void): void;
   projects: { list(): Promise<MuxyProject[]> };
+  worktrees: {
+    list(project?: string): Promise<MuxyWorktree[]>;
+    switchTo(identifier: string, project?: string): Promise<void>;
+    refresh(project?: string): Promise<void>;
+  };
   tabs: { open(target: MuxyOpenExtensionTab): Promise<void> };
+  panels: {
+    open(panelID: string, data?: Record<string, unknown>): Promise<void>;
+    toggle(panelID: string, data?: Record<string, unknown>): Promise<void>;
+    close(panelID: string): Promise<void>;
+  };
   exec(argv: string[], options?: MuxyExecOptions): Promise<MuxyExecResult>;
+  exec(options: { shell: string; cwd?: string; timeoutMs?: number }): Promise<MuxyExecResult>;
   toast(opts: MuxyToastOptions): Promise<void>;
   notifications: {
     notify(opts: { title: string; body: string }): Promise<void>;

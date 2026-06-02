@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { PanelRight, RotateCw } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { RotateCw, X } from "lucide-react";
 import type { GitResult } from "@/lib/git";
 import type { BranchList } from "@/lib/git-branches";
 import { ICON_SIZE, ICON_STROKE } from "@/lib/icons";
@@ -12,8 +12,9 @@ interface BranchBarProps {
   loadBranches: () => Promise<BranchList>;
   onCheckout: (name: string, create: boolean) => Promise<GitResult>;
   onDeleteBranch: (name: string) => Promise<GitResult>;
-  onToggleSidebar: () => void;
   onRefresh: () => Promise<unknown>;
+  onClose: () => void;
+  leading?: ReactNode;
 }
 
 export function BranchBar({
@@ -23,8 +24,9 @@ export function BranchBar({
   loadBranches,
   onCheckout,
   onDeleteBranch,
-  onToggleSidebar,
   onRefresh,
+  onClose,
+  leading,
 }: BranchBarProps) {
   const [refreshing, set_refreshing] = useState(false);
   const tracking = [ahead && `↑${ahead}`, behind && `↓${behind}`].filter(Boolean).join(" ");
@@ -40,7 +42,8 @@ export function BranchBar({
   }
 
   return (
-    <header className="flex h-[33px] flex-shrink-0 items-center gap-2 border-b border-border px-2">
+    <header className="panel-topbar flex items-center gap-2 px-2">
+      {leading}
       <BranchPicker
         current={branch}
         tracking={tracking}
@@ -49,14 +52,6 @@ export function BranchBar({
         onDeleteBranch={onDeleteBranch}
       />
       <div className="ml-auto flex flex-shrink-0">
-        <button
-          type="button"
-          title="Toggle sidebar"
-          onClick={onToggleSidebar}
-          className="flex items-center justify-center p-1 text-muted-foreground outline-none transition-colors hover:text-foreground"
-        >
-          <PanelRight size={ICON_SIZE.bar} strokeWidth={ICON_STROKE} />
-        </button>
         <button
           type="button"
           title="Refresh"
@@ -69,6 +64,14 @@ export function BranchBar({
             size={ICON_SIZE.bar}
             strokeWidth={ICON_STROKE}
           />
+        </button>
+        <button
+          type="button"
+          title="Close panel"
+          onClick={onClose}
+          className="flex items-center justify-center p-1 text-muted-foreground outline-none transition-colors hover:text-foreground"
+        >
+          <X size={ICON_SIZE.bar} strokeWidth={ICON_STROKE} />
         </button>
       </div>
     </header>

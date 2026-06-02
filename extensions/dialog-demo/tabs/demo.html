@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dialog Demo</title>
+  <style>
+    :root { --s5: 10px; --s6: 12px; --s7: 16px; --s8: 20px; --radius: 6px; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      background: var(--muxy-background);
+      color: var(--muxy-foreground);
+      font: 13px -apple-system, system-ui, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .card {
+      display: flex;
+      flex-direction: column;
+      gap: var(--s6);
+      padding: var(--s8);
+      max-width: 360px;
+    }
+    h1 { font-size: 14px; font-weight: 600; margin: 0; }
+    p { margin: 0; color: var(--muxy-foreground-muted); font-size: 12px; }
+    button {
+      appearance: none;
+      border: 1px solid var(--muxy-border);
+      background: var(--muxy-surface);
+      color: var(--muxy-foreground);
+      border-radius: var(--radius);
+      padding: var(--s5) var(--s6);
+      font: inherit;
+      cursor: pointer;
+      text-align: left;
+    }
+    button:hover { background: var(--muxy-hover); border-color: var(--muxy-accent); }
+    code {
+      font-family: "SF Mono", Menlo, monospace;
+      color: var(--muxy-accent);
+    }
+    #out {
+      margin-top: var(--s5);
+      font-family: "SF Mono", Menlo, monospace;
+      font-size: 11px;
+      color: var(--muxy-foreground-muted);
+      min-height: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Native dialogs</h1>
+    <p>These come straight from <code>muxy.dialog</code> in this tab.</p>
+    <button id="confirm">confirm — three options, focus "Keep"</button>
+    <button id="destructive">confirm — destructive (critical)</button>
+    <button id="alert">alert — single OK</button>
+    <div id="out"></div>
+  </div>
+  <script>
+    const out = document.getElementById('out');
+    const log = (text) => { out.textContent = text; };
+
+    document.getElementById('confirm').addEventListener('click', async () => {
+      const choice = await muxy.dialog.confirm({
+        title: 'Save changes?',
+        message: 'You have unsaved edits in this view.',
+        buttons: ['Discard', 'Keep editing'],
+        default: 'Keep editing',
+        cancel: 'Discard',
+      });
+      log('confirm → ' + (choice === null ? 'null (cancelled)' : JSON.stringify(choice)));
+    });
+
+    document.getElementById('destructive').addEventListener('click', async () => {
+      const choice = await muxy.dialog.confirm({
+        title: 'Delete branch?',
+        message: 'This permanently removes feature/login and cannot be undone.',
+        buttons: ['Delete', 'Cancel'],
+        default: 'Cancel',
+        cancel: 'Cancel',
+        style: 'critical',
+      });
+      log('confirm → ' + (choice === null ? 'null (cancelled)' : JSON.stringify(choice)));
+    });
+
+    document.getElementById('alert').addEventListener('click', async () => {
+      await muxy.dialog.alert({
+        title: 'Build finished',
+        message: 'All 42 tests passed.',
+        style: 'info',
+      });
+      log('alert → dismissed');
+    });
+  </script>
+</body>
+</html>

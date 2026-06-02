@@ -17,7 +17,9 @@
       "commands:exec",
       "panels:write",
       "tabs:write",
-      "notifications:write"
+      "notifications:write",
+      "worktrees:read",
+      "worktrees:write"
     ],
     "events": [
       "project.switched",
@@ -29,7 +31,8 @@
         "title": "Source Control",
         "entry": "panel/index.html",
         "position": "right",
-        "mode": "pinned"
+        "mode": "pinned",
+        "hideTopbar": true
       }
     ],
     "tabTypes": [

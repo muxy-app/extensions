@@ -149,6 +149,27 @@ b {
   color: var(--text);
 }
 
+.tool-button.active {
+  background: var(--panel-2);
+  color: var(--text);
+}
+
+.tool-button.zoom-level {
+  width: auto;
+  min-width: 38px;
+  padding: 0 6px;
+  font-family: var(--mono-font);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 16px;
+  margin: 0 2px;
+  background: var(--line);
+}
+
 .file-list {
   min-height: 0;
   overflow: auto;
@@ -361,11 +382,49 @@ b {
   display: none;
 }
 
+.loading-state {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 28px;
+  color: var(--dim);
+  font-size: 13px;
+}
+
+.loading-state.hidden {
+  display: none;
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--line-strong);
+  border-top-color: var(--muted);
+  border-radius: 50%;
+  animation: spinner-rotate 0.7s linear infinite;
+}
+
+@keyframes spinner-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 1.6s;
+  }
+}
+
 diffs-container {
   --diffs-font-family: var(--mono-font);
   --diffs-header-font-family: var(--ui-font);
-  --diffs-font-size: 13px;
-  --diffs-line-height: 20px;
+  --diffs-font-size: calc(13px * var(--diff-zoom, 1));
+  --diffs-line-height: calc(20px * var(--diff-zoom, 1));
   --diffs-font-features: "calt" 1, "liga" 1;
   --diffs-light-bg: var(--bg);
   --diffs-dark-bg: var(--bg);
@@ -433,5 +492,23 @@ diffs-container {
   .file-rail {
     border-right: 0;
     border-bottom: 1px solid var(--line);
+  }
+}
+
+.file-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  transition: transform 0.12s ease;
+}
+
+.file-chevron[data-collapsed="true"] {
+  transform: rotate(-90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .file-chevron {
+    transition: none;
   }
 }

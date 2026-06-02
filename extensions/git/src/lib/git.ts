@@ -16,8 +16,38 @@ export function open_diff(focusPath: string): void {
   try {
     void muxy.tabs.open({
       kind: "extensionWebView",
-      extension: { id: muxy.extensionID, tabType: "diff-viewer", data: { focusPath } },
+      extension: {
+        id: muxy.extensionID,
+        tabType: "diff-viewer",
+        singleton: true,
+        data: { focusPath },
+      },
     });
+  } catch {
+    void 0;
+  }
+}
+
+export async function open_pr_diff(prNumber: number, prTitle: string): Promise<void> {
+  try {
+    const cwd = await resolve_cwd();
+    void muxy.tabs.open({
+      kind: "extensionWebView",
+      extension: {
+        id: muxy.extensionID,
+        tabType: "diff-viewer",
+        singleton: true,
+        data: { source: "pr", prNumber, prTitle, cwd },
+      },
+    });
+  } catch {
+    void 0;
+  }
+}
+
+export function close_panel(): void {
+  try {
+    void muxy.panels.close("scm");
   } catch {
     void 0;
   }
