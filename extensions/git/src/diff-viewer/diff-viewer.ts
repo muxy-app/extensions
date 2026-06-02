@@ -266,15 +266,70 @@ function nextFrame() {
   return new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 }
 
+function itemOffsetFromTop(itemId: string): number | undefined {
+  const rendered = viewer.getRenderedItems().find((item) => item.id === itemId);
+  if (!rendered) return undefined;
+  return rendered.element.getBoundingClientRect().top - viewerRoot.getBoundingClientRect().top;
+}
+
+async function scrollToItemWhenSettled(itemId: string) {
+  suppressScrollSync = true;
+  let alignedFrames = 0;
+  for (let attempt = 0; attempt < 60 && alignedFrames < 3; attempt += 1) {
+    viewer.scrollTo({ type: "item", id: itemId, align: "start", offset: 8, behavior: "instant" });
+    await nextFrame();
+    const offset = itemOffsetFromTop(itemId);
+    const aligned = offset !== undefined && Math.abs(offset - 8) <= 2;
+    alignedFrames = aligned ? alignedFrames + 1 : 0;
+  }
+  suppressScrollSync = false;
+}
+
+async function waitForItemAtTop(itemId: string) {
+  let alignedFrames = 0;
+  for (let attempt = 0; attempt < 90 && alignedFrames < 3; attempt += 1) {
+    await nextFrame();
+    const offset = itemOffsetFromTop(itemId);
+    const aligned = offset !== undefined && Math.abs(offset - 8) <= 4;
+    alignedFrames = aligned ? alignedFrames + 1 : 0;
+  }
+}
+
+let activeItemId = "";
+let suppressScrollSync = false;
+
 function setActiveItem(itemId: string, shouldScroll = true) {
+  activeItemId = itemId;
   for (const row of fileListNode.querySelectorAll<HTMLElement>(".file-row")) {
-    row.classList.toggle("active", row.dataset.itemId === itemId);
+    const active = row.dataset.itemId === itemId;
+    row.classList.toggle("active", active);
+    if (active && !shouldScroll) row.scrollIntoView({ block: "nearest" });
   }
 
   if (shouldScroll && itemId) {
     viewer.scrollTo({ type: "item", id: itemId, align: "start", offset: 8, behavior: "smooth-auto" });
   }
 }
+
+function topVisibleItemId(): string {
+  const viewportTop = viewerRoot.getBoundingClientRect().top;
+  let bestId = "";
+  let bestTop = -Infinity;
+  for (const item of viewer.getRenderedItems()) {
+    const top = item.element.getBoundingClientRect().top - viewportTop;
+    if (top <= 12 && top > bestTop) {
+      bestTop = top;
+      bestId = item.id;
+    }
+  }
+  return bestId;
+}
+
+viewer.subscribeToScroll(() => {
+  if (suppressScrollSync) return;
+  const id = topVisibleItemId();
+  if (id && id !== activeItemId) setActiveItem(id, false);
+});
 
 function escapeHTML(value: string) {
   return String(value)
@@ -315,7 +370,12 @@ function renderFileList(files: FileDiff[], items: DiffItem[], focusId: string) {
 fileListNode.addEventListener("click", (event) => {
   const row = (event.target as HTMLElement).closest<HTMLElement>(".file-row");
   if (!row?.dataset.itemId) return;
-  setActiveItem(row.dataset.itemId);
+  const itemId = row.dataset.itemId;
+  suppressScrollSync = true;
+  setActiveItem(itemId);
+  void waitForItemAtTop(itemId).then(() => {
+    suppressScrollSync = false;
+  });
 });
 
 async function setViewerItems(items: DiffItem[]) {
@@ -357,6 +417,14 @@ function clearDiff(message: string) {
   summaryNode.textContent = message;
 }
 
+function findFocusIndex(files: FileDiff[], focusPath: string): number {
+  const matches = (name: string) =>
+    name === focusPath || name.endsWith(`/${focusPath}`) || focusPath.endsWith(`/${name}`);
+  const exact = files.findIndex((file) => file.name === focusPath);
+  if (exact >= 0) return exact;
+  return files.findIndex((file) => matches(file.name));
+}
+
 async function renderPatch(patch: string, focusPath: string) {
   const trimmed = patch.trim();
   if (!trimmed) {
@@ -379,7 +447,7 @@ async function renderPatch(patch: string, focusPath: string) {
     version,
   }));
 
-  const focusIndex = focusPath ? files.findIndex((file) => file.name === focusPath) : -1;
+  const focusIndex = focusPath ? findFocusIndex(files, focusPath) : -1;
   const focusId = focusIndex >= 0 ? currentItems[focusIndex].id : "";
 
   await applyViewerOptions();
@@ -390,8 +458,8 @@ async function renderPatch(patch: string, focusPath: string) {
   renderStats(summarize(files));
 
   if (focusId) {
-    await nextFrame();
-    setActiveItem(focusId, true);
+    await scrollToItemWhenSettled(focusId);
+    setActiveItem(focusId, false);
   }
 }
 

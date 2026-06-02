@@ -27,23 +27,27 @@ export function FileRow({ entry, staged, onAction, onOpen }: FileRowProps) {
   const color = STATUS_COLOR[entry.label] ?? "text-muted-foreground";
 
   return (
-    <li className="group flex h-[34px] items-center gap-2 pl-2.5 pr-2.5 hover:bg-accent">
+    <li
+      className="group flex h-[34px] cursor-pointer items-center gap-2 pl-2.5 pr-2.5 hover:bg-accent"
+      onClick={() => onOpen(entry.path)}
+    >
       <StatusBadge label={entry.label} />
       <FileText className={cn("shrink-0", color)} size={11} strokeWidth={1.5} />
-      <button
-        type="button"
+      <span
         className="min-w-0 flex-1 truncate text-left text-[12px] font-medium text-foreground"
         title={entry.path}
-        onClick={() => onOpen(entry.path)}
       >
         {middle_truncate(entry.path)}
-      </button>
+      </span>
       <Button
         variant="ghost"
         size="icon-sm"
         className="hidden size-[18px] shrink-0 group-hover:flex"
         title={staged ? "Unstage" : "Stage"}
-        onClick={() => onAction(entry.path)}
+        onClick={(e) => {
+          e.stopPropagation();
+          onAction(entry.path);
+        }}
       >
         <Action size={ICON_SIZE.row} strokeWidth={ICON_STROKE} />
       </Button>
