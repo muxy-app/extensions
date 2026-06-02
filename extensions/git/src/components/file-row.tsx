@@ -1,0 +1,53 @@
+import { FileText, Minus, Plus } from "lucide-react";
+import type { FileEntry } from "@/lib/git-status";
+import { middle_truncate } from "@/lib/file-meta";
+import { ICON_SIZE, ICON_STROKE } from "@/lib/icons";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { StatusBadge } from "./status-badge";
+import { DiffStat } from "./diff-stat";
+
+interface FileRowProps {
+  entry: FileEntry;
+  staged: boolean;
+  onAction: (path: string) => void;
+  onOpen: (path: string) => void;
+}
+
+const STATUS_COLOR: Record<string, string> = {
+  A: "text-diff-add",
+  D: "text-diff-remove",
+  M: "text-primary",
+  R: "text-primary",
+  U: "text-diff-add",
+};
+
+export function FileRow({ entry, staged, onAction, onOpen }: FileRowProps) {
+  const Action = staged ? Minus : Plus;
+  const color = STATUS_COLOR[entry.label] ?? "text-muted-foreground";
+
+  return (
+    <li className="group flex h-[34px] items-center gap-2 pl-2.5 pr-2.5 hover:bg-accent">
+      <StatusBadge label={entry.label} />
+      <FileText className={cn("shrink-0", color)} size={11} strokeWidth={1.5} />
+      <button
+        type="button"
+        className="min-w-0 flex-1 truncate text-left text-[12px] font-medium text-foreground"
+        title={entry.path}
+        onClick={() => onOpen(entry.path)}
+      >
+        {middle_truncate(entry.path)}
+      </button>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        className="hidden size-[18px] shrink-0 group-hover:flex"
+        title={staged ? "Unstage" : "Stage"}
+        onClick={() => onAction(entry.path)}
+      >
+        <Action size={ICON_SIZE.row} strokeWidth={ICON_STROKE} />
+      </Button>
+      <DiffStat added={entry.added} removed={entry.removed} />
+    </li>
+  );
+}

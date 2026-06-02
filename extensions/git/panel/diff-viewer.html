@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Diff Viewer</title>
+    <link rel="stylesheet" href="../dist/diff-viewer.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="file-rail" aria-label="Changed files">
+        <header class="rail-header">
+          <div class="rail-title">
+            <span class="rail-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18"/><path d="M3 12h18"/><path d="M3 19h18"/></svg>
+            </span>
+            <strong>Diff Files</strong>
+            <span id="file-count" class="count-pill">0</span>
+          </div>
+        </header>
+        <nav id="file-list" class="file-list" aria-label="Files in diff"></nav>
+        <footer class="rail-footer">
+          <div><span>Files</span><strong id="stat-files">0</strong></div>
+          <div><span>Additions</span><strong id="stat-additions" class="added">+0</strong></div>
+          <div><span>Deletions</span><strong id="stat-deletions" class="deleted">-0</strong></div>
+        </footer>
+      </aside>
+
+      <section class="diff-workbench">
+        <header class="topbar">
+          <div class="diff-title">
+            <span class="diff-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6"/><path d="M9 17h6"/></svg>
+            </span>
+            <strong id="source-label">Working Tree</strong>
+            <span id="summary" class="summary">No changes</span>
+          </div>
+          <div class="toolbar-actions">
+            <button id="reload" class="tool-button" type="button" title="Reload diff" aria-label="Refresh diff">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+            </button>
+          </div>
+        </header>
+
+        <section class="viewer-panel" aria-label="Rendered diff">
+          <div id="empty-state" class="empty-state">
+            <strong>No Changes</strong>
+            <span>Nothing to compare against HEAD.</span>
+          </div>
+          <div id="viewer"></div>
+        </section>
+      </section>
+    </main>
+    <script src="../dist/diff-viewer.js"></script>
+  </body>
+</html>

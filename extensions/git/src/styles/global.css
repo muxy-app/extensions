@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+@plugin "tailwindcss-animate";
+
+@theme inline {
+  --color-background: var(--muxy-background);
+  --color-foreground: var(--muxy-foreground);
+  --color-muted: var(--muxy-surface);
+  --color-muted-foreground: var(--muxy-foreground-muted);
+  --color-card: var(--muxy-background);
+  --color-card-foreground: var(--muxy-foreground);
+  --color-popover: var(--muxy-background);
+  --color-popover-foreground: var(--muxy-foreground);
+  --color-primary: var(--muxy-accent);
+  --color-primary-foreground: var(--muxy-background);
+  --color-secondary: var(--muxy-surface);
+  --color-secondary-foreground: var(--muxy-foreground);
+  --color-accent: var(--muxy-hover);
+  --color-accent-foreground: var(--muxy-foreground);
+  --color-border: var(--muxy-border);
+  --color-input: var(--muxy-border);
+  --color-ring: var(--muxy-accent);
+
+  --color-diff-add: var(--muxy-diff-add);
+  --color-diff-remove: var(--muxy-diff-remove);
+  --color-diff-hunk: var(--muxy-diff-hunk);
+
+  --radius: 6px;
+}
+
+html,
+body,
+#root {
+  height: 100vh;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+  font: 13px -apple-system, "SF Pro", system-ui, sans-serif;
+  background: var(--muxy-background);
+  color: var(--muxy-foreground);
+}
