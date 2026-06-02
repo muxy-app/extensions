@@ -92,7 +92,8 @@ body.resizing {
 
 .rail-header,
 .topbar {
-  height: 32px;
+  box-sizing: content-box;
+  height: var(--muxy-topbar-height, 32px);
   display: flex;
   align-items: center;
   justify-content: space-between;

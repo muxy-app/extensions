@@ -39,6 +39,7 @@ const LARGE_DIFF_ITEM_CHUNK_SIZE = 24;
 const ZOOM_MIN = 0.7;
 const ZOOM_MAX = 1.8;
 const ZOOM_STEP = 0.1;
+const SELECTED_FILE_TOP_OFFSET = 0;
 
 function readPref<T extends string>(key: string, fallback: T): T {
   try {
@@ -165,7 +166,7 @@ function viewerOptions() {
     pointerEventsOnScroll: true,
     theme: { dark: "muxy-diff", light: "muxy-diff" },
     themeType: resolveThemeType(),
-    itemMetrics: { lineHeight: Math.round(20 * zoom), diffHeaderHeight: 36, spacing: 8 },
+    itemMetrics: { lineHeight: Math.round(20 * zoom), diffHeaderHeight: 36, spacing: 8, paddingBottom: 0 },
     layout: { paddingTop: 0, paddingBottom: 16, gap: 0 },
     renderHeaderPrefix: headerPrefix as never,
     unsafeCSS: HEADER_CSS,
@@ -269,15 +270,18 @@ function itemOffsetFromTop(itemId: string): number | undefined {
 
 async function scrollToItemWhenSettled(itemId: string) {
   suppressScrollSync = true;
-  let alignedFrames = 0;
-  for (let attempt = 0; attempt < 60 && alignedFrames < 3; attempt += 1) {
-    viewer.scrollTo({ type: "item", id: itemId, align: "start", offset: 8, behavior: "instant" });
-    await nextFrame();
-    const offset = itemOffsetFromTop(itemId);
-    const aligned = offset !== undefined && Math.abs(offset - 8) <= 2;
-    alignedFrames = aligned ? alignedFrames + 1 : 0;
+  try {
+    let alignedFrames = 0;
+    for (let attempt = 0; attempt < 60 && alignedFrames < 3; attempt += 1) {
+      viewer.scrollTo({ type: "item", id: itemId, align: "start", offset: SELECTED_FILE_TOP_OFFSET, behavior: "instant" });
+      await nextFrame();
+      const offset = itemOffsetFromTop(itemId);
+      const aligned = offset !== undefined && Math.abs(offset - SELECTED_FILE_TOP_OFFSET) <= 2;
+      alignedFrames = aligned ? alignedFrames + 1 : 0;
+    }
+  } finally {
+    suppressScrollSync = false;
   }
-  suppressScrollSync = false;
 }
 
 async function waitForItemAtTop(itemId: string) {
@@ -285,7 +289,7 @@ async function waitForItemAtTop(itemId: string) {
   for (let attempt = 0; attempt < 90 && alignedFrames < 3; attempt += 1) {
     await nextFrame();
     const offset = itemOffsetFromTop(itemId);
-    const aligned = offset !== undefined && Math.abs(offset - 8) <= 4;
+    const aligned = offset !== undefined && Math.abs(offset - SELECTED_FILE_TOP_OFFSET) <= 4;
     alignedFrames = aligned ? alignedFrames + 1 : 0;
   }
 }
@@ -312,7 +316,7 @@ function setActiveItem(itemId: string, shouldScroll = true) {
   sidebar.setActive(itemId);
 
   if (shouldScroll && itemId) {
-    viewer.scrollTo({ type: "item", id: itemId, align: "start", offset: 8, behavior: "smooth-auto" });
+    viewer.scrollTo({ type: "item", id: itemId, align: "start", offset: SELECTED_FILE_TOP_OFFSET, behavior: "smooth-auto" });
   }
 }
 
@@ -322,7 +326,7 @@ function topVisibleItemId(): string {
   let bestTop = -Infinity;
   for (const item of viewer.getRenderedItems()) {
     const top = item.element.getBoundingClientRect().top - viewportTop;
-    if (top <= 12 && top > bestTop) {
+    if (top <= SELECTED_FILE_TOP_OFFSET + 4 && top > bestTop) {
       bestTop = top;
       bestId = item.id;
     }
@@ -587,6 +591,7 @@ function toggleItemCollapsed(itemId: string) {
   };
   currentItems[index] = next;
   viewer.updateItem(next);
+  setActiveItem(itemId, false);
 }
 
 viewerRoot.addEventListener("click", (event) => {
