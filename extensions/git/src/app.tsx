@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { toast, exec_git, active_worktree_path } from "@/lib/git";
+import { exec_git, active_worktree_path } from "@/lib/git";
 import { use_git_panel } from "@/hooks/use-git-panel";
 import { use_prs } from "@/hooks/use-prs";
 import { NoRepo } from "@/components/no-repo";
@@ -38,7 +38,6 @@ export function App() {
 
   async function init() {
     if (await exec_git(await active_worktree_path(), ["init"], "Could not initialize repository")) {
-      toast("Initialized empty repository");
       void refresh();
     }
   }

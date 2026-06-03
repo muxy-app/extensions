@@ -1,13 +1,5 @@
 import type { FileEntry, GitStatus } from "@/lib/git-status";
 
-export function toast(message: string, variant: "success" | "error" = "success"): void {
-  try {
-    void muxy.toast({ title: "Git", body: message, variant });
-  } catch {
-    void 0;
-  }
-}
-
 export async function active_worktree_path(): Promise<string | undefined> {
   try {
     const worktrees = await muxy.worktrees.list();
@@ -54,9 +46,7 @@ export async function open_pr_diff(prNumber: number): Promise<void> {
 
 export function open_url(url: string): void {
   if (!url) return;
-  void muxy.exec(["open", url]).catch(() => {
-    toast("Could not open link", "error");
-  });
+  void muxy.exec(["open", url]).catch(() => undefined);
 }
 
 export function close_panel(): void {
@@ -98,7 +88,7 @@ export async function alert_error(title: string, err: unknown): Promise<void> {
   try {
     await muxy.dialog.alert({ title, message: error_message(err), style: "critical" });
   } catch {
-    toast(`${title}: ${error_message(err)}`, "error");
+    void 0;
   }
 }
 

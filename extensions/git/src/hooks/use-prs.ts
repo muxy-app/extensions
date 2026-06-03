@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { toast, alert_error, exec_git, active_worktree_path } from "@/lib/git";
+import { alert_error, exec_git, active_worktree_path } from "@/lib/git";
 import {
   checkout_pr_here,
   checkout_pr_worktree,
@@ -86,7 +86,6 @@ export function use_prs(active: boolean, refreshGit: () => Promise<void>) {
       set_busy(pr.number);
       try {
         await checkout_pr_here(pr.number);
-        toast(`Checked out PR #${pr.number}`);
         await refreshGit();
       } catch (err) {
         await alert_error(`Could not checkout PR #${pr.number}`, err);
@@ -109,7 +108,6 @@ export function use_prs(active: boolean, refreshGit: () => Promise<void>) {
         return;
       }
       await checkout_pr_worktree(pr.number, path);
-      toast(`Created worktree for PR #${pr.number}`);
       await muxy.worktrees.refresh();
       await muxy.git.worktree.switchTo({ identifier: path }).catch(() =>
         muxy.worktrees.switchTo(path),
@@ -126,7 +124,6 @@ export function use_prs(active: boolean, refreshGit: () => Promise<void>) {
       set_busy(number);
       try {
         await merge_pr(number, method, deleteBranch);
-        toast(`Merged PR #${number}`);
         await Promise.all([refresh(), refreshGit()]);
         return true;
       } catch (err) {
@@ -144,7 +141,6 @@ export function use_prs(active: boolean, refreshGit: () => Promise<void>) {
       set_busy(number);
       try {
         await close_pr(number);
-        toast(`Closed PR #${number}`);
         await Promise.all([refresh(), refreshGit()]);
         return true;
       } catch (err) {
@@ -169,8 +165,7 @@ export function use_prs(active: boolean, refreshGit: () => Promise<void>) {
           "Could not push branch",
         );
         if (!pushed) return false;
-        const pr = await create_pr(input.title, input.body, input.baseBranch);
-        toast(`Created PR #${pr.number}`);
+        await create_pr(input.title, input.body, input.baseBranch);
         await Promise.all([refresh(), refreshGit()]);
         return true;
       } catch (err) {

@@ -27,7 +27,7 @@ interface SourceControlPanelProps {
   stage_all: () => Promise<boolean>;
   unstage_all: () => Promise<boolean>;
   commit: (message: string) => Promise<boolean>;
-  sync: (op: "push" | "pull", success: string) => Promise<boolean>;
+  sync: (op: "push" | "pull") => Promise<boolean>;
   get_branches: () => Promise<BranchList>;
   checkout: (name: string, create: boolean) => Promise<boolean>;
   delete_branch: (name: string) => Promise<boolean>;
@@ -119,8 +119,8 @@ export function SourceControlPanel({
             <CommitBox
               canCommit={status.staged.length > 0}
               onCommit={commit}
-              onPull={() => sync("pull", "Pulled")}
-              onPush={() => sync("push", "Pushed")}
+              onPull={() => sync("pull")}
+              onPush={() => sync("push")}
             />
           )}
 

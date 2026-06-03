@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  toast,
   exec_git,
   try_action,
   to_view_status,
@@ -137,25 +136,19 @@ export function use_git_panel() {
   const commit = useCallback(
     async (message: string) => {
       const ok = await try_action(() => muxy.git.commit({ message }), "Commit failed");
-      if (ok) {
-        toast("Commit created");
-        await refresh();
-      }
+      if (ok) await refresh();
       return ok;
     },
     [refresh],
   );
 
   const sync = useCallback(
-    async (op: "push" | "pull", success: string) => {
+    async (op: "push" | "pull") => {
       const ok = await try_action(
         () => (op === "push" ? muxy.git.push() : muxy.git.pull()),
         op === "push" ? "Push failed" : "Pull failed",
       );
-      if (ok) {
-        toast(success);
-        await refresh();
-      }
+      if (ok) await refresh();
       return ok;
     },
     [refresh],
@@ -170,10 +163,7 @@ export function use_git_panel() {
           create ? muxy.git.branch.create({ name }) : muxy.git.branch.switchTo({ branch: name }),
         create ? "Could not create branch" : "Could not switch branch",
       );
-      if (ok) {
-        toast(create ? `Created branch ${name}` : `Switched to ${name}`);
-        await refresh();
-      }
+      if (ok) await refresh();
       return ok;
     },
     [refresh],
@@ -185,7 +175,6 @@ export function use_git_panel() {
       ["branch", "-D", name],
       "Could not delete branch",
     );
-    if (ok) toast(`Deleted branch ${name}`);
     return ok;
   }, []);
 
@@ -236,7 +225,6 @@ export function use_git_panel() {
         await muxy.git.branch.deleteRemote({ branch }).catch(() => undefined);
         await refresh();
       }
-      toast(`Cleaned up ${branch}`);
       return true;
     } catch (err) {
       await alert_error("Cleanup failed", err);

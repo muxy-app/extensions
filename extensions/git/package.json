@@ -18,7 +18,6 @@
       "commands:exec",
       "panels:write",
       "tabs:write",
-      "notifications:write",
       "worktrees:read",
       "worktrees:write"
     ],
