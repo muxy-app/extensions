@@ -1,0 +1,26 @@
+{
+  "name": "files-demo",
+  "version": "0.1.0",
+  "muxy": {
+    "description": "Demo of the muxy.files workspace filesystem API",
+    "background": "background.js",
+    "permissions": ["files:read", "files:write", "panels:write"],
+    "events": ["file.changed"],
+    "panels": [
+      {
+        "id": "files",
+        "title": "Files Demo",
+        "entry": "panel/index.html",
+        "position": "right",
+        "mode": "pinned"
+      }
+    ],
+    "commands": [
+      {
+        "id": "toggle-files",
+        "title": "Files Demo: Toggle Panel",
+        "action": { "kind": "togglePanel", "panel": "files" }
+      }
+    ]
+  }
+}

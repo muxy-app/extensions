@@ -110,8 +110,7 @@ body.resizing {
 
 .rail-title,
 .diff-title,
-.toolbar-actions,
-.file-row {
+.toolbar-actions {
   display: flex;
   align-items: center;
 }
@@ -199,120 +198,9 @@ body.resizing {
   padding: 0;
 }
 
-.file-list[data-view="flat"] {
-  overflow: auto;
-}
-
 .file-list file-tree-container {
   display: block;
   height: 100%;
-}
-
-#toggle-view .view-icon-tree,
-#toggle-view .view-icon-flat {
-  display: none;
-}
-
-#toggle-view[data-mode="flat"] .view-icon-tree,
-#toggle-view[data-mode="tree"] .view-icon-flat {
-  display: inline-flex;
-}
-
-.section-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 26px;
-  padding: 0 8px;
-  color: var(--dim);
-  font-size: 10px;
-  font-weight: 600;
-}
-
-.section-head .section-count {
-  font-family: var(--mono-font);
-}
-
-.file-row {
-  width: 100%;
-  min-width: 0;
-  height: 30px;
-  padding: 0 8px 0 6px;
-  gap: 6px;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  text-align: left;
-}
-
-.file-row:hover {
-  background: var(--panel);
-}
-
-.file-row.active {
-  background: var(--panel-2);
-}
-
-.file-row .status {
-  width: 12px;
-  flex: 0 0 auto;
-  font-family: var(--mono-font);
-  font-size: 10px;
-  font-weight: 700;
-  text-align: center;
-}
-
-.file-row .doc {
-  display: inline-flex;
-  flex: 0 0 auto;
-}
-
-.file-row .name {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--muted);
-}
-
-.file-row .name-base {
-  color: var(--text);
-}
-
-.file-row .name-dir {
-  margin-left: 6px;
-  color: var(--dim);
-}
-
-.file-row.active .name {
-  color: var(--text);
-}
-
-.file-row .delta {
-  flex: 0 0 auto;
-  font-family: var(--mono-font);
-  font-size: 10px;
-  font-weight: 600;
-}
-
-.status.s-add,
-.doc.s-add {
-  color: var(--added);
-}
-
-.status.s-del,
-.doc.s-del {
-  color: var(--deleted);
-}
-
-.status.s-mod,
-.doc.s-mod {
-  color: var(--accent);
 }
 
 .added {

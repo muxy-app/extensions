@@ -1,20 +1,41 @@
-import { useEffect, useRef, useState } from "react";
-import type { GitStatusEntry } from "@pierre/trees";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { GitStatus, GitStatusEntry } from "@pierre/trees";
 import { FileTree, useFileTree } from "@pierre/trees/react";
 import "@pierre/trees/web-components";
 import { TREE_UNSAFE_CSS } from "@/lib/tree-theme";
+import { status_letter } from "@/lib/tree-status";
 
 interface FileTreeViewProps {
   paths: string[];
   gitStatus: GitStatusEntry[];
   onSelect: (path: string) => void;
+  onAction?: (path: string) => void;
+  staged?: boolean;
   fill?: boolean;
   maxHeight?: number;
 }
 
-export function FileTreeView({ paths, gitStatus, onSelect, fill, maxHeight = 360 }: FileTreeViewProps) {
+export function FileTreeView({
+  paths,
+  gitStatus,
+  onSelect,
+  onAction,
+  staged,
+  fill,
+  maxHeight = 360,
+}: FileTreeViewProps) {
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
+  const onActionRef = useRef(onAction);
+  onActionRef.current = onAction;
+
+  const statusByPath = useMemo(() => {
+    const map = new Map<string, GitStatus>();
+    for (const entry of gitStatus) map.set(entry.path, entry.status);
+    return map;
+  }, [gitStatus]);
+  const statusRef = useRef(statusByPath);
+  statusRef.current = statusByPath;
 
   const { model } = useFileTree({
     paths,
@@ -24,6 +45,21 @@ export function FileTreeView({ paths, gitStatus, onSelect, fill, maxHeight = 360
     initialExpansion: "open",
     itemHeight: 22,
     unsafeCSS: TREE_UNSAFE_CSS,
+    composition: {
+      contextMenu: {
+        enabled: true,
+        triggerMode: "button",
+        buttonVisibility: "when-needed",
+        onOpen: (item, context) => {
+          context.close({ restoreFocus: false });
+          if (item.kind === "file") onActionRef.current?.(item.path);
+        },
+      },
+    },
+    renderRowDecoration: ({ item }) => {
+      const status = statusRef.current.get(item.path);
+      return status ? { text: status_letter(status), title: status } : null;
+    },
     onSelectionChange: (selected: readonly string[]) => {
       const path = selected[selected.length - 1];
       if (path && model.getItem(path)?.isDirectory() === false) onSelectRef.current(path);
@@ -56,5 +92,11 @@ export function FileTreeView({ paths, gitStatus, onSelect, fill, maxHeight = 360
     return model.subscribe(measure);
   }, [model, maxHeight, fill]);
 
-  return <FileTree model={model} style={{ height: fill ? "100%" : height }} />;
+  return (
+    <FileTree
+      model={model}
+      data-action={staged ? "unstage" : "stage"}
+      style={{ height: fill ? "100%" : height }}
+    />
+  );
 }

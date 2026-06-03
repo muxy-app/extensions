@@ -1,0 +1,24 @@
+{
+  "name": "git-demo",
+  "version": "0.1.0",
+  "muxy": {
+    "description": "Demo of the muxy.git repository API",
+    "permissions": ["git:read", "git:write", "commands:exec", "panels:write"],
+    "panels": [
+      {
+        "id": "git",
+        "title": "Git Demo",
+        "entry": "panel/index.html",
+        "position": "right",
+        "mode": "pinned"
+      }
+    ],
+    "commands": [
+      {
+        "id": "toggle-git",
+        "title": "Git Demo: Toggle Panel",
+        "action": { "kind": "togglePanel", "panel": "git" }
+      }
+    ]
+  }
+}

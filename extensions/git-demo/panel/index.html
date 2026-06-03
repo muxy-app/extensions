@@ -1,0 +1,380 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      :root { color-scheme: light dark; }
+      body {
+        margin: 0;
+        font: 12px -apple-system, system-ui, sans-serif;
+        color: var(--muxy-fg, #ddd);
+        background: var(--muxy-bg, #1e1e1e);
+      }
+      header {
+        padding: 10px;
+        border-bottom: 1px solid var(--muxy-border, #333);
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        position: sticky;
+        top: 0;
+        background: var(--muxy-bg, #1e1e1e);
+      }
+      button {
+        font: inherit;
+        color: var(--muxy-fg, #ddd);
+        background: var(--muxy-surface, #2a2a2a);
+        border: 1px solid var(--muxy-border, #333);
+        border-radius: 6px;
+        padding: 3px 10px;
+        cursor: pointer;
+      }
+      button:hover { background: var(--muxy-hover, #333); border-color: var(--muxy-accent, #4a90d9); }
+      button:disabled { opacity: 0.5; cursor: default; }
+      input {
+        font: inherit;
+        color: var(--muxy-fg, #ddd);
+        background: var(--muxy-bg, #161616);
+        border: 1px solid var(--muxy-border, #333);
+        border-radius: 5px;
+        padding: 3px 6px;
+        min-width: 0;
+      }
+      .group { padding: 6px 10px 2px; font-weight: 600; color: var(--muxy-fg-muted, #888); text-transform: uppercase; font-size: 10px; letter-spacing: 0.05em; }
+      .note { padding: 8px 10px; color: var(--muxy-fg-muted, #888); }
+      ul { list-style: none; margin: 0; padding: 0; }
+      li { padding: 6px 10px; display: grid; grid-template-columns: 150px auto 1fr; gap: 8px; align-items: center; border-bottom: 1px solid var(--muxy-border, #242424); }
+      li.destructive { background: color-mix(in srgb, #e06c75 8%, transparent); }
+      .name { font-weight: 600; }
+      .args { display: flex; gap: 4px; flex-wrap: wrap; }
+      .runcell { display: flex; gap: 6px; align-items: center; }
+      .badge { flex: none; width: 42px; font-weight: 600; text-align: center; border-radius: 4px; font-size: 11px; }
+      .pass { color: #98c379; }
+      .fail { color: #e06c75; }
+      .pending { color: var(--muxy-fg-muted, #888); }
+      .detail { color: var(--muxy-fg-muted, #999); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, monospace; font-size: 11px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <button id="runReads">Run all reads</button>
+      <span class="note" style="padding:0;">Each row runs independently. Writes never fire unless you click them.</span>
+    </header>
+
+    <ul id="rows"></ul>
+
+    <script>
+      const rowsEl = document.getElementById('rows');
+
+      function assert(cond, msg) {
+        if (!cond) throw new Error(msg);
+      }
+
+      function group(title) {
+        const li = document.createElement('div');
+        li.className = 'group';
+        li.textContent = title;
+        rowsEl.appendChild(li);
+      }
+
+      // shared state captured by reads, used to prefill write inputs
+      const state = {
+        baseBranch: '',
+        unstagedPath: '',
+        prNumber: '',
+      };
+
+      // def: { name, run: async (inputs) => detail, destructive?, inputs?: [{key, placeholder, value?}] }
+      function addRow(def) {
+        const li = document.createElement('li');
+        if (def.destructive) li.className = 'destructive';
+
+        const name = document.createElement('span');
+        name.className = 'name';
+        name.textContent = def.name;
+
+        const runcell = document.createElement('span');
+        runcell.className = 'runcell';
+        const btn = document.createElement('button');
+        btn.textContent = 'Run';
+        const badge = document.createElement('span');
+        badge.className = 'badge pending';
+        badge.textContent = '–';
+        runcell.append(btn, badge);
+
+        const args = document.createElement('span');
+        args.className = 'args';
+        const inputs = {};
+        (def.inputs || []).forEach((spec) => {
+          const inp = document.createElement('input');
+          inp.placeholder = spec.placeholder;
+          inp.style.width = (spec.width || 110) + 'px';
+          inp.dataset.key = spec.key;
+          if (spec.value) inp.value = spec.value;
+          inputs[spec.key] = inp;
+          args.appendChild(inp);
+        });
+
+        const detail = document.createElement('span');
+        detail.className = 'detail';
+        detail.style.gridColumn = '1 / -1';
+        detail.style.display = 'none';
+
+        const run = async () => {
+          // re-sync prefill values that depend on captured state
+          (def.inputs || []).forEach((spec) => {
+            if (spec.fromState && !inputs[spec.key].value) inputs[spec.key].value = state[spec.fromState] || '';
+          });
+          btn.disabled = true;
+          badge.className = 'badge pending';
+          badge.textContent = '…';
+          detail.style.display = 'none';
+          try {
+            const values = {};
+            Object.keys(inputs).forEach((k) => (values[k] = inputs[k].value));
+            const out = await def.run(values);
+            badge.className = 'badge pass';
+            badge.textContent = 'PASS';
+            if (out) { detail.textContent = out; detail.style.display = 'block'; }
+            return true;
+          } catch (err) {
+            badge.className = 'badge fail';
+            badge.textContent = 'FAIL';
+            detail.textContent = err.message;
+            detail.style.display = 'block';
+            return false;
+          } finally {
+            btn.disabled = false;
+          }
+        };
+        btn.onclick = run;
+        def._run = run;
+        def._isRead = !def.destructive;
+
+        li.append(name, runcell, args, detail);
+        rowsEl.appendChild(li);
+        return def;
+      }
+
+      // ---------- READS ----------
+      group('reads · safe');
+      const reads = [];
+
+      reads.push(addRow({ name: 'status', run: async () => {
+        const s = await muxy.git.status();
+        assert(typeof s.branch === 'string' && s.branch.length, 'no branch: ' + JSON.stringify(s.branch));
+        assert(Array.isArray(s.branches) && Array.isArray(s.stagedFiles) && Array.isArray(s.unstagedFiles), 'arrays missing');
+        state.baseBranch = s.branch;
+        if (s.unstagedFiles[0]) state.unstagedPath = s.unstagedFiles[0].path;
+        if (s.pullRequest) state.prNumber = String(s.pullRequest.number);
+        return s.branch + ' · ' + s.stagedFiles.length + ' staged / ' + s.unstagedFiles.length + ' unstaged';
+      } }));
+
+      reads.push(addRow({ name: 'currentBranch', run: async () => {
+        const b = await muxy.git.currentBranch();
+        assert(typeof b === 'string' && b.length, 'empty: ' + JSON.stringify(b));
+        state.baseBranch = b;
+        return b;
+      } }));
+
+      reads.push(addRow({ name: 'branches', run: async () => {
+        const list = await muxy.git.branches();
+        assert(Array.isArray(list), 'not an array');
+        return list.length + ' branches';
+      } }));
+
+      reads.push(addRow({ name: 'aheadBehind', run: async () => {
+        const ab = await muxy.git.aheadBehind();
+        assert(typeof ab.ahead === 'number' && typeof ab.behind === 'number', 'shape: ' + JSON.stringify(ab));
+        return 'ahead ' + ab.ahead + ' / behind ' + ab.behind + ' · upstream ' + ab.hasUpstream;
+      } }));
+
+      reads.push(addRow({ name: 'log', inputs: [{ key: 'maxCount', placeholder: 'maxCount', value: '5', width: 70 }], run: async (v) => {
+        const commits = await muxy.git.log({ maxCount: Number(v.maxCount) || 5 });
+        assert(Array.isArray(commits), 'not an array');
+        assert(commits.every((c) => c.hash && c.subject != null), 'shape: ' + JSON.stringify(commits[0]));
+        return commits.length + ' commits · head ' + (commits[0] ? commits[0].shortHash : '—');
+      } }));
+
+      reads.push(addRow({ name: 'diff', inputs: [
+        { key: 'filePath', placeholder: 'filePath (blank=first unstaged)', fromState: 'unstagedPath', width: 200 },
+        { key: 'staged', placeholder: 'staged?', width: 60 },
+      ], run: async (v) => {
+        const path = v.filePath || state.unstagedPath;
+        assert(path, 'no filePath and no unstaged file — edit a file or type a path');
+        const opts = { filePath: path };
+        if (v.staged === 'true') opts.staged = true;
+        if (v.staged === 'false') opts.staged = false;
+        const d = await muxy.git.diff(opts);
+        assert(Array.isArray(d.rows), 'rows missing');
+        const headers = d.rows.filter((r) => /^diff --git/.test(r.text || '')).length;
+        assert(headers <= 1, 'patch concatenation bug: ' + headers + ' diff headers');
+        return path + ' · +' + d.additions + ' -' + d.deletions + ' · ' + d.rows.length + ' rows';
+      } }));
+
+      reads.push(addRow({ name: 'worktrees', run: async () => {
+        const w = await muxy.git.worktrees();
+        assert(Array.isArray(w) && w.every((x) => typeof x.path === 'string'), 'shape: ' + JSON.stringify(w[0]));
+        return w.length + ' worktrees';
+      } }));
+
+      reads.push(addRow({ name: 'pr.info', run: async () => {
+        const info = await muxy.git.pr.info();
+        if (info == null) return 'no PR for current branch (null is valid)';
+        assert(typeof info.number === 'number', 'shape: ' + JSON.stringify(info));
+        state.prNumber = String(info.number);
+        return 'PR #' + info.number + ' · ' + info.state;
+      } }));
+
+      reads.push(addRow({ name: 'pr.list', inputs: [
+        { key: 'filter', placeholder: 'open', value: 'open', width: 70 },
+        { key: 'limit', placeholder: 'limit', value: '5', width: 50 },
+      ], run: async (v) => {
+        const list = await muxy.git.pr.list({ filter: v.filter || 'open', limit: Number(v.limit) || 5 });
+        assert(Array.isArray(list), 'not an array');
+        return list.length + ' PRs';
+      } }));
+
+      // ---------- LOCAL WRITES ----------
+      group('local writes · mutate working tree, no network');
+
+      addRow({ name: 'exec: make probe', destructive: true,
+        inputs: [{ key: 'file', placeholder: 'file', value: 'git-demo-probe.txt', width: 150 }],
+        run: async (v) => {
+          const r = await muxy.exec(['sh', '-c', 'printf "git-demo probe %s\\n" "$(date +%s)" > ' + (v.file || 'git-demo-probe.txt')]);
+          assert(r.exitCode === 0, 'exec failed (' + r.exitCode + '): ' + r.stderr);
+          return 'wrote ' + (v.file || 'git-demo-probe.txt');
+        } });
+
+      addRow({ name: 'stage', destructive: true,
+        inputs: [{ key: 'paths', placeholder: 'comma paths (blank=all)', width: 200 }],
+        run: async (v) => {
+          const paths = v.paths ? v.paths.split(',').map((s) => s.trim()).filter(Boolean) : [];
+          await muxy.git.stage({ paths });
+          return paths.length ? 'staged ' + paths.join(', ') : 'staged all';
+        } });
+
+      addRow({ name: 'unstage', destructive: true,
+        inputs: [{ key: 'paths', placeholder: 'comma paths (blank=all)', width: 200 }],
+        run: async (v) => {
+          const paths = v.paths ? v.paths.split(',').map((s) => s.trim()).filter(Boolean) : [];
+          await muxy.git.unstage({ paths });
+          return paths.length ? 'unstaged ' + paths.join(', ') : 'unstaged all';
+        } });
+
+      addRow({ name: 'discard', destructive: true,
+        inputs: [
+          { key: 'paths', placeholder: 'tracked paths', width: 140 },
+          { key: 'untracked', placeholder: 'untracked paths', width: 140 },
+        ],
+        run: async (v) => {
+          const paths = v.paths ? v.paths.split(',').map((s) => s.trim()).filter(Boolean) : [];
+          const untrackedPaths = v.untracked ? v.untracked.split(',').map((s) => s.trim()).filter(Boolean) : [];
+          assert(paths.length || untrackedPaths.length, 'give at least one path (discard is irreversible)');
+          await muxy.git.discard({ paths, untrackedPaths });
+          return 'discarded ' + [...paths, ...untrackedPaths].join(', ');
+        } });
+
+      addRow({ name: 'commit', destructive: true,
+        inputs: [{ key: 'message', placeholder: 'message', value: 'git-demo: probe commit', width: 200 }, { key: 'stageAll', placeholder: 'stageAll?', width: 70 }],
+        run: async (v) => {
+          const r = await muxy.git.commit({ message: v.message || 'git-demo: probe commit', stageAll: v.stageAll === 'true' });
+          assert(r && r.hash, 'no hash: ' + JSON.stringify(r));
+          return r.hash.slice(0, 10);
+        } });
+
+      addRow({ name: 'branch.create', destructive: true,
+        inputs: [{ key: 'name', placeholder: 'new branch name', width: 200 }],
+        run: async (v) => {
+          assert(v.name, 'enter a branch name');
+          await muxy.git.branch.create({ name: v.name });
+          const b = await muxy.git.currentBranch();
+          assert(b === v.name, 'on ' + b);
+          return 'on ' + v.name;
+        } });
+
+      addRow({ name: 'branch.switchTo', destructive: true,
+        inputs: [{ key: 'branch', placeholder: 'branch (blank=base)', fromState: 'baseBranch', width: 200 }],
+        run: async (v) => {
+          const target = v.branch || state.baseBranch;
+          assert(target, 'no branch captured yet — run status/currentBranch first');
+          await muxy.git.branch.switchTo({ branch: target });
+          const b = await muxy.git.currentBranch();
+          assert(b === target, 'on ' + b);
+          return 'on ' + target;
+        } });
+
+      // ---------- WORKTREE ----------
+      group('worktrees · creates a real worktree dir');
+
+      addRow({ name: 'worktree.add', destructive: true,
+        inputs: [
+          { key: 'path', placeholder: '/tmp/git-demo-wt', value: '/tmp/git-demo-wt', width: 150 },
+          { key: 'branch', placeholder: 'branch', width: 110 },
+          { key: 'createBranch', placeholder: 'create?', width: 60 },
+        ],
+        run: async (v) => {
+          assert(v.path && v.branch, 'path and branch required');
+          await muxy.git.worktree.add({ path: v.path, branch: v.branch, createBranch: v.createBranch === 'true' });
+          return 'added ' + v.path;
+        } });
+
+      addRow({ name: 'worktree.remove', destructive: true,
+        inputs: [
+          { key: 'path', placeholder: '/tmp/git-demo-wt', value: '/tmp/git-demo-wt', width: 150 },
+          { key: 'force', placeholder: 'force?', width: 60 },
+        ],
+        run: async (v) => {
+          assert(v.path, 'path required');
+          await muxy.git.worktree.remove({ path: v.path, force: v.force === 'true' });
+          return 'removed ' + v.path;
+        } });
+
+      // ---------- REMOTE ----------
+      group('remote · pushes / hits network');
+
+      addRow({ name: 'push', destructive: true, run: async () => { await muxy.git.push(); return 'pushed'; } });
+      addRow({ name: 'pull', destructive: true, run: async () => { await muxy.git.pull(); return 'pulled'; } });
+
+      // ---------- PR (gh) ----------
+      group('pull requests · creates / mutates REAL PRs via gh');
+
+      addRow({ name: 'pr.create', destructive: true,
+        inputs: [
+          { key: 'title', placeholder: 'title', value: 'git-demo test PR', width: 160 },
+          { key: 'draft', placeholder: 'draft?', value: 'true', width: 60 },
+        ],
+        run: async (v) => {
+          assert(v.title, 'title required');
+          const info = await muxy.git.pr.create({ title: v.title, body: 'Opened by git-demo.', draft: v.draft === 'true' });
+          assert(info && typeof info.number === 'number', 'shape: ' + JSON.stringify(info));
+          state.prNumber = String(info.number);
+          return 'PR #' + info.number + ' · ' + info.url;
+        } });
+
+      addRow({ name: 'pr.merge', destructive: true,
+        inputs: [
+          { key: 'number', placeholder: 'PR #', fromState: 'prNumber', width: 60 },
+          { key: 'method', placeholder: 'merge|squash|rebase', value: 'squash', width: 130 },
+        ],
+        run: async (v) => {
+          assert(v.number, 'PR number required');
+          await muxy.git.pr.merge({ number: Number(v.number), method: v.method || 'squash' });
+          return 'merged #' + v.number;
+        } });
+
+      addRow({ name: 'pr.close', destructive: true,
+        inputs: [{ key: 'number', placeholder: 'PR #', fromState: 'prNumber', width: 60 }],
+        run: async (v) => {
+          assert(v.number, 'PR number required');
+          await muxy.git.pr.close({ number: Number(v.number) });
+          return 'closed #' + v.number;
+        } });
+
+      // run-all-reads convenience
+      document.getElementById('runReads').onclick = async () => {
+        for (const r of reads) await r._run();
+      };
+    </script>
+  </body>
+</html>

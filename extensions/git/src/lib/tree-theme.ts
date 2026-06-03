@@ -21,14 +21,41 @@ export const TREE_UNSAFE_CSS = `
 
   --trees-font-size-override: 12px;
   --trees-font-family-override: var(--muxy-font-family, system-ui);
-  --trees-padding-inline-override: 4px;
+  --trees-padding-inline-override: 8px;
   --trees-item-padding-x-override: 4px;
-  --trees-item-margin-x-override: 2px;
-  --trees-item-row-gap-override: 4px;
-  --trees-level-gap-override: 8px;
-  --trees-icon-width-override: 14px;
+  --trees-item-margin-x-override: 0px;
+  --trees-item-row-gap-override: 6px;
+  --trees-level-gap-override: 10px;
+  --trees-icon-width-override: 16px;
   --trees-git-lane-width-override: 10px;
   --trees-border-radius-override: 4px;
   --trees-scrollbar-gutter-override: 0px;
+}
+
+[data-item-section='decoration'] > span {
+  padding-inline: 8px 4px;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--trees-item-git-status-color, var(--muxy-foreground-muted));
+}
+
+[data-type='context-menu-trigger'] {
+  position: relative;
+}
+
+[data-type='context-menu-trigger'] > * {
+  display: none;
+}
+
+[data-type='context-menu-trigger']::after {
+  content: '+';
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+:host([data-action='unstage']) [data-type='context-menu-trigger']::after {
+  content: '\\2212';
 }
 `;

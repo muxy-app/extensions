@@ -7,8 +7,7 @@ import {
 } from "@pierre/diffs";
 import { getOrCreateWorkerPoolSingleton } from "@pierre/diffs/worker";
 import type { GitStatus } from "@pierre/trees";
-import type { DiffTreeFile } from "./diff-tree";
-import { DiffSidebar, type DiffViewMode } from "./diff-sidebar";
+import { DiffTree, type DiffTreeFile } from "./diff-tree";
 import "./diff-viewer.css";
 
 const viewerRoot = document.querySelector<HTMLElement>("#viewer")!;
@@ -297,19 +296,13 @@ async function waitForItemAtTop(itemId: string) {
 let activeItemId = "";
 let suppressScrollSync = false;
 
-let viewMode = readPref<DiffViewMode>("view", "tree");
-
-const sidebar = new DiffSidebar(
-  fileListNode,
-  (itemId) => {
-    suppressScrollSync = true;
-    setActiveItem(itemId);
-    void waitForItemAtTop(itemId).then(() => {
-      suppressScrollSync = false;
-    });
-  },
-  viewMode,
-);
+const sidebar = new DiffTree(fileListNode, (itemId) => {
+  suppressScrollSync = true;
+  setActiveItem(itemId);
+  void waitForItemAtTop(itemId).then(() => {
+    suppressScrollSync = false;
+  });
+});
 
 function setActiveItem(itemId: string, shouldScroll = true) {
   activeItemId = itemId;
@@ -497,23 +490,10 @@ const zoomLevelNode = document.querySelector<HTMLElement>("#zoom-reset")!;
 const toggleStyleButton = document.querySelector<HTMLButtonElement>("#toggle-style")!;
 const collapseAllButton = document.querySelector<HTMLButtonElement>("#collapse-all")!;
 const expandAllButton = document.querySelector<HTMLButtonElement>("#expand-all")!;
-const toggleViewButton = document.querySelector<HTMLButtonElement>("#toggle-view")!;
 const railResize = document.querySelector<HTMLElement>("#rail-resize")!;
 
 const RAIL_MIN = 180;
 const RAIL_MAX = 520;
-
-function syncViewButton() {
-  toggleViewButton.dataset.mode = viewMode;
-  toggleViewButton.title = viewMode === "tree" ? "View as flat list" : "View as tree";
-}
-
-function toggleView() {
-  viewMode = viewMode === "tree" ? "flat" : "tree";
-  writePref("view", viewMode);
-  syncViewButton();
-  sidebar.setMode(viewMode);
-}
 
 function applyRailWidth(width: number) {
   const clamped = Math.min(RAIL_MAX, Math.max(RAIL_MIN, Math.round(width)));
@@ -612,7 +592,6 @@ zoomInButton.addEventListener("click", () => setZoom(zoom + ZOOM_STEP));
 zoomOutButton.addEventListener("click", () => setZoom(zoom - ZOOM_STEP));
 zoomResetButton.addEventListener("click", () => setZoom(1));
 toggleStyleButton.addEventListener("click", toggleStyle);
-toggleViewButton.addEventListener("click", toggleView);
 collapseAllButton.addEventListener("click", () => setAllCollapsed(true));
 expandAllButton.addEventListener("click", () => setAllCollapsed(false));
 
@@ -641,5 +620,4 @@ window.muxy?.onDataChange?.(() => void loadGitDiff());
 
 applyZoom();
 syncStyleButton();
-syncViewButton();
 void loadGitDiff();

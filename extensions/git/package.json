@@ -46,6 +46,7 @@
       {
         "id": "toggle-scm",
         "title": "Git: Toggle Source Control",
+        "defaultShortcut": "cmd+y",
         "action": {
           "kind": "togglePanel",
           "panel": "scm"

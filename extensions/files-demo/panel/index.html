@@ -1,0 +1,198 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      :root { color-scheme: light dark; }
+      body {
+        margin: 0;
+        font: 12px -apple-system, system-ui, sans-serif;
+        color: var(--muxy-fg, #ddd);
+        background: var(--muxy-bg, #1e1e1e);
+      }
+      header {
+        padding: 10px;
+        border-bottom: 1px solid var(--muxy-border, #333);
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      button {
+        font: inherit;
+        color: var(--muxy-fg, #ddd);
+        background: var(--muxy-surface, #2a2a2a);
+        border: 1px solid var(--muxy-border, #333);
+        border-radius: 6px;
+        padding: 5px 12px;
+        cursor: pointer;
+      }
+      button:hover { background: var(--muxy-hover, #333); border-color: var(--muxy-accent, #4a90d9); }
+      #summary { margin-left: auto; font-weight: 600; }
+      ul { list-style: none; margin: 0; padding: 8px 10px; }
+      li { padding: 4px 0; display: flex; gap: 8px; align-items: baseline; border-bottom: 1px solid var(--muxy-border, #2a2a2a); }
+      .badge { flex: none; width: 46px; font-weight: 600; text-align: center; border-radius: 4px; padding: 1px 0; }
+      .pass { color: #98c379; }
+      .fail { color: #e06c75; }
+      .pending { color: var(--muxy-fg-muted, #888); }
+      .name { flex: none; width: 150px; }
+      .detail { color: var(--muxy-fg-muted, #999); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      #watch { padding: 8px 10px; border-top: 1px solid var(--muxy-border, #333); color: var(--muxy-fg-muted, #999); }
+    </style>
+  </head>
+  <body>
+    <header>
+      <button id="run">Run tests</button>
+      <span id="summary" class="pending">not run</span>
+    </header>
+    <div style="padding: 8px 10px; color: var(--muxy-fg-muted, #888);">
+      First run prompts once per write op (mkdir/write/rename/move/delete) — pick “Allow &amp; remember”.
+    </div>
+    <ul id="results"></ul>
+    <div id="watch">file.changed: <span id="watchState">waiting…</span></div>
+
+    <script>
+      const results = document.getElementById('results');
+      const summary = document.getElementById('summary');
+      const watchState = document.getElementById('watchState');
+
+      const checks = [];
+      function row(name) {
+        const li = document.createElement('li');
+        const badge = document.createElement('span');
+        badge.className = 'badge pending';
+        badge.textContent = '…';
+        const label = document.createElement('span');
+        label.className = 'name';
+        label.textContent = name;
+        const detail = document.createElement('span');
+        detail.className = 'detail';
+        li.append(badge, label, detail);
+        results.appendChild(li);
+        return { badge, detail };
+      }
+
+      // Each check: { name, run: async () => detailString, expectFail?: bool }
+      async function check(name, run) {
+        const ui = row(name);
+        try {
+          const detail = await run();
+          ui.badge.className = 'badge pass';
+          ui.badge.textContent = 'PASS';
+          ui.detail.textContent = detail || '';
+          return true;
+        } catch (err) {
+          ui.badge.className = 'badge fail';
+          ui.badge.textContent = 'FAIL';
+          ui.detail.textContent = err.message;
+          return false;
+        }
+      }
+
+      const DIR = 'files-demo-test';
+      const FILE = DIR + '/proof.txt';
+      const RENAMED = DIR + '/proof-renamed.txt';
+      const MOVED = DIR + '/sub';
+
+      function assert(cond, msg) {
+        if (!cond) throw new Error(msg);
+      }
+
+      async function runAll() {
+        results.innerHTML = '';
+        summary.className = 'pending';
+        summary.textContent = 'running…';
+        let pass = 0;
+        let total = 0;
+        const c = async (name, fn) => {
+          total++;
+          if (await check(name, fn)) pass++;
+        };
+
+        // Clean any leftovers from a previous run (best-effort, ignore errors).
+        try { await muxy.files.delete([DIR]); } catch (_) {}
+
+        await c('mkdir', async () => {
+          const r = await muxy.files.mkdir(DIR);
+          assert(r && r.path, 'no path returned');
+          return r.path;
+        });
+
+        await c('write', async () => {
+          const r = await muxy.files.write(FILE, 'proof v1\n');
+          assert(r.path === FILE, 'unexpected path ' + r.path);
+          return r.path;
+        });
+
+        await c('read', async () => {
+          const f = await muxy.files.read(FILE);
+          assert(f.content === 'proof v1\n', 'content mismatch: ' + JSON.stringify(f.content));
+          return f.size + ' bytes';
+        });
+
+        await c('write (overwrite)', async () => {
+          await muxy.files.write(FILE, 'proof v2\n');
+          const f = await muxy.files.read(FILE);
+          assert(f.content === 'proof v2\n', 'overwrite failed');
+          return 'overwritten';
+        });
+
+        await c('stat', async () => {
+          const s = await muxy.files.stat(FILE);
+          assert(s.isDirectory === false, 'should be a file');
+          assert(s.name === 'proof.txt', 'name=' + s.name);
+          return 'size ' + s.size;
+        });
+
+        await c('list', async () => {
+          const entries = await muxy.files.list(DIR);
+          assert(entries.some((e) => e.path === FILE), 'proof.txt not listed');
+          return entries.length + ' entries';
+        });
+
+        await c('rename', async () => {
+          const r = await muxy.files.rename(FILE, 'proof-renamed.txt');
+          assert(r.path === RENAMED, 'path=' + r.path);
+          return r.path;
+        });
+
+        await c('move', async () => {
+          await muxy.files.mkdir(MOVED);
+          const moved = await muxy.files.move([RENAMED], MOVED);
+          assert(moved[0] === MOVED + '/proof-renamed.txt', 'moved=' + moved[0]);
+          return moved[0];
+        });
+
+        await c('sandbox blocks ../escape', async () => {
+          let content;
+          try {
+            content = await muxy.files.read('../../../../../../etc/hosts');
+          } catch (err) {
+            return 'rejected: ' + err.message;
+          }
+          throw new Error('escape was NOT blocked; read ' + (content && content.size) + ' bytes');
+        });
+
+        await c('delete', async () => {
+          await muxy.files.delete([DIR]);
+          const entries = await muxy.files.list('');
+          assert(!entries.some((e) => e.path === DIR), 'dir still present after delete');
+          return 'moved to Trash';
+        });
+
+        summary.className = pass === total ? 'pass' : 'fail';
+        summary.textContent = pass + '/' + total + ' passed';
+      }
+
+      document.getElementById('run').onclick = runAll;
+
+      // file.changed proof: background.js logs it; here we light up when our own writes land.
+      if (muxy.events && muxy.events.subscribe) {
+        muxy.events.subscribe('file.changed', (p) => {
+          watchState.textContent = 'fired for ' + (p && p.path);
+        });
+      } else {
+        watchState.textContent = '(panel surface has no events; background.js logs it)';
+      }
+    </script>
+  </body>
+</html>
