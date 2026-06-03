@@ -76,7 +76,7 @@ export function SourceControlPanel({
         <>
           <BranchBar
             leading={tabs}
-            trailing={
+            afterBranch={
               currentPr ? (
                 <CurrentPrPopover
                   pr={currentPr}

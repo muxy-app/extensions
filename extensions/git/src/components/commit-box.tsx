@@ -12,14 +12,21 @@ interface CommitBoxProps {
   onPush: () => Promise<unknown>;
 }
 
+type Op = SyncOp | "commit";
+
 export function CommitBox({ canCommit, onCommit, onPull, onPush }: CommitBoxProps) {
   const [message, set_message] = useState("");
-  const [busy, set_busy] = useState<SyncOp | null>(null);
-  const disabled = !canCommit || message.trim() === "";
+  const [busy, set_busy] = useState<Op | null>(null);
+  const disabled = !canCommit || message.trim() === "" || busy !== null;
 
   async function commit() {
     if (disabled) return;
-    if (await onCommit(message.trim())) set_message("");
+    set_busy("commit");
+    try {
+      if (await onCommit(message.trim())) set_message("");
+    } finally {
+      set_busy(null);
+    }
   }
 
   async function run(op: SyncOp, action: () => Promise<unknown>) {
@@ -78,7 +85,11 @@ export function CommitBox({ canCommit, onCommit, onPull, onPush }: CommitBoxProp
           disabled={disabled}
           onClick={() => void commit()}
         >
-          <Check size={10} strokeWidth={3} />
+          {busy === "commit" ? (
+            <Loader2 size={10} strokeWidth={3} className="animate-spin" />
+          ) : (
+            <Check size={10} strokeWidth={3} />
+          )}
           Commit
         </Button>
         <SyncButton op="pull" label="Pull" icon={ArrowDown} action={onPull} />

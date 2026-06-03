@@ -14,7 +14,7 @@ interface BranchBarProps {
   onRefresh: () => Promise<unknown>;
   onClose: () => void;
   leading?: ReactNode;
-  trailing?: ReactNode;
+  afterBranch?: ReactNode;
 }
 
 export function BranchBar({
@@ -27,7 +27,7 @@ export function BranchBar({
   onRefresh,
   onClose,
   leading,
-  trailing,
+  afterBranch,
 }: BranchBarProps) {
   const [refreshing, set_refreshing] = useState(false);
   const tracking = [ahead && `↑${ahead}`, behind && `↓${behind}`].filter(Boolean).join(" ");
@@ -52,8 +52,8 @@ export function BranchBar({
         onCheckout={onCheckout}
         onDeleteBranch={onDeleteBranch}
       />
+      {afterBranch}
       <div className="ml-auto flex flex-shrink-0 items-center gap-1.5">
-        {trailing}
         <button
           type="button"
           title="Refresh"

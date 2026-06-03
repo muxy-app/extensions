@@ -22,7 +22,7 @@ export function FileTreeView({
   onAction,
   staged,
   fill,
-  maxHeight = 360,
+  maxHeight = Infinity,
 }: FileTreeViewProps) {
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;

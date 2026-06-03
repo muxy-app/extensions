@@ -38,7 +38,7 @@ export function FileSection({
   const Bulk = staged ? Minus : Plus;
 
   return (
-    <section className={cn("flex flex-col", open && "min-h-0 flex-1")}>
+    <section className="flex shrink-0 flex-col">
       <header className="group sticky top-0 z-10 flex h-[26px] shrink-0 items-center bg-background pl-2 pr-2">
         <button
           type="button"
@@ -64,16 +64,13 @@ export function FileSection({
         </div>
       </header>
       {open && (
-        <div className="min-h-0 flex-1">
-          <FileTreeView
-            paths={paths}
-            gitStatus={gitStatus}
-            onSelect={onOpen}
-            onAction={onAction}
-            staged={staged}
-            fill
-          />
-        </div>
+        <FileTreeView
+          paths={paths}
+          gitStatus={gitStatus}
+          onSelect={onOpen}
+          onAction={onAction}
+          staged={staged}
+        />
       )}
     </section>
   );

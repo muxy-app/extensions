@@ -3,6 +3,7 @@ import { toast, exec_git, active_worktree_path } from "@/lib/git";
 import { use_git_panel } from "@/hooks/use-git-panel";
 import { use_prs } from "@/hooks/use-prs";
 import { NoRepo } from "@/components/no-repo";
+import { LoadingOverlay } from "@/components/loading-overlay";
 import { SourceControlPanel } from "@/views/source-control-panel";
 import type { PanelTab } from "@/components/panel-tabs";
 
@@ -42,7 +43,13 @@ export function App() {
     }
   }
 
-  if (state.kind === "loading") return null;
+  if (state.kind === "loading") {
+    return (
+      <div className="relative h-screen">
+        <LoadingOverlay />
+      </div>
+    );
+  }
   if (state.kind === "no_repo") return <NoRepo onInit={() => void init()} />;
   return (
     <SourceControlPanel

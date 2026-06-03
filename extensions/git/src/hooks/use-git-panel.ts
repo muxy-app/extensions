@@ -20,27 +20,52 @@ export function use_git_panel() {
   const [state, set_state] = useState<RepoState>({ kind: "loading" });
   const [switching, set_switching] = useState(false);
   const refresh_id = useRef(0);
+  const cache = useRef(new Map<string, RepoState>());
 
   const refresh = useCallback(async () => {
     const id = ++refresh_id.current;
     const current = () => refresh_id.current === id;
+    const key = await active_worktree_path();
+    let next: RepoState;
     try {
-      const native = await muxy.git.status();
-      if (!current()) return;
-      set_state({ kind: "ready", status: to_view_status(native) });
+      next = { kind: "ready", status: to_view_status(await muxy.git.status()) };
     } catch {
-      if (current()) set_state({ kind: "no_repo" });
+      next = { kind: "no_repo" };
+    }
+    if (key) cache.current.set(key, next);
+    if (current()) {
+      set_state(next);
+      set_switching(false);
     }
   }, []);
 
   const switch_scope = useCallback(async () => {
-    set_switching(true);
+    const id = ++refresh_id.current;
+    const current = () => refresh_id.current === id;
+    const key = await active_worktree_path();
+    if (!current()) return;
+
+    const cached = key ? cache.current.get(key) : undefined;
+    if (cached) {
+      set_state(cached);
+      set_switching(false);
+    } else {
+      set_state({ kind: "loading" });
+      set_switching(true);
+    }
+
+    let next: RepoState;
     try {
-      await refresh();
-    } finally {
+      next = { kind: "ready", status: to_view_status(await muxy.git.status()) };
+    } catch {
+      next = { kind: "no_repo" };
+    }
+    if (key) cache.current.set(key, next);
+    if (current()) {
+      set_state(next);
       set_switching(false);
     }
-  }, [refresh]);
+  }, []);
 
   const reconcile_timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconcile = useCallback(() => {
