@@ -1,12 +1,10 @@
 import { ChevronDown, Minus, Plus } from "lucide-react";
-import { useMemo } from "react";
 import type { FileEntry } from "@/lib/git-status";
-import { entries_to_git_status } from "@/lib/tree-status";
 import { use_persistent_toggle } from "@/hooks/use-persistent-toggle";
 import { ICON_SIZE, ICON_STROKE } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { FileTreeView } from "./file-tree-view";
+import { FileRow } from "./file-row";
 
 interface FileSectionProps {
   id: string;
@@ -30,9 +28,6 @@ export function FileSection({
   onOpen,
 }: FileSectionProps) {
   const [open, toggle] = use_persistent_toggle(id, true);
-
-  const paths = useMemo(() => entries.map((e) => e.path), [entries]);
-  const gitStatus = useMemo(() => entries_to_git_status(entries), [entries]);
 
   if (entries.length === 0) return null;
   const Bulk = staged ? Minus : Plus;
@@ -64,13 +59,20 @@ export function FileSection({
         </div>
       </header>
       {open && (
-        <FileTreeView
-          paths={paths}
-          gitStatus={gitStatus}
-          onSelect={onOpen}
-          onAction={onAction}
-          staged={staged}
-        />
+        <ul className="divide-y divide-border">
+          {entries.map((entry) => (
+            <FileRow
+              key={entry.path}
+              path={entry.path}
+              label={entry.label}
+              added={entry.added}
+              removed={entry.removed}
+              staged={staged}
+              onAction={onAction}
+              onOpen={onOpen}
+            />
+          ))}
+        </ul>
       )}
     </section>
   );

@@ -6,8 +6,8 @@ import {
   type FileDiffMetadata,
 } from "@pierre/diffs";
 import { getOrCreateWorkerPoolSingleton } from "@pierre/diffs/worker";
-import type { GitStatus } from "@pierre/trees";
-import { DiffTree, type DiffTreeFile } from "./diff-tree";
+import { DiffFileListView, type DiffFile, type DiffFileStatus } from "./diff-file-list";
+import "@/styles/global.css";
 import "./diff-viewer.css";
 
 const viewerRoot = document.querySelector<HTMLElement>("#viewer")!;
@@ -202,7 +202,7 @@ function summarize(files: FileDiff[]) {
   );
 }
 
-function gitStatusForFile(file: FileDiff): GitStatus {
+function gitStatusForFile(file: FileDiff): DiffFileStatus {
   if (file.type === "new") return "added";
   if (file.type === "deleted") return "deleted";
   if (file.type.startsWith("rename")) return "renamed";
@@ -296,7 +296,7 @@ async function waitForItemAtTop(itemId: string) {
 let activeItemId = "";
 let suppressScrollSync = false;
 
-const sidebar = new DiffTree(fileListNode, (itemId) => {
+const sidebar = new DiffFileListView(fileListNode, (itemId) => {
   suppressScrollSync = true;
   setActiveItem(itemId);
   void waitForItemAtTop(itemId).then(() => {
@@ -334,12 +334,12 @@ viewer.subscribeToScroll(() => {
 });
 
 function renderFileList(files: FileDiff[], items: DiffItem[], focusId: string) {
-  const treeFiles: DiffTreeFile[] = files.map((file, index) => ({
+  const listFiles: DiffFile[] = files.map((file, index) => ({
     path: file.name,
     itemId: items[index].id,
     status: gitStatusForFile(file),
   }));
-  sidebar.render(treeFiles);
+  sidebar.setFiles(listFiles);
   setActiveItem(focusId || items[0]?.id || "", false);
 }
 

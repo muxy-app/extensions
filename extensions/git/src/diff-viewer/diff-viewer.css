@@ -194,13 +194,8 @@ body.resizing {
 
 .file-list {
   min-height: 0;
-  overflow: hidden;
+  overflow: auto;
   padding: 0;
-}
-
-.file-list file-tree-container {
-  display: block;
-  height: 100%;
 }
 
 .added {
