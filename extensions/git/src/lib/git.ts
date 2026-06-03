@@ -52,6 +52,13 @@ export async function open_pr_diff(prNumber: number): Promise<void> {
   }
 }
 
+export function open_url(url: string): void {
+  if (!url) return;
+  void muxy.exec(["open", url]).catch(() => {
+    toast("Could not open link", "error");
+  });
+}
+
 export function close_panel(): void {
   try {
     void muxy.panels.close("scm");

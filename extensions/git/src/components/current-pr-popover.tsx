@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ExternalLink, GitMerge, Loader2, Trash2, XCircle } from "lucide-react";
+import { open_url } from "@/lib/git";
 import { pr_state, type MergeMethod } from "@/lib/git-prs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { PrStateIcon } from "./pr-state-icon";
@@ -51,6 +52,26 @@ export function CurrentPrPopover({ pr, busy, onMerge, onClose, onCleanup }: Curr
             <PrStateIcon pr={pr} size={13} />
             <span className="font-mono text-[12px] font-semibold text-foreground">#{pr.number}</span>
             <span className="text-[11px] text-muted-foreground">{state_label(pr)}</span>
+            <div className="ml-auto flex items-center gap-0.5">
+              <IconAction
+                icon={XCircle}
+                title="Close PR"
+                disabled={busy || pr_state(pr) !== "open"}
+                tone="danger"
+                onClick={() => set_confirm({ kind: "close" })}
+              />
+              <IconAction
+                icon={Trash2}
+                title="Clean up branch"
+                disabled={busy}
+                onClick={() => void run(onCleanup())}
+              />
+              <IconAction
+                icon={ExternalLink}
+                title="View on GitHub"
+                onClick={() => open_url(pr.url)}
+              />
+            </div>
           </div>
           <Row label="Base" value={pr.baseBranch} />
           <Row label="Mergeable" value={mergeable_label(pr)} tone={mergeable_tone(pr)} />
@@ -61,7 +82,6 @@ export function CurrentPrPopover({ pr, busy, onMerge, onClose, onCleanup }: Curr
               pr={pr}
               busy={busy}
               onMerge={(method) => set_confirm({ kind: "merge", method })}
-              onClose={() => set_confirm({ kind: "close" })}
             />
           ) : confirm.kind === "merge" ? (
             <ConfirmMerge
@@ -78,30 +98,36 @@ export function CurrentPrPopover({ pr, busy, onMerge, onClose, onCleanup }: Curr
               onConfirm={() => void run(onClose(pr.number))}
             />
           )}
-
-          {confirm.kind === "none" && !busy && (
-            <button
-              type="button"
-              onClick={() => void run(onCleanup())}
-              className="flex h-7 items-center justify-center gap-1.5 rounded-md border border-border text-[11px] font-medium text-foreground outline-none transition-colors hover:border-primary hover:bg-accent"
-            >
-              <Trash2 size={12} strokeWidth={2} />
-              Clean up branch
-            </button>
-          )}
-
-          <a
-            href={pr.url}
-            target="_blank"
-            rel="noreferrer"
-            className="flex h-7 items-center justify-center gap-1.5 rounded-md border border-border bg-muted text-[11px] font-medium text-foreground outline-none transition-colors hover:border-primary hover:bg-accent"
-          >
-            <ExternalLink size={12} strokeWidth={2} />
-            View on GitHub
-          </a>
         </div>
       </PopoverContent>
     </Popover>
+  );
+}
+
+function IconAction({
+  icon: Icon,
+  title,
+  disabled,
+  tone = "default",
+  onClick,
+}: {
+  icon: typeof XCircle;
+  title: string;
+  disabled?: boolean;
+  tone?: "default" | "danger";
+  onClick: () => void;
+}) {
+  const hover = tone === "danger" ? "hover:text-diff-remove" : "hover:text-foreground";
+  return (
+    <button
+      type="button"
+      title={title}
+      disabled={disabled}
+      onClick={onClick}
+      className={`flex size-6 items-center justify-center rounded text-muted-foreground outline-none transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-40 ${hover}`}
+    >
+      <Icon size={13} strokeWidth={2} />
+    </button>
   );
 }
 
@@ -109,12 +135,10 @@ function Actions({
   pr,
   busy,
   onMerge,
-  onClose,
 }: {
   pr: MuxyGitPR;
   busy: boolean;
   onMerge: (method: MergeMethod) => void;
-  onClose: () => void;
 }) {
   if (busy) {
     return (
@@ -143,14 +167,6 @@ function Actions({
       {blockedReason && (
         <span className="text-center text-[10px] text-muted-foreground">{blockedReason}</span>
       )}
-      <button
-        type="button"
-        onClick={onClose}
-        className="flex h-7 items-center justify-center gap-1.5 rounded-md border border-border text-[11px] font-medium text-diff-remove outline-none transition-colors hover:bg-accent"
-      >
-        <XCircle size={12} strokeWidth={2} />
-        Close PR
-      </button>
     </div>
   );
 }

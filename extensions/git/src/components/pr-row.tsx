@@ -11,6 +11,7 @@ import {
   SquareStack,
   XOctagon,
 } from "lucide-react";
+import { open_url } from "@/lib/git";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { PrStatusPopover } from "./pr-status-popover";
 import { PrStateIcon } from "./pr-state-icon";
@@ -128,16 +129,11 @@ function Actions({ busy, url, onCheckoutHere, onCheckoutWorktree, onViewDiff }: 
           onClick={() => run(onCheckoutWorktree)}
         />
         <MenuItem icon={SplitSquareHorizontal} label="View diff" onClick={() => run(onViewDiff)} />
-        <a
-          href={url}
-          target="_blank"
-          rel="noreferrer"
-          onClick={() => set_open(false)}
-          className="flex items-center gap-2 rounded px-2 py-1.5 text-[12px] text-foreground outline-none hover:bg-accent"
-        >
-          <ExternalLink size={13} strokeWidth={2} className="text-muted-foreground" />
-          Open on GitHub
-        </a>
+        <MenuItem
+          icon={ExternalLink}
+          label="Open on GitHub"
+          onClick={() => run(() => open_url(url))}
+        />
       </PopoverContent>
     </Popover>
   );

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ExternalLink } from "lucide-react";
+import { open_url } from "@/lib/git";
 import { pr_state } from "@/lib/git-prs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { PrStateIcon } from "./pr-state-icon";
@@ -26,15 +27,14 @@ export function PrStatusPopover({ pr, children }: PrStatusPopoverProps) {
           <Row label="Base" value={pr.baseBranch} />
           <Row label="Mergeable" value={mergeable_label(pr)} tone={mergeable_tone(pr)} />
           <ChecksRow pr={pr} />
-          <a
-            href={pr.url}
-            target="_blank"
-            rel="noreferrer"
+          <button
+            type="button"
+            onClick={() => open_url(pr.url)}
             className="mt-1 flex h-7 items-center justify-center gap-1.5 rounded-md border border-border bg-muted text-[11px] font-medium text-foreground outline-none transition-colors hover:border-primary hover:bg-accent"
           >
             <ExternalLink size={12} strokeWidth={2} />
             Open on GitHub
-          </a>
+          </button>
         </div>
       </PopoverContent>
     </Popover>
