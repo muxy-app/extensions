@@ -433,7 +433,6 @@ function diffData() {
     focusPath?: string;
     source?: "pr";
     prNumber?: number;
-    prTitle?: string;
     cwd?: string;
   };
 }
@@ -449,9 +448,7 @@ async function loadGitDiff() {
 
   try {
     if (data.source === "pr" && data.prNumber) {
-      sourceLabelNode.textContent = data.prTitle
-        ? `PR #${data.prNumber} · ${data.prTitle}`
-        : `PR #${data.prNumber}`;
+      sourceLabelNode.textContent = `PR #${data.prNumber}`;
       showLoading(`Loading diff for PR #${data.prNumber}…`);
       const result = await window.muxy.exec(
         ["gh", "pr", "diff", String(data.prNumber), "--color", "never"],
@@ -469,9 +466,9 @@ async function loadGitDiff() {
     sourceLabelNode.textContent = "Working Tree";
     showLoading("Loading changes…");
     const base = ["git", "diff", "--no-ext-diff", "--no-color"];
-    let result = await window.muxy.exec([...base, "HEAD"], { timeoutMs: 15000 });
+    let result = await window.muxy.exec([...base, "HEAD"], { timeoutMs: 15000, cwd: data.cwd });
     if (result.exitCode !== 0) {
-      result = await window.muxy.exec(base, { timeoutMs: 15000 });
+      result = await window.muxy.exec(base, { timeoutMs: 15000, cwd: data.cwd });
     }
     if (result.exitCode !== 0) {
       throw new Error(result.stderr || `git diff exited with ${result.exitCode}`);

@@ -13,7 +13,8 @@
     "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
     "description": "Official Git extension for Muxy",
     "permissions": [
-      "projects:read",
+      "git:read",
+      "git:write",
       "commands:exec",
       "panels:write",
       "tabs:write",
@@ -23,7 +24,8 @@
     ],
     "events": [
       "project.switched",
-      "worktree.switched"
+      "worktree.switched",
+      "file.changed"
     ],
     "panels": [
       {

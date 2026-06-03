@@ -1,71 +1,95 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { toast, resolve_cwd, run_git } from "@/lib/git";
-import { gh_available, type PrInfo, type PrListItem } from "@/lib/gh";
+import { toast, alert_error, exec_git, active_worktree_path } from "@/lib/git";
 import {
   checkout_pr_here,
   checkout_pr_worktree,
-  local_branch_name,
+  close_pr,
+  create_pr,
   list_prs,
-  view_pr,
+  merge_pr,
+  type MergeMethod,
 } from "@/lib/git-prs";
 import { read_pr_cache, write_pr_cache } from "@/lib/pr-cache";
 
+export interface CreatePrInput {
+  title: string;
+  body: string;
+  baseBranch?: string;
+  newBranch?: string;
+}
+
 export type PrsState =
+  | { kind: "idle" }
   | { kind: "loading" }
-  | { kind: "no_gh" }
-  | { kind: "ready"; prs: PrListItem[] };
+  | { kind: "unavailable" }
+  | { kind: "ready"; prs: MuxyGitPRListItem[] };
 
 export function use_prs(active: boolean, refreshGit: () => Promise<void>) {
   const [state, set_state] = useState<PrsState>({ kind: "loading" });
   const [refreshing, set_refreshing] = useState(false);
   const [busy, set_busy] = useState<number | null>(null);
-  const cwd = useRef<string | undefined>(undefined);
   const loaded = useRef(false);
   const refresh_id = useRef(0);
+
+  const load = useCallback(async () => {
+    const id = ++refresh_id.current;
+    const current = () => refresh_id.current === id;
+    const key = await active_worktree_path();
+    const cached = read_pr_cache(key);
+    if (!current()) return;
+    set_state(cached ? { kind: "ready", prs: cached } : { kind: "idle" });
+  }, []);
 
   const refresh = useCallback(async () => {
     const id = ++refresh_id.current;
     const current = () => refresh_id.current === id;
     set_refreshing(true);
     try {
-      cwd.current = await resolve_cwd();
-
-      const cached = read_pr_cache(cwd.current);
-      if (cached && current()) set_state({ kind: "ready", prs: cached });
-
-      if (!(await gh_available(cwd.current))) {
-        if (current()) set_state({ kind: "no_gh" });
-        return;
-      }
-      const prs = await list_prs(cwd.current);
+      const key = await active_worktree_path();
+      const prs = await list_prs();
       if (!current()) return;
-      write_pr_cache(cwd.current, prs);
+      write_pr_cache(key, prs);
       set_state({ kind: "ready", prs });
+    } catch {
+      if (current() && read_pr_cache(await active_worktree_path()) === null) {
+        set_state({ kind: "unavailable" });
+      }
     } finally {
       if (current()) set_refreshing(false);
     }
   }, []);
 
   useEffect(() => {
-    if (active && !loaded.current) {
+    if (!active) return;
+    if (loaded.current) {
+      void load();
+    } else {
       loaded.current = true;
       void refresh();
     }
-  }, [active, refresh]);
+  }, [active, load, refresh]);
 
-  const detail = useCallback((number: number): Promise<PrInfo | null> => {
-    return view_pr(cwd.current, number);
-  }, []);
+  useEffect(() => {
+    const reload = () => {
+      if (active) void load();
+    };
+    const off_project = muxy.events.subscribe("project.switched", reload);
+    const off_worktree = muxy.events.subscribe("worktree.switched", reload);
+    return () => {
+      off_project?.();
+      off_worktree?.();
+    };
+  }, [active, load]);
 
   const checkout_here = useCallback(
-    async (pr: PrListItem) => {
+    async (pr: MuxyGitPRListItem) => {
       set_busy(pr.number);
       try {
-        const res = await checkout_pr_here(cwd.current, pr.number);
-        if (res.ok) {
-          toast(`Checked out PR #${pr.number}`);
-          await refreshGit();
-        }
+        await checkout_pr_here(pr.number);
+        toast(`Checked out PR #${pr.number}`);
+        await refreshGit();
+      } catch (err) {
+        await alert_error(`Could not checkout PR #${pr.number}`, err);
       } finally {
         set_busy(null);
       }
@@ -73,47 +97,111 @@ export function use_prs(active: boolean, refreshGit: () => Promise<void>) {
     [refreshGit],
   );
 
-  const checkout_worktree = useCallback(async (pr: PrListItem) => {
+  const checkout_worktree = useCallback(async (pr: MuxyGitPRListItem) => {
     set_busy(pr.number);
     try {
-      const path = await worktree_path(cwd.current, local_branch_name({
-        number: pr.number,
-        headBranch: pr.headBranch,
-        headRepositoryNameWithOwner: "",
-      }));
+      const path = await worktree_path(pr.headBranch || `pr-${pr.number}`);
       if (!path) {
-        toast("Could not resolve worktree location", "error");
+        await alert_error(
+          `Could not checkout PR #${pr.number}`,
+          new Error("Could not resolve a location for the new worktree."),
+        );
         return;
       }
-      const res = await checkout_pr_worktree(cwd.current, pr.number, path);
-      if (res.ok && res.path && res.branch) {
-        toast(`Created worktree for PR #${pr.number}`);
-        await muxy.worktrees.refresh();
-        await muxy.worktrees.switchTo(res.path).catch(() => muxy.worktrees.switchTo(res.branch!));
-      }
+      await checkout_pr_worktree(pr.number, path);
+      toast(`Created worktree for PR #${pr.number}`);
+      await muxy.worktrees.refresh();
+      await muxy.git.worktree.switchTo({ identifier: path }).catch(() =>
+        muxy.worktrees.switchTo(path),
+      );
+    } catch (err) {
+      await alert_error(`Could not checkout PR #${pr.number}`, err);
     } finally {
       set_busy(null);
     }
   }, []);
 
-  return { state, refreshing, busy, refresh, detail, checkout_here, checkout_worktree };
+  const merge = useCallback(
+    async (number: number, method: MergeMethod, deleteBranch: boolean) => {
+      set_busy(number);
+      try {
+        await merge_pr(number, method, deleteBranch);
+        toast(`Merged PR #${number}`);
+        await Promise.all([refresh(), refreshGit()]);
+        return true;
+      } catch (err) {
+        await alert_error(`Could not merge PR #${number}`, err);
+        return false;
+      } finally {
+        set_busy(null);
+      }
+    },
+    [refresh, refreshGit],
+  );
+
+  const close = useCallback(
+    async (number: number) => {
+      set_busy(number);
+      try {
+        await close_pr(number);
+        toast(`Closed PR #${number}`);
+        await Promise.all([refresh(), refreshGit()]);
+        return true;
+      } catch (err) {
+        await alert_error(`Could not close PR #${number}`, err);
+        return false;
+      } finally {
+        set_busy(null);
+      }
+    },
+    [refresh, refreshGit],
+  );
+
+  const create = useCallback(
+    async (input: CreatePrInput) => {
+      try {
+        if (input.newBranch) {
+          await muxy.git.branch.create({ name: input.newBranch });
+        }
+        const pushed = await exec_git(
+          await active_worktree_path(),
+          ["push", "-u", "origin", "HEAD"],
+          "Could not push branch",
+        );
+        if (!pushed) return false;
+        const pr = await create_pr(input.title, input.body, input.baseBranch);
+        toast(`Created PR #${pr.number}`);
+        await Promise.all([refresh(), refreshGit()]);
+        return true;
+      } catch (err) {
+        await alert_error("Could not create pull request", err);
+        return false;
+      }
+    },
+    [refresh, refreshGit],
+  );
+
+  return {
+    state,
+    refreshing,
+    busy,
+    refresh,
+    checkout_here,
+    checkout_worktree,
+    merge,
+    close,
+    create,
+  };
 }
 
-async function worktree_path(
-  cwd: string | undefined,
-  branch: string,
-): Promise<string | null> {
+async function worktree_path(branch: string): Promise<string | null> {
   const slug = branch.replace(/\//g, "-");
-  const existing = await muxy.worktrees.list().catch(() => [] as never[]);
+  const existing = await muxy.worktrees.list().catch(() => [] as MuxyWorktree[]);
   const sibling = existing.find((w) => !w.isPrimary)?.path;
   if (sibling) return join(parent(sibling), slug);
 
-  const common = await run_git(cwd, ["rev-parse", "--git-common-dir"], { quiet: true });
-  if (common.ok && common.stdout.trim()) {
-    const gitDir = common.stdout.trim();
-    const repoRoot = gitDir.endsWith("/.git") ? gitDir.slice(0, -5) : parent(gitDir);
-    return join(parent(repoRoot), `${base(repoRoot)}-worktrees`, slug);
-  }
+  const primary = existing.find((w) => w.isPrimary)?.path ?? existing[0]?.path;
+  if (primary) return join(parent(primary), `${base(primary)}-worktrees`, slug);
   return null;
 }
 

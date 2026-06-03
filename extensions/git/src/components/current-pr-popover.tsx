@@ -1,0 +1,343 @@
+import { useState } from "react";
+import { ExternalLink, GitMerge, Loader2, Trash2, XCircle } from "lucide-react";
+import { pr_state, type MergeMethod } from "@/lib/git-prs";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { PrStateIcon } from "./pr-state-icon";
+
+interface CurrentPrPopoverProps {
+  pr: MuxyGitPR;
+  busy: boolean;
+  onMerge: (method: MergeMethod, deleteBranch: boolean) => Promise<boolean>;
+  onClose: (number: number) => Promise<boolean>;
+  onCleanup: () => Promise<boolean>;
+}
+
+type Confirm =
+  | { kind: "none" }
+  | { kind: "merge"; method: MergeMethod }
+  | { kind: "close" };
+
+export function CurrentPrPopover({ pr, busy, onMerge, onClose, onCleanup }: CurrentPrPopoverProps) {
+  const [open, set_open] = useState(false);
+  const [confirm, set_confirm] = useState<Confirm>({ kind: "none" });
+  const [deleteBranch, set_delete_branch] = useState(true);
+
+  function on_open(next: boolean) {
+    set_open(next);
+    if (!next) set_confirm({ kind: "none" });
+  }
+
+  async function run(action: Promise<boolean>) {
+    const ok = await action;
+    set_confirm({ kind: "none" });
+    if (ok) set_open(false);
+  }
+
+  return (
+    <Popover open={open} onOpenChange={on_open}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          title={`PR #${pr.number}`}
+          className="flex items-center gap-1.5 rounded-md border border-border bg-muted px-2 py-1 text-[12px] font-medium text-foreground outline-none transition-colors hover:border-primary hover:bg-accent"
+        >
+          <PrStateIcon pr={pr} size={13} />
+          <span className="font-mono">#{pr.number}</span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-72 p-3">
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-1.5">
+            <PrStateIcon pr={pr} size={13} />
+            <span className="font-mono text-[12px] font-semibold text-foreground">#{pr.number}</span>
+            <span className="text-[11px] text-muted-foreground">{state_label(pr)}</span>
+          </div>
+          <Row label="Base" value={pr.baseBranch} />
+          <Row label="Mergeable" value={mergeable_label(pr)} tone={mergeable_tone(pr)} />
+          <ChecksRow checks={pr.checks} />
+
+          {confirm.kind === "none" ? (
+            <Actions
+              pr={pr}
+              busy={busy}
+              onMerge={(method) => set_confirm({ kind: "merge", method })}
+              onClose={() => set_confirm({ kind: "close" })}
+            />
+          ) : confirm.kind === "merge" ? (
+            <ConfirmMerge
+              method={confirm.method}
+              deleteBranch={deleteBranch}
+              onToggleDelete={set_delete_branch}
+              onCancel={() => set_confirm({ kind: "none" })}
+              onConfirm={() => void run(onMerge(confirm.method, deleteBranch))}
+            />
+          ) : (
+            <ConfirmClose
+              number={pr.number}
+              onCancel={() => set_confirm({ kind: "none" })}
+              onConfirm={() => void run(onClose(pr.number))}
+            />
+          )}
+
+          {confirm.kind === "none" && !busy && (
+            <button
+              type="button"
+              onClick={() => void run(onCleanup())}
+              className="flex h-7 items-center justify-center gap-1.5 rounded-md border border-border text-[11px] font-medium text-foreground outline-none transition-colors hover:border-primary hover:bg-accent"
+            >
+              <Trash2 size={12} strokeWidth={2} />
+              Clean up branch
+            </button>
+          )}
+
+          <a
+            href={pr.url}
+            target="_blank"
+            rel="noreferrer"
+            className="flex h-7 items-center justify-center gap-1.5 rounded-md border border-border bg-muted text-[11px] font-medium text-foreground outline-none transition-colors hover:border-primary hover:bg-accent"
+          >
+            <ExternalLink size={12} strokeWidth={2} />
+            View on GitHub
+          </a>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function Actions({
+  pr,
+  busy,
+  onMerge,
+  onClose,
+}: {
+  pr: MuxyGitPR;
+  busy: boolean;
+  onMerge: (method: MergeMethod) => void;
+  onClose: () => void;
+}) {
+  if (busy) {
+    return (
+      <span className="mt-1 flex h-7 items-center justify-center gap-2 text-[11px] text-muted-foreground">
+        <Loader2 size={13} className="animate-spin" />
+        Working…
+      </span>
+    );
+  }
+
+  const state = pr_state(pr);
+  if (state !== "open") {
+    return (
+      <span className="mt-1 flex h-7 items-center justify-center rounded-md border border-border text-[11px] text-muted-foreground">
+        This PR is {state}.
+      </span>
+    );
+  }
+
+  const blockedReason = merge_blocked_reason(pr);
+  return (
+    <div className="mt-1 flex flex-col gap-1.5">
+      <MergeButton label="Merge commit" disabled={!!blockedReason} onClick={() => onMerge("merge")} />
+      <MergeButton label="Squash & merge" disabled={!!blockedReason} onClick={() => onMerge("squash")} />
+      <MergeButton label="Rebase & merge" disabled={!!blockedReason} onClick={() => onMerge("rebase")} />
+      {blockedReason && (
+        <span className="text-center text-[10px] text-muted-foreground">{blockedReason}</span>
+      )}
+      <button
+        type="button"
+        onClick={onClose}
+        className="flex h-7 items-center justify-center gap-1.5 rounded-md border border-border text-[11px] font-medium text-diff-remove outline-none transition-colors hover:bg-accent"
+      >
+        <XCircle size={12} strokeWidth={2} />
+        Close PR
+      </button>
+    </div>
+  );
+}
+
+function merge_blocked_reason(pr: MuxyGitPR): string | null {
+  if (pr.isDraft) return "Draft PRs can't be merged.";
+  if (pr.mergeable === false || pr.mergeStateStatus === "DIRTY") return "Has merge conflicts.";
+  if (pr.mergeStateStatus === "BLOCKED") return "Merge is blocked by branch rules.";
+  if (pr.mergeStateStatus === "BEHIND") return "Branch is behind the base.";
+  return null;
+}
+
+function MergeButton({
+  label,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="flex h-7 items-center justify-center gap-1.5 rounded-md border border-border bg-muted text-[11px] font-medium text-foreground outline-none transition-colors hover:border-primary hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+    >
+      <GitMerge size={12} strokeWidth={2} />
+      {label}
+    </button>
+  );
+}
+
+function ConfirmMerge({
+  method,
+  deleteBranch,
+  onToggleDelete,
+  onCancel,
+  onConfirm,
+}: {
+  method: MergeMethod;
+  deleteBranch: boolean;
+  onToggleDelete: (next: boolean) => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="mt-1 flex flex-col gap-2 rounded-md border border-border p-2">
+      <span className="text-[11px] text-foreground">{method_label(method)} this PR?</span>
+      <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+        <input
+          type="checkbox"
+          checked={deleteBranch}
+          onChange={(e) => onToggleDelete(e.target.checked)}
+        />
+        Delete head branch after merge
+      </label>
+      <div className="flex gap-1.5">
+        <ConfirmButton label="Cancel" onClick={onCancel} />
+        <ConfirmButton label={method_label(method)} tone="primary" onClick={onConfirm} />
+      </div>
+    </div>
+  );
+}
+
+function ConfirmClose({
+  number,
+  onCancel,
+  onConfirm,
+}: {
+  number: number;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="mt-1 flex flex-col gap-2 rounded-md border border-border p-2">
+      <span className="text-[11px] text-foreground">Close PR #{number}?</span>
+      <div className="flex gap-1.5">
+        <ConfirmButton label="Cancel" onClick={onCancel} />
+        <ConfirmButton label="Close PR" tone="danger" onClick={onConfirm} />
+      </div>
+    </div>
+  );
+}
+
+function ConfirmButton({
+  label,
+  tone = "default",
+  onClick,
+}: {
+  label: string;
+  tone?: "default" | "primary" | "danger";
+  onClick: () => void;
+}) {
+  const cls =
+    tone === "primary"
+      ? "bg-primary text-primary-foreground font-semibold hover:brightness-110"
+      : tone === "danger"
+        ? "border border-border text-diff-remove hover:bg-accent"
+        : "border border-border text-foreground hover:bg-accent";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex h-7 flex-1 items-center justify-center rounded-md text-[11px] font-medium outline-none transition-colors ${cls}`}
+    >
+      {label}
+    </button>
+  );
+}
+
+function ChecksRow({ checks }: { checks: MuxyGitPRChecks }) {
+  if (checks.status === "none") return <Row label="Checks" value="—" />;
+  const parts = [
+    checks.passing > 0 && `${checks.passing} passing`,
+    checks.failing > 0 && `${checks.failing} failing`,
+    checks.pending > 0 && `${checks.pending} running`,
+  ].filter(Boolean) as string[];
+  const tone: Tone =
+    checks.status === "failure" ? "negative" : checks.status === "success" ? "positive" : "default";
+  return <Row label="Checks" value={parts.join(" · ") || "—"} tone={tone} />;
+}
+
+type Tone = "positive" | "negative" | "muted" | "default";
+
+function Row({ label, value, tone = "default" }: { label: string; value: string; tone?: Tone }) {
+  const color =
+    tone === "positive"
+      ? "text-diff-add"
+      : tone === "negative"
+        ? "text-diff-remove"
+        : tone === "muted"
+          ? "text-muted-foreground"
+          : "text-foreground";
+  return (
+    <div className="flex items-center gap-2">
+      <span className="w-[68px] shrink-0 text-[11px] text-muted-foreground">{label}</span>
+      <span className={`truncate font-mono text-[11px] font-medium ${color}`}>{value}</span>
+    </div>
+  );
+}
+
+function method_label(method: MergeMethod): string {
+  if (method === "squash") return "Squash & merge";
+  if (method === "rebase") return "Rebase & merge";
+  return "Merge commit";
+}
+
+function state_label(pr: MuxyGitPR): string {
+  const state = pr_state(pr);
+  if (state === "open") return pr.isDraft ? "Draft · Open" : "Open";
+  if (state === "merged") return "Merged";
+  return "Closed";
+}
+
+function mergeable_label(pr: MuxyGitPR): string {
+  if (pr.mergeable === false) return "Conflicts";
+  switch (pr.mergeStateStatus) {
+    case "DIRTY":
+      return "Conflicts";
+    case "BEHIND":
+      return "Behind base";
+    case "BLOCKED":
+      return "Blocked";
+    case "DRAFT":
+      return "Draft";
+    default:
+      break;
+  }
+  if (pr.checks.status === "failure") return "Yes (checks failing)";
+  if (pr.checks.status === "pending") return "Yes (checks running)";
+  return "Yes";
+}
+
+function mergeable_tone(pr: MuxyGitPR): Tone {
+  if (pr.mergeable === false) return "negative";
+  switch (pr.mergeStateStatus) {
+    case "DIRTY":
+    case "BEHIND":
+    case "BLOCKED":
+      return "negative";
+    case "DRAFT":
+      return "muted";
+    default:
+      break;
+  }
+  if (pr.checks.status === "failure") return "negative";
+  return "positive";
+}

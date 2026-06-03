@@ -1,32 +1,19 @@
 import { useState } from "react";
 import { ExternalLink } from "lucide-react";
-import type { PrInfo, PrListItem } from "@/lib/gh";
+import { pr_state } from "@/lib/git-prs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { PrStateIcon } from "./pr-state-icon";
 
 interface PrStatusPopoverProps {
-  pr: PrListItem;
-  loadDetail: (number: number) => Promise<PrInfo | null>;
+  pr: MuxyGitPRListItem;
   children: React.ReactNode;
 }
 
-export function PrStatusPopover({ pr, loadDetail, children }: PrStatusPopoverProps) {
+export function PrStatusPopover({ pr, children }: PrStatusPopoverProps) {
   const [open, set_open] = useState(false);
-  const [info, set_info] = useState<PrInfo | null>(null);
-  const [loading, set_loading] = useState(false);
-
-  function on_open(next: boolean) {
-    set_open(next);
-    if (next && !info && !loading) {
-      set_loading(true);
-      void loadDetail(pr.number)
-        .then((res) => set_info(res))
-        .finally(() => set_loading(false));
-    }
-  }
 
   return (
-    <Popover open={open} onOpenChange={on_open}>
+    <Popover open={open} onOpenChange={set_open}>
       <PopoverTrigger asChild>{children}</PopoverTrigger>
       <PopoverContent align="end" className="w-64 p-3">
         <div className="flex flex-col gap-2">
@@ -35,20 +22,12 @@ export function PrStatusPopover({ pr, loadDetail, children }: PrStatusPopoverPro
             <span className="truncate text-[12px] font-semibold text-foreground">{pr.title}</span>
           </div>
           <Row label="PR" value={`#${pr.number}`} />
-          <Row label="State" value={state_label(info, pr)} />
-          <Row label="Base" value={info?.baseBranch || pr.baseBranch} />
-          {loading && !info ? (
-            <Row label="Status" value="loading…" />
-          ) : info ? (
-            <>
-              <Row label="Mergeable" value={mergeable_label(info)} tone={mergeable_tone(info)} />
-              <ChecksRow pr={pr} />
-            </>
-          ) : (
-            <ChecksRow pr={pr} />
-          )}
+          <Row label="State" value={state_label(pr)} />
+          <Row label="Base" value={pr.baseBranch} />
+          <Row label="Mergeable" value={mergeable_label(pr)} tone={mergeable_tone(pr)} />
+          <ChecksRow pr={pr} />
           <a
-            href={info?.url || pr.url}
+            href={pr.url}
             target="_blank"
             rel="noreferrer"
             className="mt-1 flex h-7 items-center justify-center gap-1.5 rounded-md border border-border bg-muted text-[11px] font-medium text-foreground outline-none transition-colors hover:border-primary hover:bg-accent"
@@ -62,7 +41,7 @@ export function PrStatusPopover({ pr, loadDetail, children }: PrStatusPopoverPro
   );
 }
 
-function ChecksRow({ pr }: { pr: PrListItem }) {
+function ChecksRow({ pr }: { pr: MuxyGitPRListItem }) {
   const c = pr.checks;
   if (c.status === "none") return <Row label="Checks" value="—" />;
   if (c.status === "success")
@@ -91,17 +70,16 @@ function Row({ label, value, tone = "default" }: { label: string; value: string;
   );
 }
 
-function state_label(info: PrInfo | null, pr: PrListItem): string {
-  const draft = info?.isDraft ?? pr.isDraft;
-  const state = info?.state ?? pr.state;
-  if (state === "open") return draft ? "Draft · Open" : "Open";
+function state_label(pr: MuxyGitPRListItem): string {
+  const state = pr_state(pr);
+  if (state === "open") return pr.isDraft ? "Draft · Open" : "Open";
   if (state === "merged") return "Merged";
   return "Closed";
 }
 
-function mergeable_label(info: PrInfo): string {
-  if (info.mergeable === false) return "Conflicts";
-  switch (info.mergeStateStatus) {
+function mergeable_label(pr: MuxyGitPRListItem): string {
+  if (pr.mergeable === false) return "Conflicts";
+  switch (pr.mergeStateStatus) {
     case "DIRTY":
       return "Conflicts";
     case "BEHIND":
@@ -113,14 +91,14 @@ function mergeable_label(info: PrInfo): string {
     default:
       break;
   }
-  if (info.checks.status === "failure") return "Yes (checks failing)";
-  if (info.checks.status === "pending") return "Yes (checks running)";
+  if (pr.checks.status === "failure") return "Yes (checks failing)";
+  if (pr.checks.status === "pending") return "Yes (checks running)";
   return "Yes";
 }
 
-function mergeable_tone(info: PrInfo): Tone {
-  if (info.mergeable === false) return "negative";
-  switch (info.mergeStateStatus) {
+function mergeable_tone(pr: MuxyGitPRListItem): Tone {
+  if (pr.mergeable === false) return "negative";
+  switch (pr.mergeStateStatus) {
     case "DIRTY":
     case "BEHIND":
     case "BLOCKED":
@@ -130,6 +108,6 @@ function mergeable_tone(info: PrInfo): Tone {
     default:
       break;
   }
-  if (info.checks.status === "failure") return "negative";
+  if (pr.checks.status === "failure") return "negative";
   return "positive";
 }

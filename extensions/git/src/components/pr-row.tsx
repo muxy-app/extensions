@@ -11,15 +11,13 @@ import {
   SquareStack,
   XOctagon,
 } from "lucide-react";
-import type { PrInfo, PrListItem } from "@/lib/gh";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { PrStatusPopover } from "./pr-status-popover";
 import { PrStateIcon } from "./pr-state-icon";
 
 interface PrRowProps {
-  pr: PrListItem;
+  pr: MuxyGitPRListItem;
   busy: boolean;
-  loadDetail: (number: number) => Promise<PrInfo | null>;
   onCheckoutHere: () => void;
   onCheckoutWorktree: () => void;
   onViewDiff: () => void;
@@ -28,14 +26,13 @@ interface PrRowProps {
 export function PrRow({
   pr,
   busy,
-  loadDetail,
   onCheckoutHere,
   onCheckoutWorktree,
   onViewDiff,
 }: PrRowProps) {
   return (
     <li className="group flex items-center gap-2 px-2.5 py-1.5 hover:bg-accent">
-      <PrStatusPopover pr={pr} loadDetail={loadDetail}>
+      <PrStatusPopover pr={pr}>
         <button type="button" className="shrink-0 outline-none" title="PR status">
           <PrStateIcon pr={pr} />
         </button>
@@ -75,7 +72,7 @@ export function PrRow({
   );
 }
 
-function ChecksBadge({ pr }: { pr: PrListItem }) {
+function ChecksBadge({ pr }: { pr: MuxyGitPRListItem }) {
   switch (pr.checks.status) {
     case "pending":
       return <Clock size={12} strokeWidth={2} className="shrink-0 text-muted-foreground" />;

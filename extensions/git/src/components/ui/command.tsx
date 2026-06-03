@@ -15,6 +15,10 @@ export function CommandInput({ className, ...props }: ComponentProps<typeof Comm
   return (
     <div className="border-b border-border px-2">
       <CommandPrimitive.Input
+        spellCheck={false}
+        autoCorrect="off"
+        autoCapitalize="off"
+        autoComplete="off"
         className={cn(
           "flex h-9 w-full bg-transparent py-2 text-sm outline-none placeholder:text-muted-foreground",
           className,

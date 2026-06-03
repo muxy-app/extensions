@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { toast, resolve_cwd, run_git } from "@/lib/git";
-import { apply_stats, parse_numstat, parse_status, type GitStatus } from "@/lib/git-status";
+import {
+  toast,
+  exec_git,
+  try_action,
+  to_view_status,
+  active_worktree_path,
+  confirm_action,
+  alert_error,
+} from "@/lib/git";
+import type { GitStatus } from "@/lib/git-status";
 import { list_branches, type BranchList } from "@/lib/git-branches";
 
 export type RepoState =
@@ -10,53 +18,29 @@ export type RepoState =
 
 export function use_git_panel() {
   const [state, set_state] = useState<RepoState>({ kind: "loading" });
-  const cwd = useRef<string | undefined>(undefined);
+  const [switching, set_switching] = useState(false);
   const refresh_id = useRef(0);
 
   const refresh = useCallback(async () => {
     const id = ++refresh_id.current;
     const current = () => refresh_id.current === id;
-
-    cwd.current = await resolve_cwd();
-    const probe = await run_git(cwd.current, ["rev-parse", "--is-inside-work-tree"], {
-      quiet: true,
-    });
-    if (!current()) return;
-    if (!probe.ok || probe.stdout.trim() !== "true") {
-      set_state({ kind: "no_repo" });
-      return;
-    }
-    const [res, staged_diff, unstaged_diff] = await Promise.all([
-      run_git(cwd.current, ["status", "--porcelain=v2", "--branch", "--untracked-files=all"]),
-      run_git(cwd.current, ["diff", "--cached", "--numstat"], { quiet: true }),
-      run_git(cwd.current, ["diff", "--numstat"], { quiet: true }),
-    ]);
-    if (!current() || !res.ok) return;
-    const status = parse_status(res.stdout);
-    if (staged_diff.ok) apply_stats(status.staged, parse_numstat(staged_diff.stdout));
-    if (unstaged_diff.ok) apply_stats(status.unstaged, parse_numstat(unstaged_diff.stdout));
-
-    set_state({ kind: "ready", status });
-
-    const untracked = status.unstaged.filter((e) => e.label === "?");
-    if (untracked.length === 0) return;
-    for (const entry of untracked) {
+    try {
+      const native = await muxy.git.status();
       if (!current()) return;
-      const out = await run_git(
-        cwd.current,
-        ["diff", "--no-index", "--numstat", "--", "/dev/null", entry.path],
-        { quiet: true },
-      );
-      const stat = parse_numstat(out.stdout).values().next().value;
-      if (stat) {
-        entry.added = stat.added;
-        entry.removed = stat.removed;
-      }
+      set_state({ kind: "ready", status: to_view_status(native) });
+    } catch {
+      if (current()) set_state({ kind: "no_repo" });
     }
-    if (!current()) return;
-
-    set_state({ kind: "ready", status: { ...status } });
   }, []);
+
+  const switch_scope = useCallback(async () => {
+    set_switching(true);
+    try {
+      await refresh();
+    } finally {
+      set_switching(false);
+    }
+  }, [refresh]);
 
   const reconcile_timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconcile = useCallback(() => {
@@ -66,15 +50,6 @@ export function use_git_panel() {
       void refresh();
     }, 250);
   }, [refresh]);
-
-  const run_action = useCallback(
-    async (args: string[]) => {
-      const res = await run_git(cwd.current, args);
-      if (res.ok) await refresh();
-      return res;
-    },
-    [refresh],
-  );
 
   const move_entry = useCallback(
     (path: string, from: "staged" | "unstaged", to: "staged" | "unstaged") => {
@@ -103,10 +78,10 @@ export function use_git_panel() {
   const stage = useCallback(
     async (path: string) => {
       move_entry(path, "unstaged", "staged");
-      const res = await run_git(cwd.current, ["add", "--", path]);
-      if (res.ok) reconcile();
+      const ok = await try_action(() => muxy.git.stage({ paths: [path] }), "Could not stage file");
+      if (ok) reconcile();
       else void refresh();
-      return res;
+      return ok;
     },
     [move_entry, reconcile, refresh],
   );
@@ -114,60 +89,162 @@ export function use_git_panel() {
   const unstage = useCallback(
     async (path: string) => {
       move_entry(path, "staged", "unstaged");
-      const res = await run_git(cwd.current, ["reset", "-q", "HEAD", "--", path]);
-      if (res.ok) reconcile();
+      const ok = await try_action(() => muxy.git.unstage({ paths: [path] }), "Could not unstage file");
+      if (ok) reconcile();
       else void refresh();
-      return res;
+      return ok;
     },
     [move_entry, reconcile, refresh],
   );
 
+  const stage_all = useCallback(async () => {
+    const ok = await try_action(() => muxy.git.stage({ paths: [] }), "Could not stage changes");
+    await refresh();
+    return ok;
+  }, [refresh]);
+
+  const unstage_all = useCallback(async () => {
+    const ok = await try_action(() => muxy.git.unstage({ paths: [] }), "Could not unstage changes");
+    await refresh();
+    return ok;
+  }, [refresh]);
+
+  const commit = useCallback(
+    async (message: string) => {
+      const ok = await try_action(() => muxy.git.commit({ message }), "Commit failed");
+      if (ok) {
+        toast("Commit created");
+        await refresh();
+      }
+      return ok;
+    },
+    [refresh],
+  );
+
   const sync = useCallback(
-    async (args: string[], success: string) => {
-      const res = await run_git(cwd.current, args);
-      if (res.ok) {
+    async (op: "push" | "pull", success: string) => {
+      const ok = await try_action(
+        () => (op === "push" ? muxy.git.push() : muxy.git.pull()),
+        op === "push" ? "Push failed" : "Pull failed",
+      );
+      if (ok) {
         toast(success);
         await refresh();
       }
-      return res;
+      return ok;
     },
     [refresh],
   );
 
-  const get_branches = useCallback((): Promise<BranchList> => list_branches(cwd.current), []);
+  const get_branches = useCallback((): Promise<BranchList> => list_branches(), []);
 
   const checkout = useCallback(
     async (name: string, create: boolean) => {
-      const args = create ? ["checkout", "-b", name] : ["checkout", name];
-      const res = await run_git(cwd.current, args);
-      if (res.ok) {
+      const ok = await try_action(
+        () =>
+          create ? muxy.git.branch.create({ name }) : muxy.git.branch.switchTo({ branch: name }),
+        create ? "Could not create branch" : "Could not switch branch",
+      );
+      if (ok) {
         toast(create ? `Created branch ${name}` : `Switched to ${name}`);
         await refresh();
       }
-      return res;
+      return ok;
     },
     [refresh],
   );
 
-  const delete_branch = useCallback(
-    async (name: string) => {
-      const res = await run_git(cwd.current, ["branch", "-D", name]);
-      if (res.ok) toast(`Deleted branch ${name}`);
-      return res;
-    },
-    [],
-  );
+  const delete_branch = useCallback(async (name: string) => {
+    const ok = await exec_git(
+      await active_worktree_path(),
+      ["branch", "-D", name],
+      "Could not delete branch",
+    );
+    if (ok) toast(`Deleted branch ${name}`);
+    return ok;
+  }, []);
+
+  const cleanup = useCallback(async () => {
+    if (state.kind !== "ready") return false;
+    const branch = state.status.branch;
+    const defaultBranch = state.status.defaultBranch;
+    if (!branch) return false;
+
+    const worktrees = await muxy.worktrees.list().catch(() => [] as MuxyWorktree[]);
+    const active = worktrees.find((w) => w.isActive) ?? worktrees.find((w) => w.isPrimary);
+    const isWorktree = !!active && !active.isPrimary;
+    const dirty = state.status.staged.length > 0 || state.status.unstaged.length > 0;
+
+    const message = isWorktree
+      ? `This removes the worktree and deletes branch "${branch}".${
+          dirty ? " Uncommitted changes in this worktree will be lost permanently." : ""
+        }`
+      : `This switches to ${defaultBranch ?? "the default branch"} and deletes branch "${branch}".${
+          dirty ? " Uncommitted changes on this branch will no longer belong to any branch." : ""
+        }`;
+    const ok = await confirm_action({
+      title: `Clean up branch "${branch}"?`,
+      message,
+      confirmLabel: "Clean Up",
+      critical: dirty,
+    });
+    if (!ok) return false;
+
+    try {
+      if (isWorktree && active) {
+        const replacement =
+          worktrees.find((w) => w.isPrimary && w.id !== active.id) ??
+          worktrees.find((w) => w.id !== active.id);
+        if (replacement) {
+          await muxy.git.worktree
+            .switchTo({ identifier: replacement.path })
+            .catch(() => muxy.worktrees.switchTo(replacement.path));
+        }
+        await muxy.git.worktree.remove({ path: active.path, force: dirty });
+        await muxy.git.branch.deleteRemote({ branch }).catch(() => undefined);
+        await muxy.worktrees.refresh();
+      } else {
+        if (defaultBranch && defaultBranch !== branch) {
+          await muxy.git.branch.switchTo({ branch: defaultBranch });
+        }
+        await exec_git(await active_worktree_path(), ["branch", "-D", branch], "Could not delete branch");
+        await muxy.git.branch.deleteRemote({ branch }).catch(() => undefined);
+        await refresh();
+      }
+      toast(`Cleaned up ${branch}`);
+      return true;
+    } catch (err) {
+      await alert_error("Cleanup failed", err);
+      return false;
+    }
+  }, [state, refresh]);
 
   useEffect(() => {
     void refresh();
-    const off_project = muxy.events.subscribe("project.switched", () => void refresh());
-    const off_worktree = muxy.events.subscribe("worktree.switched", () => void refresh());
+    const off_project = muxy.events.subscribe("project.switched", () => void switch_scope());
+    const off_worktree = muxy.events.subscribe("worktree.switched", () => void switch_scope());
+    const off_file = muxy.events.subscribe("file.changed", () => reconcile());
     return () => {
       off_project?.();
       off_worktree?.();
+      off_file?.();
       if (reconcile_timer.current) clearTimeout(reconcile_timer.current);
     };
-  }, [refresh]);
+  }, [refresh, switch_scope, reconcile]);
 
-  return { state, refresh, run_action, stage, unstage, sync, get_branches, checkout, delete_branch };
+  return {
+    state,
+    switching,
+    refresh,
+    stage,
+    unstage,
+    stage_all,
+    unstage_all,
+    commit,
+    sync,
+    get_branches,
+    checkout,
+    delete_branch,
+    cleanup,
+  };
 }

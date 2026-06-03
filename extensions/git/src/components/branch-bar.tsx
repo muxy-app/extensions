@@ -1,6 +1,5 @@
 import { useState, type ReactNode } from "react";
 import { RotateCw, X } from "lucide-react";
-import type { GitResult } from "@/lib/git";
 import type { BranchList } from "@/lib/git-branches";
 import { ICON_SIZE, ICON_STROKE } from "@/lib/icons";
 import { BranchPicker } from "./branch-picker";
@@ -10,11 +9,12 @@ interface BranchBarProps {
   ahead: number;
   behind: number;
   loadBranches: () => Promise<BranchList>;
-  onCheckout: (name: string, create: boolean) => Promise<GitResult>;
-  onDeleteBranch: (name: string) => Promise<GitResult>;
+  onCheckout: (name: string, create: boolean) => Promise<boolean>;
+  onDeleteBranch: (name: string) => Promise<boolean>;
   onRefresh: () => Promise<unknown>;
   onClose: () => void;
   leading?: ReactNode;
+  trailing?: ReactNode;
 }
 
 export function BranchBar({
@@ -27,6 +27,7 @@ export function BranchBar({
   onRefresh,
   onClose,
   leading,
+  trailing,
 }: BranchBarProps) {
   const [refreshing, set_refreshing] = useState(false);
   const tracking = [ahead && `↑${ahead}`, behind && `↓${behind}`].filter(Boolean).join(" ");
@@ -51,7 +52,8 @@ export function BranchBar({
         onCheckout={onCheckout}
         onDeleteBranch={onDeleteBranch}
       />
-      <div className="ml-auto flex flex-shrink-0">
+      <div className="ml-auto flex flex-shrink-0 items-center gap-1.5">
+        {trailing}
         <button
           type="button"
           title="Refresh"

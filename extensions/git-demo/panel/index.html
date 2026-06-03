@@ -183,6 +183,12 @@
         return list.length + ' branches';
       } }));
 
+      reads.push(addRow({ name: 'remoteBranches', run: async () => {
+        const list = await muxy.git.remoteBranches();
+        assert(Array.isArray(list), 'not an array');
+        return list.length + ' remote branches';
+      } }));
+
       reads.push(addRow({ name: 'aheadBehind', run: async () => {
         const ab = await muxy.git.aheadBehind();
         assert(typeof ab.ahead === 'number' && typeof ab.behind === 'number', 'shape: ' + JSON.stringify(ab));
@@ -304,6 +310,46 @@
           return 'on ' + target;
         } });
 
+      addRow({ name: 'checkout (detached)', destructive: true,
+        inputs: [{ key: 'hash', placeholder: 'commit hash', width: 200 }],
+        run: async (v) => {
+          assert(v.hash, 'enter a commit hash (e.g. from log)');
+          await muxy.git.checkout({ hash: v.hash });
+          return 'detached at ' + v.hash;
+        } });
+
+      addRow({ name: 'cherryPick', destructive: true,
+        inputs: [{ key: 'hash', placeholder: 'commit hash', width: 200 }],
+        run: async (v) => {
+          assert(v.hash, 'enter a commit hash');
+          await muxy.git.cherryPick({ hash: v.hash });
+          return 'cherry-picked ' + v.hash;
+        } });
+
+      addRow({ name: 'revert', destructive: true,
+        inputs: [{ key: 'hash', placeholder: 'commit hash', width: 200 }],
+        run: async (v) => {
+          assert(v.hash, 'enter a commit hash');
+          await muxy.git.revert({ hash: v.hash });
+          return 'reverted (staged, not committed) ' + v.hash;
+        } });
+
+      addRow({ name: 'tag.create', destructive: true,
+        inputs: [{ key: 'name', placeholder: 'tag name', width: 110 }, { key: 'hash', placeholder: 'commit hash', width: 140 }],
+        run: async (v) => {
+          assert(v.name && v.hash, 'name and hash required');
+          await muxy.git.tag.create({ name: v.name, hash: v.hash });
+          return 'tagged ' + v.name + ' → ' + v.hash;
+        } });
+
+      addRow({ name: 'branch.deleteRemote', destructive: true,
+        inputs: [{ key: 'branch', placeholder: 'remote branch name', width: 200 }],
+        run: async (v) => {
+          assert(v.branch, 'enter a branch name (pushes a delete to origin)');
+          await muxy.git.branch.deleteRemote({ branch: v.branch });
+          return 'deleted origin/' + v.branch;
+        } });
+
       // ---------- WORKTREE ----------
       group('worktrees · creates a real worktree dir');
 
@@ -328,6 +374,14 @@
           assert(v.path, 'path required');
           await muxy.git.worktree.remove({ path: v.path, force: v.force === 'true' });
           return 'removed ' + v.path;
+        } });
+
+      addRow({ name: 'worktree.switchTo', destructive: true,
+        inputs: [{ key: 'identifier', placeholder: 'worktree id / name / branch / path', width: 220 }],
+        run: async (v) => {
+          assert(v.identifier, 'identifier required (see worktrees list)');
+          await muxy.git.worktree.switchTo({ identifier: v.identifier });
+          return 'activated ' + v.identifier;
         } });
 
       // ---------- REMOTE ----------
@@ -369,6 +423,26 @@
           assert(v.number, 'PR number required');
           await muxy.git.pr.close({ number: Number(v.number) });
           return 'closed #' + v.number;
+        } });
+
+      addRow({ name: 'pr.checkout', destructive: true,
+        inputs: [{ key: 'number', placeholder: 'PR #', fromState: 'prNumber', width: 60 }],
+        run: async (v) => {
+          assert(v.number, 'PR number required');
+          await muxy.git.pr.checkout({ number: Number(v.number) });
+          return 'checked out PR #' + v.number;
+        } });
+
+      addRow({ name: 'pr.checkoutWorktree', destructive: true,
+        inputs: [
+          { key: 'number', placeholder: 'PR #', fromState: 'prNumber', width: 60 },
+          { key: 'path', placeholder: '/tmp/git-demo-pr', value: '/tmp/git-demo-pr', width: 150 },
+        ],
+        run: async (v) => {
+          assert(v.number && v.path, 'PR number and path required');
+          const r = await muxy.git.pr.checkoutWorktree({ number: Number(v.number), path: v.path });
+          assert(r && r.branch, 'no branch returned: ' + JSON.stringify(r));
+          return 'PR #' + v.number + ' → ' + v.path + ' (' + r.branch + ')';
         } });
 
       // run-all-reads convenience

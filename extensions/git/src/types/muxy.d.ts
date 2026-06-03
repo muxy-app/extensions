@@ -1,5 +1,7 @@
 export {};
 
+declare global {
+
 interface MuxyProject {
   path: string;
   isActive?: boolean;
@@ -34,6 +36,7 @@ interface MuxyWorktree {
   path: string;
   branch?: string | null;
   isPrimary: boolean;
+  isActive?: boolean;
 }
 
 interface MuxyTheme {
@@ -75,6 +78,21 @@ interface MuxyGitPR {
   mergeable: boolean | null;
   mergeStateStatus: string;
   isCrossRepository: boolean;
+  checks: MuxyGitPRChecks;
+}
+
+interface MuxyGitPRListItem {
+  number: number;
+  title: string;
+  author: string;
+  headBranch: string;
+  baseBranch: string;
+  state: string;
+  isDraft: boolean;
+  url: string;
+  updatedAt: string | null;
+  mergeable: boolean | null;
+  mergeStateStatus: string;
   checks: MuxyGitPRChecks;
 }
 
@@ -145,17 +163,21 @@ interface MuxyGit {
   branch: {
     create(opts: MuxyGitScope & { name: string }): Promise<void>;
     switchTo(opts: MuxyGitScope & { branch: string }): Promise<void>;
+    deleteRemote(opts: MuxyGitScope & { branch: string }): Promise<void>;
   };
   pr: {
     info(opts?: MuxyGitScope): Promise<MuxyGitPR | null>;
-    list(opts?: MuxyGitScope & { filter?: "open" | "closed" | "merged" | "all"; limit?: number }): Promise<MuxyGitPR[]>;
+    list(opts?: MuxyGitScope & { filter?: "open" | "closed" | "merged" | "all"; limit?: number }): Promise<MuxyGitPRListItem[]>;
     create(opts: MuxyGitScope & { title: string; body?: string; baseBranch?: string; draft?: boolean }): Promise<MuxyGitPR>;
     merge(opts: MuxyGitScope & { number: number; method?: "merge" | "squash" | "rebase"; deleteBranch?: boolean }): Promise<void>;
     close(opts: MuxyGitScope & { number: number }): Promise<void>;
+    checkout(opts: MuxyGitScope & { number: number }): Promise<void>;
+    checkoutWorktree(opts: MuxyGitScope & { number: number; path: string }): Promise<{ branch: string }>;
   };
   worktree: {
     add(opts: MuxyGitScope & { path: string; branch: string; createBranch?: boolean; baseBranch?: string }): Promise<void>;
     remove(opts: MuxyGitScope & { path: string; force?: boolean }): Promise<void>;
+    switchTo(opts: MuxyGitScope & { identifier: string }): Promise<void>;
   };
 }
 
@@ -178,6 +200,21 @@ interface MuxyBridge {
     close(panelID: string): Promise<void>;
   };
   git: MuxyGit;
+  dialog: {
+    confirm(opts: {
+      title?: string;
+      message?: string;
+      buttons?: string[];
+      default?: string;
+      cancel?: string;
+      style?: "info" | "warning" | "critical";
+    }): Promise<string | null>;
+    alert(opts: {
+      title?: string;
+      message?: string;
+      style?: "info" | "warning" | "critical";
+    }): Promise<void>;
+  };
   exec(argv: string[], options?: MuxyExecOptions): Promise<MuxyExecResult>;
   exec(options: { shell: string; cwd?: string; timeoutMs?: number }): Promise<MuxyExecResult>;
   toast(opts: MuxyToastOptions): Promise<void>;
@@ -191,7 +228,6 @@ interface MuxyBridge {
   };
 }
 
-declare global {
   interface Window {
     muxy: MuxyBridge;
   }

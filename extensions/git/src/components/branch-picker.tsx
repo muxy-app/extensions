@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Check, ChevronDown, GitBranch, Plus, Trash2, X } from "lucide-react";
-import type { GitResult } from "@/lib/git";
 import type { BranchList } from "@/lib/git-branches";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -17,8 +16,8 @@ interface BranchPickerProps {
   current: string;
   tracking: string;
   loadBranches: () => Promise<BranchList>;
-  onCheckout: (name: string, create: boolean) => Promise<GitResult>;
-  onDeleteBranch: (name: string) => Promise<GitResult>;
+  onCheckout: (name: string, create: boolean) => Promise<boolean>;
+  onDeleteBranch: (name: string) => Promise<boolean>;
 }
 
 export function BranchPicker({
@@ -43,11 +42,11 @@ export function BranchPicker({
   }
 
   async function select(name: string, create: boolean) {
-    if ((await onCheckout(name, create)).ok) on_open(false);
+    if (await onCheckout(name, create)) on_open(false);
   }
 
   async function remove(name: string) {
-    if ((await onDeleteBranch(name)).ok) reload();
+    if (await onDeleteBranch(name)) reload();
   }
 
   const term = query.trim();
