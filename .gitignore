@@ -6,3 +6,4 @@ release/
 # minisign signing secret key — NEVER commit. Only minisign.pub is public.
 minisign.key
 *.key
+*.log

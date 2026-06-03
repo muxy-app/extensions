@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="Clock">
-  <circle cx="128" cy="128" r="104" fill="none" stroke="currentColor" stroke-width="16"/>
-  <line x1="128" y1="128" x2="128" y2="64" stroke="currentColor" stroke-width="16" stroke-linecap="round"/>
-  <line x1="128" y1="128" x2="176" y2="148" stroke="currentColor" stroke-width="16" stroke-linecap="round"/>
-  <circle cx="128" cy="128" r="10" fill="currentColor"/>
-</svg>
