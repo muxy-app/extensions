@@ -85,20 +85,23 @@ function SplitButton({
     action();
   }
 
+  const label = busy === "pull" ? "Pulling…" : busy === "push" ? "Pushing…" : "Commit";
+  const Icon = busy === "pull" ? ArrowDown : busy === "push" ? ArrowUp : Check;
+
   return (
     <div className="flex">
       <Button
         variant={disabled ? "secondary" : "default"}
         className="h-7 flex-1 gap-1 rounded-l-md rounded-r-none text-[11px] font-medium"
-        disabled={disabled}
+        disabled={disabled || busy !== null}
         onClick={onPrimary}
       >
-        {busy === "commit" ? (
+        {busy ? (
           <Loader2 size={10} strokeWidth={3} className="animate-spin" />
         ) : (
-          <Check size={11} strokeWidth={3} />
+          <Icon size={11} strokeWidth={3} />
         )}
-        Commit
+        {label}
       </Button>
       <Popover open={open} onOpenChange={set_open}>
         <PopoverTrigger asChild>
