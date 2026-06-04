@@ -54,7 +54,7 @@ export function BranchPanel() {
   const exact = branches.includes(term);
 
   return (
-    <div className="w-64 rounded-md border border-border bg-popover text-popover-foreground shadow-lg">
+    <div className="w-64 text-popover-foreground">
       <Command>
         <CommandInput
           placeholder="Switch or create branch…"
@@ -65,13 +65,15 @@ export function BranchPanel() {
           autoCapitalize="off"
           spellCheck={false}
         />
-        <CommandList>
+        <CommandList className="min-h-[9rem]">
           <CommandEmpty>No branches</CommandEmpty>
           {term && !exact && (
             <CommandGroup>
               <CommandItem value={`create-${term}`} onSelect={() => void select(term, true)}>
                 <Plus size={14} className="text-primary" />
-                Create branch “{term}”
+                <span className="truncate">
+                  Create branch <span className="font-medium">“{term}”</span>
+                </span>
               </CommandItem>
             </CommandGroup>
           )}

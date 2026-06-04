@@ -26,6 +26,7 @@ export function PopoverShell({ children }: { children: ReactNode }) {
 }
 
 export function mount_popover(node: ReactNode) {
+  document.body.classList.add("popover-body");
   const root = document.getElementById("root");
   if (root) createRoot(root).render(<StrictMode>{node}</StrictMode>);
 }

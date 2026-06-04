@@ -84,14 +84,14 @@ export function PrInfoPanel() {
   }, [state]);
 
   return (
-    <div className="w-72 rounded-md border border-border bg-popover p-3 text-popover-foreground shadow-lg">
+    <div className="flex min-h-[13rem] w-72 flex-col p-3 text-popover-foreground">
       {state.kind === "loading" ? (
-        <span className="flex h-16 items-center justify-center gap-2 text-[11px] text-muted-foreground">
+        <span className="flex flex-1 items-center justify-center gap-2 text-[11px] text-muted-foreground">
           <Loader2 size={14} className="animate-spin" />
           Loading…
         </span>
       ) : state.kind === "none" ? (
-        <span className="flex h-16 flex-col items-center justify-center gap-1.5 text-center text-[11px] text-muted-foreground">
+        <span className="flex flex-1 flex-col items-center justify-center gap-1.5 text-center text-[11px] text-muted-foreground">
           <GitPullRequest size={18} strokeWidth={1.5} />
           No pull request for this branch.
         </span>

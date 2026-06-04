@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 export function Command({ className, ...props }: ComponentProps<typeof CommandPrimitive>) {
   return (
     <CommandPrimitive
-      className={cn("flex flex-col overflow-hidden rounded-md bg-popover text-foreground", className)}
+      className={cn("flex flex-col overflow-hidden rounded-md text-foreground", className)}
       {...props}
     />
   );
@@ -13,14 +13,14 @@ export function Command({ className, ...props }: ComponentProps<typeof CommandPr
 
 export function CommandInput({ className, ...props }: ComponentProps<typeof CommandPrimitive.Input>) {
   return (
-    <div className="border-b border-border px-2">
+    <div className="border-b border-border/60 px-3">
       <CommandPrimitive.Input
         spellCheck={false}
         autoCorrect="off"
         autoCapitalize="off"
         autoComplete="off"
         className={cn(
-          "flex h-9 w-full bg-transparent py-2 text-sm outline-none placeholder:text-muted-foreground",
+          "flex h-9 w-full bg-transparent py-2 text-[13px] outline-none placeholder:text-muted-foreground/70",
           className,
         )}
         {...props}
@@ -50,8 +50,8 @@ export function CommandItem({ className, ...props }: ComponentProps<typeof Comma
   return (
     <CommandPrimitive.Item
       className={cn(
-        "flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none",
-        "data-[selected=true]:bg-accent data-[selected=true]:text-foreground",
+        "flex cursor-pointer select-none items-center gap-2 rounded-md px-2 py-1.5 text-[13px] outline-none",
+        "data-[selected=true]:bg-accent/60 data-[selected=true]:text-foreground",
         className,
       )}
       {...props}
