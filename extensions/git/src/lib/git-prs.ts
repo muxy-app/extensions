@@ -1,23 +1,8 @@
-export function list_prs(): Promise<MuxyGitPRListItem[]> {
-  return muxy.git.pr.list({ filter: "open", limit: 100 });
-}
-
 export function pr_state(pr: { state: string }): "open" | "closed" | "merged" {
   const s = pr.state.toLowerCase();
   if (s === "merged") return "merged";
   if (s === "closed") return "closed";
   return "open";
-}
-
-export function checkout_pr_here(number: number): Promise<void> {
-  return muxy.git.pr.checkout({ number });
-}
-
-export function checkout_pr_worktree(
-  number: number,
-  path: string,
-): Promise<{ branch: string }> {
-  return muxy.git.pr.checkoutWorktree({ number, path });
 }
 
 export type MergeMethod = "merge" | "squash" | "rebase";
@@ -38,6 +23,7 @@ export function create_pr(
   title: string,
   body: string,
   baseBranch: string | undefined,
+  draft: boolean,
 ): Promise<MuxyGitPR> {
-  return muxy.git.pr.create({ title, body, baseBranch });
+  return muxy.git.pr.create({ title, body, baseBranch, draft });
 }

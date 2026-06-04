@@ -33,7 +33,32 @@
         "entry": "panel/index.html",
         "position": "right",
         "mode": "pinned",
-        "hideTopbar": true
+        "headerButtons": [
+          {
+            "id": "refresh",
+            "icon": {
+              "symbol": "arrow.clockwise"
+            },
+            "tooltip": "Refresh",
+            "command": "refresh-scm"
+          }
+        ]
+      }
+    ],
+    "popovers": [
+      {
+        "id": "branch",
+        "title": "Branch",
+        "entry": "popover/branch.html",
+        "width": 256,
+        "height": 320
+      },
+      {
+        "id": "pr-info",
+        "title": "Pull Request",
+        "entry": "popover/pr-info.html",
+        "width": 300,
+        "height": 280
       }
     ],
     "tabTypes": [
@@ -52,6 +77,27 @@
           "kind": "togglePanel",
           "panel": "scm"
         }
+      },
+      {
+        "id": "refresh-scm",
+        "title": "Git: Refresh"
+      },
+      {
+        "id": "open-branch",
+        "title": "Git: Switch Branch",
+        "action": {
+          "kind": "openPopover",
+          "popover": "branch"
+        }
+      },
+      {
+        "id": "open-pr-info",
+        "title": "Git: Current Pull Request",
+        "defaultShortcut": "cmd+shift+y",
+        "action": {
+          "kind": "openPopover",
+          "popover": "pr-info"
+        }
       }
     ],
     "topbarItems": [
@@ -63,12 +109,33 @@
         "tooltip": "Toggle Source Control",
         "command": "toggle-scm"
       }
+    ],
+    "statusBarItems": [
+      {
+        "id": "branch",
+        "icon": {
+          "symbol": "arrow.triangle.branch"
+        },
+        "tooltip": "Switch branch",
+        "side": "left",
+        "command": "open-branch"
+      },
+      {
+        "id": "pr-info",
+        "icon": {
+          "symbol": "arrow.triangle.pull"
+        },
+        "tooltip": "Current pull request",
+        "side": "left",
+        "command": "open-pr-info"
+      }
     ]
   },
   "name": "git",
   "private": true,
   "scripts": {
     "build": "tsc --noEmit && vite build && vite build --config vite.diff-viewer.config.ts",
+    "build:surfaces": "vite build",
     "dev": "vite",
     "typecheck": "tsc --noEmit"
   },

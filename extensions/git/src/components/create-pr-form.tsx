@@ -1,19 +1,20 @@
 import { useState } from "react";
-import { ArrowLeft, ChevronDown, ChevronRight, GitPullRequest, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronRight, GitPullRequest, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import type { CreatePrInput } from "@/hooks/use-prs";
+import type { CreatePrInput } from "@/hooks/use-create-pr";
 
 interface CreatePrFormProps {
   baseBranch: string | null;
   onSubmit: (input: CreatePrInput) => Promise<boolean>;
-  onBack: () => void;
 }
 
-export function CreatePrForm({ baseBranch, onSubmit, onBack }: CreatePrFormProps) {
+export function CreatePrForm({ baseBranch, onSubmit }: CreatePrFormProps) {
   const [title, set_title] = useState("");
   const [body, set_body] = useState("");
   const [newBranch, set_new_branch] = useState("");
+  const [draft, set_draft] = useState(false);
   const [advanced, set_advanced] = useState(false);
   const [busy, set_busy] = useState(false);
 
@@ -23,37 +24,23 @@ export function CreatePrForm({ baseBranch, onSubmit, onBack }: CreatePrFormProps
     if (disabled) return;
     set_busy(true);
     try {
-      const ok = await onSubmit({
+      await onSubmit({
         title: title.trim(),
         body: body.trim(),
         baseBranch: baseBranch ?? undefined,
         newBranch: newBranch.trim() || undefined,
+        draft,
       });
-      if (ok) onBack();
     } finally {
       set_busy(false);
     }
   }
 
   return (
-    <section className="flex flex-col gap-2 border-b border-border p-2.5">
-      <div className="flex items-center gap-1.5">
-        <button
-          type="button"
-          title="Back to commit"
-          onClick={onBack}
-          className="flex size-5 items-center justify-center rounded text-muted-foreground outline-none hover:bg-accent hover:text-foreground"
-        >
-          <ArrowLeft size={13} strokeWidth={2} />
-        </button>
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-          New pull request{baseBranch ? ` → ${baseBranch}` : ""}
-        </span>
-      </div>
-
+    <div className="flex flex-col gap-2">
       <Textarea
         rows={1}
-        placeholder="Title"
+        placeholder={baseBranch ? `Pull request title (→ ${baseBranch})` : "Pull request title"}
         value={title}
         onChange={(e) => set_title(e.target.value)}
         className="min-h-[32px] text-[12px]"
@@ -75,13 +62,23 @@ export function CreatePrForm({ baseBranch, onSubmit, onBack }: CreatePrFormProps
         Advanced
       </button>
       {advanced && (
-        <Textarea
-          rows={1}
-          placeholder="New branch name (commit current changes here, then open PR)"
-          value={newBranch}
-          onChange={(e) => set_new_branch(e.target.value)}
-          className="min-h-[32px] font-mono text-[12px]"
-        />
+        <div className="flex flex-col gap-2">
+          <Input
+            placeholder="New branch name (optional)"
+            value={newBranch}
+            onChange={(e) => set_new_branch(e.target.value)}
+            className="font-mono text-[12px]"
+          />
+          <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={draft}
+              onChange={(e) => set_draft(e.target.checked)}
+              className="accent-primary"
+            />
+            Create as draft
+          </label>
+        </div>
       )}
 
       <Button
@@ -97,6 +94,6 @@ export function CreatePrForm({ baseBranch, onSubmit, onBack }: CreatePrFormProps
         )}
         Create pull request
       </Button>
-    </section>
+    </div>
   );
 }

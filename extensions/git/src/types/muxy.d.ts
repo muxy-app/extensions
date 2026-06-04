@@ -199,6 +199,13 @@ interface MuxyBridge {
     toggle(panelID: string, data?: Record<string, unknown>): Promise<void>;
     close(panelID: string): Promise<void>;
   };
+  popover: {
+    resize(width: number, height: number): Promise<void>;
+    close(): Promise<void>;
+  };
+  statusbar: {
+    set(opts: { id: string; icon?: unknown; text?: string | null }): Promise<void>;
+  };
   git: MuxyGit;
   dialog: {
     confirm(opts: {

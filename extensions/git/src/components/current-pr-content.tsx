@@ -2,105 +2,72 @@ import { useState } from "react";
 import { ExternalLink, GitMerge, Loader2, Trash2, XCircle } from "lucide-react";
 import { open_url } from "@/lib/git";
 import { pr_state, type MergeMethod } from "@/lib/git-prs";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { PrStateIcon } from "./pr-state-icon";
 
-interface CurrentPrPopoverProps {
+interface CurrentPrContentProps {
   pr: MuxyGitPR;
   busy: boolean;
   onMerge: (method: MergeMethod, deleteBranch: boolean) => Promise<boolean>;
   onClose: (number: number) => Promise<boolean>;
   onCleanup: () => Promise<boolean>;
+  onDone?: () => void;
 }
 
-type Confirm =
-  | { kind: "none" }
-  | { kind: "merge"; method: MergeMethod }
-  | { kind: "close" };
+type Confirm = { kind: "none" } | { kind: "close" };
 
-export function CurrentPrPopover({ pr, busy, onMerge, onClose, onCleanup }: CurrentPrPopoverProps) {
-  const [open, set_open] = useState(false);
+export function CurrentPrContent({
+  pr,
+  busy,
+  onMerge,
+  onClose,
+  onCleanup,
+  onDone,
+}: CurrentPrContentProps) {
   const [confirm, set_confirm] = useState<Confirm>({ kind: "none" });
-  const [deleteBranch, set_delete_branch] = useState(true);
-
-  function on_open(next: boolean) {
-    set_open(next);
-    if (!next) set_confirm({ kind: "none" });
-  }
 
   async function run(action: Promise<boolean>) {
     const ok = await action;
     set_confirm({ kind: "none" });
-    if (ok) set_open(false);
+    if (ok) onDone?.();
   }
 
   return (
-    <Popover open={open} onOpenChange={on_open}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          title={`PR #${pr.number}`}
-          className="flex items-center gap-1.5 rounded-md border border-border bg-muted px-2 py-1 text-[12px] font-medium text-foreground outline-none transition-colors hover:border-primary hover:bg-accent"
-        >
-          <PrStateIcon pr={pr} size={13} />
-          <span className="font-mono">#{pr.number}</span>
-        </button>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-72 p-3">
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-1.5">
-            <PrStateIcon pr={pr} size={13} />
-            <span className="font-mono text-[12px] font-semibold text-foreground">#{pr.number}</span>
-            <span className="text-[11px] text-muted-foreground">{state_label(pr)}</span>
-            <div className="ml-auto flex items-center gap-0.5">
-              <IconAction
-                icon={XCircle}
-                title="Close PR"
-                disabled={busy || pr_state(pr) !== "open"}
-                tone="danger"
-                onClick={() => set_confirm({ kind: "close" })}
-              />
-              <IconAction
-                icon={Trash2}
-                title="Clean up branch"
-                disabled={busy}
-                onClick={() => void run(onCleanup())}
-              />
-              <IconAction
-                icon={ExternalLink}
-                title="View on GitHub"
-                onClick={() => open_url(pr.url)}
-              />
-            </div>
-          </div>
-          <Row label="Base" value={pr.baseBranch} />
-          <Row label="Mergeable" value={mergeable_label(pr)} tone={mergeable_tone(pr)} />
-          <ChecksRow checks={pr.checks} />
-
-          {confirm.kind === "none" ? (
-            <Actions
-              pr={pr}
-              busy={busy}
-              onMerge={(method) => set_confirm({ kind: "merge", method })}
-            />
-          ) : confirm.kind === "merge" ? (
-            <ConfirmMerge
-              method={confirm.method}
-              deleteBranch={deleteBranch}
-              onToggleDelete={set_delete_branch}
-              onCancel={() => set_confirm({ kind: "none" })}
-              onConfirm={() => void run(onMerge(confirm.method, deleteBranch))}
-            />
-          ) : (
-            <ConfirmClose
-              number={pr.number}
-              onCancel={() => set_confirm({ kind: "none" })}
-              onConfirm={() => void run(onClose(pr.number))}
-            />
-          )}
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-1.5">
+        <PrStateIcon pr={pr} size={13} />
+        <span className="font-mono text-[12px] font-semibold text-foreground">#{pr.number}</span>
+        <span className="text-[11px] text-muted-foreground">{state_label(pr)}</span>
+        <div className="ml-auto flex items-center gap-0.5">
+          <IconAction
+            icon={XCircle}
+            title="Close PR"
+            disabled={busy || pr_state(pr) !== "open"}
+            tone="danger"
+            onClick={() => set_confirm({ kind: "close" })}
+          />
+          <IconAction
+            icon={Trash2}
+            title="Clean up branch"
+            disabled={busy}
+            onClick={() => void run(onCleanup())}
+          />
+          <IconAction icon={ExternalLink} title="View on GitHub" onClick={() => open_url(pr.url)} />
         </div>
-      </PopoverContent>
-    </Popover>
+      </div>
+      <Row label="Base" value={pr.baseBranch} />
+      <Row label="Mergeable" value={mergeable_label(pr)} tone={mergeable_tone(pr)} />
+      <ChecksRow checks={pr.checks} />
+
+      {confirm.kind === "close" ? (
+        <ConfirmClose
+          number={pr.number}
+          onCancel={() => set_confirm({ kind: "none" })}
+          onConfirm={() => void run(onClose(pr.number))}
+        />
+      ) : (
+        <Actions pr={pr} busy={busy} onMerge={(method) => void run(onMerge(method, true))} />
+      )}
+    </div>
   );
 }
 
@@ -201,38 +168,6 @@ function MergeButton({
   );
 }
 
-function ConfirmMerge({
-  method,
-  deleteBranch,
-  onToggleDelete,
-  onCancel,
-  onConfirm,
-}: {
-  method: MergeMethod;
-  deleteBranch: boolean;
-  onToggleDelete: (next: boolean) => void;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <div className="mt-1 flex flex-col gap-2 rounded-md border border-border p-2">
-      <span className="text-[11px] text-foreground">{method_label(method)} this PR?</span>
-      <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-        <input
-          type="checkbox"
-          checked={deleteBranch}
-          onChange={(e) => onToggleDelete(e.target.checked)}
-        />
-        Delete head branch after merge
-      </label>
-      <div className="flex gap-1.5">
-        <ConfirmButton label="Cancel" onClick={onCancel} />
-        <ConfirmButton label={method_label(method)} tone="primary" onClick={onConfirm} />
-      </div>
-    </div>
-  );
-}
-
 function ConfirmClose({
   number,
   onCancel,
@@ -308,12 +243,6 @@ function Row({ label, value, tone = "default" }: { label: string; value: string;
       <span className={`truncate font-mono text-[11px] font-medium ${color}`}>{value}</span>
     </div>
   );
-}
-
-function method_label(method: MergeMethod): string {
-  if (method === "squash") return "Squash & merge";
-  if (method === "rebase") return "Rebase & merge";
-  return "Merge commit";
 }
 
 function state_label(pr: MuxyGitPR): string {

@@ -42,6 +42,14 @@ body {
   color: var(--muxy-foreground);
 }
 
+html:has(.popover-body),
+body.popover-body,
+body.popover-body #root {
+  height: auto;
+  overflow: visible;
+  background: transparent;
+}
+
 .panel-topbar {
   box-sizing: content-box;
   height: var(--muxy-topbar-height, 32px);

@@ -1,11 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { exec_git, active_worktree_path } from "@/lib/git";
 import { use_git_panel } from "@/hooks/use-git-panel";
-import { use_prs } from "@/hooks/use-prs";
+import { use_create_pr } from "@/hooks/use-create-pr";
 import { NoRepo } from "@/components/no-repo";
 import { LoadingOverlay } from "@/components/loading-overlay";
 import { SourceControlPanel } from "@/views/source-control-panel";
-import type { PanelTab } from "@/components/panel-tabs";
 
 export function App() {
   const {
@@ -18,23 +17,19 @@ export function App() {
     unstage_all,
     commit,
     sync,
-    get_branches,
-    checkout,
-    delete_branch,
-    cleanup,
   } = use_git_panel();
-  const [tab, set_tab] = useState<PanelTab>("changes");
-  const {
-    state: prsState,
-    refreshing: prsRefreshing,
-    busy,
-    refresh: refreshPrs,
-    checkout_here,
-    checkout_worktree,
-    merge,
-    close: closePr,
-    create,
-  } = use_prs(tab === "prs", refresh);
+  const create = use_create_pr(refresh);
+  const [refreshing, set_refreshing] = useState(false);
+
+  useEffect(() => {
+    const off = muxy.events.subscribe("command.refresh-scm", () => {
+      set_refreshing(true);
+      void Promise.all([refresh(), new Promise((r) => setTimeout(r, 400))]).finally(() =>
+        set_refreshing(false),
+      );
+    });
+    return () => off?.();
+  }, [refresh]);
 
   async function init() {
     if (await exec_git(await active_worktree_path(), ["init"], "Could not initialize repository")) {
@@ -50,34 +45,21 @@ export function App() {
     );
   }
   if (state.kind === "no_repo") return <NoRepo onInit={() => void init()} />;
+
   return (
-    <SourceControlPanel
-      tab={tab}
-      onTabChange={set_tab}
-      status={state.status}
-      switching={switching}
-      refresh={refresh}
-      stage={stage}
-      unstage={unstage}
-      stage_all={stage_all}
-      unstage_all={unstage_all}
-      commit={commit}
-      sync={sync}
-      get_branches={get_branches}
-      checkout={checkout}
-      delete_branch={delete_branch}
-      cleanup={cleanup}
-      prs={{
-        state: prsState,
-        refreshing: prsRefreshing,
-        busy,
-        refresh: refreshPrs,
-        checkout_here,
-        checkout_worktree,
-        merge,
-        close: closePr,
-        create,
-      }}
-    />
+    <div className="relative flex h-screen flex-col">
+      {switching && <LoadingOverlay label="Loading worktree…" />}
+      {refreshing && !switching && <LoadingOverlay label="Refreshing…" />}
+      <SourceControlPanel
+        status={state.status}
+        stage={stage}
+        unstage={unstage}
+        stage_all={stage_all}
+        unstage_all={unstage_all}
+        commit={commit}
+        sync={sync}
+        create_pr={create}
+      />
+    </div>
   );
 }

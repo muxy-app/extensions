@@ -1,14 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  exec_git,
-  try_action,
-  to_view_status,
-  active_worktree_path,
-  confirm_action,
-  alert_error,
-} from "@/lib/git";
+import { try_action, to_view_status, active_worktree_path } from "@/lib/git";
+import { sync_status_bar } from "@/lib/status-bar";
 import type { GitStatus } from "@/lib/git-status";
-import { list_branches, type BranchList } from "@/lib/git-branches";
 
 export type RepoState =
   | { kind: "loading" }
@@ -154,83 +147,9 @@ export function use_git_panel() {
     [refresh],
   );
 
-  const get_branches = useCallback((): Promise<BranchList> => list_branches(), []);
-
-  const checkout = useCallback(
-    async (name: string, create: boolean) => {
-      const ok = await try_action(
-        () =>
-          create ? muxy.git.branch.create({ name }) : muxy.git.branch.switchTo({ branch: name }),
-        create ? "Could not create branch" : "Could not switch branch",
-      );
-      if (ok) await refresh();
-      return ok;
-    },
-    [refresh],
-  );
-
-  const delete_branch = useCallback(async (name: string) => {
-    const ok = await exec_git(
-      await active_worktree_path(),
-      ["branch", "-D", name],
-      "Could not delete branch",
-    );
-    return ok;
-  }, []);
-
-  const cleanup = useCallback(async () => {
-    if (state.kind !== "ready") return false;
-    const branch = state.status.branch;
-    const defaultBranch = state.status.defaultBranch;
-    if (!branch) return false;
-
-    const worktrees = await muxy.worktrees.list().catch(() => [] as MuxyWorktree[]);
-    const active = worktrees.find((w) => w.isActive) ?? worktrees.find((w) => w.isPrimary);
-    const isWorktree = !!active && !active.isPrimary;
-    const dirty = state.status.staged.length > 0 || state.status.unstaged.length > 0;
-
-    const message = isWorktree
-      ? `This removes the worktree and deletes branch "${branch}".${
-          dirty ? " Uncommitted changes in this worktree will be lost permanently." : ""
-        }`
-      : `This switches to ${defaultBranch ?? "the default branch"} and deletes branch "${branch}".${
-          dirty ? " Uncommitted changes on this branch will no longer belong to any branch." : ""
-        }`;
-    const ok = await confirm_action({
-      title: `Clean up branch "${branch}"?`,
-      message,
-      confirmLabel: "Clean Up",
-      critical: dirty,
-    });
-    if (!ok) return false;
-
-    try {
-      if (isWorktree && active) {
-        const replacement =
-          worktrees.find((w) => w.isPrimary && w.id !== active.id) ??
-          worktrees.find((w) => w.id !== active.id);
-        if (replacement) {
-          await muxy.git.worktree
-            .switchTo({ identifier: replacement.path })
-            .catch(() => muxy.worktrees.switchTo(replacement.path));
-        }
-        await muxy.git.worktree.remove({ path: active.path, force: dirty });
-        await muxy.git.branch.deleteRemote({ branch }).catch(() => undefined);
-        await muxy.worktrees.refresh();
-      } else {
-        if (defaultBranch && defaultBranch !== branch) {
-          await muxy.git.branch.switchTo({ branch: defaultBranch });
-        }
-        await exec_git(await active_worktree_path(), ["branch", "-D", branch], "Could not delete branch");
-        await muxy.git.branch.deleteRemote({ branch }).catch(() => undefined);
-        await refresh();
-      }
-      return true;
-    } catch (err) {
-      await alert_error("Cleanup failed", err);
-      return false;
-    }
-  }, [state, refresh]);
+  useEffect(() => {
+    sync_status_bar(state.kind === "ready" ? state.status : null);
+  }, [state]);
 
   useEffect(() => {
     void refresh();
@@ -255,9 +174,5 @@ export function use_git_panel() {
     unstage_all,
     commit,
     sync,
-    get_branches,
-    checkout,
-    delete_branch,
-    cleanup,
   };
 }
