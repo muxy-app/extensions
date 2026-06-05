@@ -1,0 +1,327 @@
+:root {
+  --s1: 2px;
+  --s2: 4px;
+  --s3: 6px;
+  --s4: 8px;
+  --s5: 10px;
+  --s6: 12px;
+  --s7: 16px;
+  --s8: 20px;
+  --s9: 24px;
+  --font-caption: 10px;
+  --font-footnote: 11px;
+  --font-body: 12px;
+  --font-emphasis: 13px;
+  --font-title: 14px;
+  --control: 24px;
+  --radius: 6px;
+  --row-height: 28px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+  background: var(--muxy-background, #111);
+  color: var(--muxy-foreground, #f4f4f5);
+  font: var(--font-body) -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.shell {
+  display: flex;
+  min-width: 0;
+  height: 100%;
+  flex-direction: column;
+  background: var(--muxy-background, #111);
+}
+
+.toolbar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--s4);
+  padding: var(--s5) var(--s6) var(--s4);
+  border-bottom: 1px solid var(--muxy-border);
+}
+
+.search {
+  min-width: 0;
+  flex: 1;
+}
+
+.search input {
+  width: 100%;
+  height: 28px;
+  padding: 0 var(--s6);
+  border: 1px solid var(--muxy-border);
+  border-radius: var(--radius);
+  outline: none;
+  background: var(--muxy-surface);
+  color: var(--muxy-foreground);
+}
+
+.search input::placeholder {
+  color: var(--muxy-foreground-muted, #a1a1aa);
+}
+
+.search input:focus {
+  border-color: var(--muxy-accent);
+  box-shadow: 0 0 0 2px var(--muxy-accent-soft);
+}
+
+.status {
+  flex: 0 0 auto;
+  padding: var(--s4) var(--s6);
+  color: var(--muxy-foreground-muted, #a1a1aa);
+  font-size: var(--font-footnote);
+}
+
+.status[data-kind="error"] {
+  color: var(--muxy-diff-remove, #ef4444);
+}
+
+.tree {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  padding: var(--s3) 0 var(--s5);
+}
+
+.row {
+  display: grid;
+  width: calc(100% - var(--s6));
+  height: var(--row-height);
+  grid-template-columns: 12px 20px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s3);
+  margin: var(--s1) var(--s3);
+  padding: 0 var(--s5) 0 calc(var(--s4) + (var(--depth) * 16px));
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--muxy-foreground, #f4f4f5);
+  cursor: pointer;
+  text-align: left;
+}
+
+.row:hover,
+.row:focus-visible {
+  background: var(--muxy-hover, rgba(255, 255, 255, 0.08));
+  outline: none;
+}
+
+.row.active {
+  background: var(--muxy-accent-soft);
+  color: var(--muxy-foreground);
+}
+
+.row.active .caret {
+  color: var(--muxy-accent);
+}
+
+.row.directory .name {
+  font-weight: 500;
+}
+
+.row.ignored {
+  color: var(--muxy-foreground-muted, #a1a1aa);
+}
+
+.caret {
+  color: var(--muxy-foreground-muted, #a1a1aa);
+  font-size: var(--font-footnote);
+  font-weight: 600;
+  text-align: center;
+}
+
+.file-icon {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  justify-self: center;
+  flex: 0 0 auto;
+}
+
+.file-icon.folder {
+  width: 18px;
+  height: 16px;
+  color: var(--muxy-foreground-muted, #a1a1aa);
+  opacity: 0.78;
+}
+
+.file-icon.folder svg {
+  display: block;
+  width: 18px;
+  height: 16px;
+  overflow: visible;
+  fill: none;
+  stroke: currentcolor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.35;
+}
+
+.file-icon.file {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--muxy-border);
+  border-radius: 3px;
+  background: var(--muxy-background);
+  color: var(--muxy-foreground-muted, #a1a1aa);
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: 6.5px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.file-icon.file::after {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  width: 6px;
+  height: 6px;
+  border-bottom: 1px solid var(--muxy-border);
+  border-left: 1px solid var(--muxy-border);
+  background: var(--muxy-surface);
+  content: "";
+}
+
+.file-icon.file-md,
+.file-icon.file-js,
+.file-icon.file-ts,
+.file-icon.file-py,
+.file-icon.file-swift,
+.file-icon.file-code,
+.file-icon.file-go,
+.file-icon.file-java {
+  color: var(--muxy-accent);
+}
+
+.file-icon.file-csv,
+.file-icon.file-sheet {
+  color: var(--muxy-diff-add, #22c55e);
+}
+
+.file-icon.file-pdf,
+.file-icon.file-doc {
+  color: var(--muxy-diff-remove, #ef4444);
+}
+
+.file-icon.file-json,
+.file-icon.file-config,
+.file-icon.file-env,
+.file-icon.file-git,
+.file-icon.file-docker,
+.file-icon.file-make {
+  color: var(--muxy-warning, #d97706);
+}
+
+.file-icon.file-image {
+  color: var(--muxy-info, #0ea5e9);
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spinner {
+  color: var(--muxy-foreground-muted, #a1a1aa);
+  font-size: var(--font-caption);
+}
+
+.empty,
+.loading {
+  padding: var(--s6) var(--s5);
+  color: var(--muxy-foreground-muted, #a1a1aa);
+  font-size: var(--font-footnote);
+}
+
+.menu {
+  position: fixed;
+  z-index: 20;
+  display: flex;
+  min-width: 190px;
+  max-width: min(280px, calc(100vw - 16px));
+  flex-direction: column;
+  gap: var(--s1);
+  padding: var(--s2);
+  border: 1px solid var(--muxy-border);
+  border-radius: var(--radius);
+  background: var(--muxy-background, #fff);
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.32);
+  color: var(--muxy-foreground);
+  opacity: 1;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.menu[hidden] {
+  display: none;
+}
+
+.menu button {
+  display: flex;
+  width: 100%;
+  height: 28px;
+  align-items: center;
+  justify-content: flex-start;
+  overflow: hidden;
+  padding: 0 var(--s6);
+  border: 0;
+  border-radius: var(--s2);
+  appearance: none;
+  background: transparent;
+  color: inherit;
+  cursor: default;
+  font-size: var(--font-body);
+  font-weight: 500;
+  line-height: 1;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu button:hover,
+.menu button:focus-visible {
+  background: var(--muxy-hover, rgba(255, 255, 255, 0.08));
+  outline: none;
+}
+
+.menu button:active {
+  background: var(--muxy-accent-soft);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .row,
+  .search input,
+  .menu button {
+    transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+  }
+}
