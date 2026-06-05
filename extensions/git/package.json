@@ -2,7 +2,6 @@
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.0",
     "tailwindcss": "^4.3.0",
-    "typescript": "^6.0.3",
     "vite": "^7.3.5"
   },
   "muxy": {
@@ -76,10 +75,9 @@
   "name": "git",
   "private": true,
   "scripts": {
-    "build": "tsc --noEmit && vite build && vite build --config vite.diff-viewer.config.ts && node -e \"require('fs').copyFileSync('package.json','dist/package.json')\"",
+    "build": "vite build && vite build --config vite.diff-viewer.config.js && node -e \"require('fs').copyFileSync('package.json','dist/package.json')\"",
     "build:surfaces": "vite build",
-    "dev": "vite",
-    "typecheck": "tsc --noEmit"
+    "dev": "vite"
   },
   "type": "module",
   "version": "1.0.1",

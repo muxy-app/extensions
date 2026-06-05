@@ -15,7 +15,7 @@ export default defineConfig({
     emptyOutDir: false,
     cssCodeSplit: false,
     lib: {
-      entry: resolve(__dirname, "src/diff-viewer/diff-viewer.ts"),
+      entry: resolve(__dirname, "src/diff-viewer/diff-viewer.js"),
       formats: ["iife"],
       name: "DiffViewer",
       fileName: () => "diff-viewer.js",
