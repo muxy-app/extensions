@@ -42,7 +42,7 @@ Both can be remapped in Settings -> Keyboard Shortcuts -> App Shortcuts under th
 Muxy loads extensions from:
 
 ```text
-~/.config/muxy/extensions/muxy-file-tree-extension/
+~/.config/muxy/extensions/file-tree/
 ```
 
 ## Development Notes

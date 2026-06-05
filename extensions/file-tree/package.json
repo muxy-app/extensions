@@ -1,12 +1,12 @@
 {
-  "name": "muxy-file-tree-extension",
+  "name": "file-tree",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "vite build && node scripts/copy-manifest.mjs",
-    "install:local": "npm run build && rm -rf ~/.config/muxy/extensions/muxy-file-tree-extension && mkdir -p ~/.config/muxy/extensions && cp -R dist ~/.config/muxy/extensions/muxy-file-tree-extension"
+    "install:local": "npm run build && rm -rf ~/.config/muxy/extensions/file-tree && mkdir -p ~/.config/muxy/extensions && cp -R dist ~/.config/muxy/extensions/file-tree"
   },
   "devDependencies": {
     "vite": "^7.3.5"
@@ -90,8 +90,8 @@
     "marketplace": {
       "author": "Theoz",
       "github": "Theoz001",
-      "homepage": "https://github.com/Theoz001/muxy-file-tree-extension",
-      "repository": "https://github.com/Theoz001/muxy-file-tree-extension",
+      "homepage": "https://github.com/Theoz001/file-tree",
+      "repository": "https://github.com/Theoz001/file-tree",
       "categories": [
         "productivity",
         "files"
