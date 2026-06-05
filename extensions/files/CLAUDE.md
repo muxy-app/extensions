@@ -7,9 +7,9 @@ Muxy extension scaffolded from a starter kit. This is an npm + Vite project.
 - `package.json` — npm manifest. Identity (`name`, `version`) is at the
   top level; all Muxy fields live under the `muxy` key. A `build` script
   (Vite) is required.
-- `vite.config.ts` — builds to `dist/`, the directory Muxy installs.
-- `panel/` + `src/` — your source. The kit ships a working panel, a topbar
-  item, and a command; edit them or add your own.
+- `vite.config.js` — builds to `dist/`, the directory Muxy installs.
+- `panel/` + `src/` — vanilla JavaScript source for the files panel and
+  editor tab.
 
 Add a `"background"` script (e.g. `background.js`) under the `muxy` key
 only if the extension needs to receive pushed workspace events or run

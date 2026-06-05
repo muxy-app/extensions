@@ -1,3 +1,29 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: var(--muxy-background);
+  --color-foreground: var(--muxy-foreground);
+  --color-muted: var(--muxy-surface);
+  --color-muted-foreground: var(--muxy-foreground-muted);
+  --color-card: var(--muxy-background);
+  --color-card-foreground: var(--muxy-foreground);
+  --color-popover: var(--muxy-background);
+  --color-popover-foreground: var(--muxy-foreground);
+  --color-primary: var(--muxy-accent);
+  --color-primary-foreground: var(--muxy-background);
+  --color-secondary: var(--muxy-surface);
+  --color-secondary-foreground: var(--muxy-foreground);
+  --color-accent: var(--muxy-hover);
+  --color-accent-foreground: var(--muxy-foreground);
+  --color-border: var(--muxy-border);
+  --color-input: var(--muxy-border);
+  --color-ring: var(--muxy-accent);
+  --color-diff-add: var(--muxy-diff-add);
+  --color-diff-remove: var(--muxy-diff-remove);
+  --color-diff-hunk: var(--muxy-diff-hunk);
+  --radius: 6px;
+}
+
 :root {
   --s1: 2px;
   --s2: 4px;
@@ -12,18 +38,32 @@
   --font-body: 12px;
   --font-emphasis: 13px;
   --font-title: 14px;
+  --icon-sm: 12px;
+  --icon: 14px;
   --control: 24px;
   --radius: 6px;
+  --radius-card: 8px;
+  --row-height: 34px;
 }
 
 html,
+#root,
 body {
   height: 100vh;
   margin: 0;
+}
+
+body {
   overflow: hidden;
   background: var(--muxy-background);
   color: var(--muxy-foreground);
   font: var(--font-body) -apple-system, "SF Pro", system-ui, sans-serif;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
 }
 
 .panel {
@@ -93,14 +133,99 @@ body {
   display: flex;
 }
 
-.file-tree {
+.file-tree-list {
   flex: 1;
   min-height: 0;
+  overflow: auto;
+  padding: var(--s1) 0;
+  background: var(--muxy-background);
+  color: var(--muxy-foreground);
+  font-size: var(--font-body);
 }
 
-/* Make the @pierre/trees host (:host{height:100%}) actually fill the wrapper. */
-.file-tree-wrap > .file-tree {
-  height: 100%;
+.file-tree-row {
+  display: flex;
+  height: 24px;
+  align-items: center;
+  gap: var(--s3);
+  padding: 0 var(--s3);
+  border-radius: var(--s2);
+  margin: 0 var(--s1);
+  color: var(--muxy-foreground);
+  cursor: default;
+  user-select: none;
+}
+
+.file-tree-row:hover,
+.file-tree-row-drop {
+  background: var(--muxy-hover);
+}
+
+.file-tree-row-selected {
+  background: var(--muxy-hover);
+}
+
+.file-tree-row-ignored {
+  color: var(--muxy-foreground-muted);
+}
+
+.file-tree-indent {
+  flex: 0 0 auto;
+  height: 1px;
+}
+
+.file-tree-disclosure {
+  display: inline-flex;
+  width: 14px;
+  height: 20px;
+  flex: 0 0 14px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muxy-foreground-muted);
+}
+
+.file-tree-disclosure:hover {
+  color: var(--muxy-foreground);
+}
+
+.file-tree-disclosure-placeholder {
+  pointer-events: none;
+}
+
+.file-tree-kind-icon {
+  display: inline-flex;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  align-items: center;
+  justify-content: center;
+  color: var(--muxy-foreground-muted);
+}
+
+.file-tree-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-tree-rename-input {
+  min-width: 0;
+  flex: 1;
+  height: 20px;
+  padding: 0 var(--s2);
+  border: 1px solid var(--muxy-accent);
+  border-radius: var(--s2);
+  background: var(--muxy-surface);
+  color: var(--muxy-foreground);
+  font-size: var(--font-body);
+}
+
+.file-tree-rename-input:focus {
+  outline: none;
 }
 
 .files-status {
@@ -155,6 +280,10 @@ body {
 
 .ctx-item-critical {
   color: var(--muxy-diff-remove, var(--muxy-foreground));
+}
+
+.ctx-item-spaced {
+  margin-top: var(--s2);
 }
 
 /* --- editor --- */

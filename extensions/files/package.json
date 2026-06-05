@@ -1,32 +1,25 @@
 {
   "name": "files",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build && node -e \"require('fs').copyFileSync('package.json','dist/package.json')\"",
-    "typecheck": "tsc --noEmit"
+    "build": "vite build && node -e \"require('fs').copyFileSync('package.json','dist/package.json')\""
   },
   "private": true,
   "type": "module",
   "dependencies": {
     "@codemirror/language": "^6.12.3",
     "@codemirror/language-data": "^6.5.2",
+    "@codemirror/commands": "^6.10.3",
     "@codemirror/search": "^6.7.0",
     "@codemirror/state": "^6.6.0",
     "@codemirror/view": "^6.43.0",
-    "@pierre/trees": "^1.0.0-beta.4",
-    "@uiw/react-codemirror": "^4.25.10",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
-    "react-markdown": "^10.1.0",
-    "remark-gfm": "^4.0.1",
+    "@lezer/highlight": "^1.2.3",
     "yaml": "^2.9.0"
   },
   "devDependencies": {
-    "@types/react": "^19.2.16",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^5.2.0",
-    "typescript": "^6.0.3",
+    "@tailwindcss/vite": "^4.3.0",
+    "tailwindcss": "^4.3.0",
     "vite": "^7.3.5"
   },
   "muxy": {
@@ -94,7 +87,7 @@
       "repository": "https://github.com/muxy-app/extensions",
       "categories": ["files", "explorer"],
       "icon": "icon.svg",
-      "screenshots": ["screenshots/screenshot-1.png"]
+      "screenshots": ["screenshots/screenshot-1.png", "screenshots/screenshot-2.png"]
     }
   }
 }
