@@ -1,39 +1,8 @@
-export interface CommitRef {
-  name: string;
-  kind: string;
-}
-
-export interface CommitNode {
-  hash: string;
-  shortHash: string;
-  subject: string;
-  authorName: string;
-  authorDate: string;
-  isMerge: boolean;
-  parentHashes: string[];
-  refs: CommitRef[];
-}
-
-export interface GraphEdge {
-  fromColumn: number;
-  toColumn: number;
-}
-
-export interface CommitLane {
-  column: number;
-  passthrough: number[];
-  edges: GraphEdge[];
-  width: number;
-}
-
-export interface GraphRow {
-  commit: CommitNode;
-  lane: CommitLane;
-}
+import type { CommitLane, CommitNode, GraphRow } from "@/lib/types";
 
 export const MAX_LANES = 6;
 
-export function to_commit_node(c: MuxyGitCommit): CommitNode {
+export function toCommitNode(c: MuxyGitCommit): CommitNode {
   return {
     hash: c.hash,
     shortHash: c.shortHash,
@@ -46,7 +15,7 @@ export function to_commit_node(c: MuxyGitCommit): CommitNode {
   };
 }
 
-function claim_lane(lanes: (string | null)[], hash: string): number {
+function claimLane(lanes: Array<string | null>, hash: string): number {
   const existing = lanes.indexOf(hash);
   if (existing !== -1) return existing;
   const free = lanes.indexOf(null);
@@ -58,30 +27,28 @@ function claim_lane(lanes: (string | null)[], hash: string): number {
   return lanes.length - 1;
 }
 
-export function compute_lanes(commits: CommitNode[]): GraphRow[] {
-  const lanes: (string | null)[] = [];
+export function computeLanes(commits: CommitNode[]): GraphRow[] {
+  const lanes: Array<string | null> = [];
   const rows: GraphRow[] = [];
 
   for (const commit of commits) {
-    const column = claim_lane(lanes, commit.hash);
-    const before = lanes.map((l) => l);
-
+    const column = claimLane(lanes, commit.hash);
+    const before = lanes.map((lane) => lane);
     const first = commit.parentHashes[0] ?? null;
     lanes[column] = first;
-
-    const edges: GraphEdge[] = [];
+    const edges: CommitLane["edges"] = [];
     if (first) edges.push({ fromColumn: column, toColumn: column });
 
-    for (let i = 1; i < commit.parentHashes.length; i++) {
+    for (let i = 1; i < commit.parentHashes.length; i += 1) {
       const parent = commit.parentHashes[i];
-      const target = claim_lane(lanes, parent);
+      const target = claimLane(lanes, parent);
       edges.push({ fromColumn: column, toColumn: target });
     }
 
     while (lanes.length > 0 && lanes[lanes.length - 1] === null) lanes.pop();
 
     const passthrough: number[] = [];
-    for (let i = 0; i < before.length; i++) {
+    for (let i = 0; i < before.length; i += 1) {
       if (i !== column && before[i] !== null) passthrough.push(i);
     }
 
@@ -92,7 +59,7 @@ export function compute_lanes(commits: CommitNode[]): GraphRow[] {
   return rows;
 }
 
-export function relative_time(iso: string): string {
+export function relativeTime(iso: string): string {
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return "";
   const seconds = Math.max(0, Math.floor((Date.now() - then) / 1000));

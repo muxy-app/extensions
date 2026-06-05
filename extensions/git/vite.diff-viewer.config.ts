@@ -1,13 +1,7 @@
 import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { copyFileSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
-
-const WORKER_SRC = resolve(
-  __dirname,
-  "node_modules/@pierre/diffs/dist/worker/worker-portable.js",
-);
 
 export default defineConfig({
   resolve: {
@@ -31,12 +25,10 @@ export default defineConfig({
     },
   },
   plugins: [
-    react(),
     tailwindcss(),
     {
-      name: "copy-diffs-worker",
+      name: "copy-diff-viewer-html",
       writeBundle() {
-        copyFileSync(WORKER_SRC, resolve(__dirname, "dist/diffs-worker.js"));
         mkdirSync(resolve(__dirname, "dist/panel"), { recursive: true });
         copyFileSync(
           resolve(__dirname, "panel/diff-viewer.html"),

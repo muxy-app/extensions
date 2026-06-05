@@ -1,14 +1,28 @@
-import {
-  CodeView,
-  parsePatchFiles,
-  registerCustomCSSVariableTheme,
-  type CodeViewDiffItem,
-  type FileDiffMetadata,
-} from "@pierre/diffs";
-import { getOrCreateWorkerPoolSingleton } from "@pierre/diffs/worker";
+import { h, readPref, writePref } from "@/lib/dom";
 import { DiffFileListView, type DiffFile, type DiffFileStatus } from "./diff-file-list";
 import "@/styles/global.css";
 import "./diff-viewer.css";
+
+type DiffStyle = "split" | "unified";
+type RowKind = "hunk" | "context" | "addition" | "deletion" | "meta";
+
+interface DiffRow {
+  kind: RowKind;
+  oldLineNumber: number | null;
+  newLineNumber: number | null;
+  text: string;
+}
+
+interface PatchFile {
+  id: string;
+  path: string;
+  oldPath: string | null;
+  status: DiffFileStatus;
+  additions: number;
+  deletions: number;
+  rows: DiffRow[];
+  truncated: boolean;
+}
 
 const viewerRoot = document.querySelector<HTMLElement>("#viewer")!;
 const emptyState = document.querySelector<HTMLElement>("#empty-state")!;
@@ -22,357 +36,410 @@ const statFilesNode = document.querySelector<HTMLElement>("#stat-files")!;
 const statAdditionsNode = document.querySelector<HTMLElement>("#stat-additions")!;
 const statDeletionsNode = document.querySelector<HTMLElement>("#stat-deletions")!;
 const reloadButton = document.querySelector<HTMLButtonElement>("#reload")!;
+const zoomInButton = document.querySelector<HTMLButtonElement>("#zoom-in")!;
+const zoomOutButton = document.querySelector<HTMLButtonElement>("#zoom-out")!;
+const zoomResetButton = document.querySelector<HTMLButtonElement>("#zoom-reset")!;
+const zoomLevelNode = document.querySelector<HTMLElement>("#zoom-reset")!;
+const toggleStyleButton = document.querySelector<HTMLButtonElement>("#toggle-style")!;
+const collapseAllButton = document.querySelector<HTMLButtonElement>("#collapse-all")!;
+const expandAllButton = document.querySelector<HTMLButtonElement>("#expand-all")!;
+const railResize = document.querySelector<HTMLElement>("#rail-resize")!;
 
-type FileDiff = FileDiffMetadata;
-type DiffItem = CodeViewDiffItem;
-
-let currentItems: DiffItem[] = [];
-let version = 0;
-let largeDiffMode = false;
-
-const LARGE_DIFF_FILE_LIMIT = 80;
-const LARGE_DIFF_LINE_LIMIT = 4500;
-const LARGE_DIFF_BYTE_LIMIT = 1_500_000;
-const LARGE_DIFF_ITEM_CHUNK_SIZE = 24;
-
+const MAX_RENDER_ROWS = 12000;
 const ZOOM_MIN = 0.7;
 const ZOOM_MAX = 1.8;
 const ZOOM_STEP = 0.1;
-const SELECTED_FILE_TOP_OFFSET = 0;
+const RAIL_MIN = 180;
+const RAIL_MAX = 520;
 
-function readPref<T extends string>(key: string, fallback: T): T {
-  try {
-    return (localStorage.getItem(`muxy.git.diff.${key}`) as T) || fallback;
-  } catch {
-    return fallback;
-  }
-}
+let files: PatchFile[] = [];
+let activeItemId = "";
+let diffStyle: DiffStyle = readPref<DiffStyle>("muxy.git.diff.style", "split");
+let zoom = Number(readPref("muxy.git.diff.zoom", "1")) || 1;
+let collapsed = new Set<string>();
+let suppressScrollSync = false;
+let scrollFrame = 0;
 
-function writePref(key: string, value: string) {
-  try {
-    localStorage.setItem(`muxy.git.diff.${key}`, value);
-  } catch {
-    void 0;
-  }
-}
-
-let diffStyle: "split" | "unified" = readPref<"split" | "unified">("style", "split");
-let zoom = Number(readPref("zoom", "1")) || 1;
-
-const THEME_COLORS = {
-  foreground: "#d5d0c8",
-  background: "#181716",
-  "ansi-black": "#1f1d1b",
-  "ansi-red": "#ff5f57",
-  "ansi-green": "#9bbf72",
-  "ansi-yellow": "#d9b26c",
-  "ansi-blue": "#7aa2c7",
-  "ansi-magenta": "#c895bf",
-  "ansi-cyan": "#7ab8aa",
-  "ansi-white": "#d5d0c8",
-  "ansi-bright-black": "#807872",
-  "ansi-bright-red": "#ff776f",
-  "ansi-bright-green": "#b2d487",
-  "ansi-bright-yellow": "#e8c47f",
-  "ansi-bright-blue": "#8fb9dd",
-  "ansi-bright-magenta": "#d8a8cf",
-  "ansi-bright-cyan": "#91cfc1",
-  "ansi-bright-white": "#f0ece6",
-  "token-comment": "#807872",
-  "token-constant": "#d9b26c",
-  "token-deleted": "#ff5f57",
-  "token-function": "#7ab8aa",
-  "token-inserted": "#9bbf72",
-  "token-keyword": "#df805c",
-  "token-link": "#7aa2c7",
-  "token-parameter": "#c895bf",
-  "token-punctuation": "#a8a09a",
-  "token-string": "#9bbf72",
-  "token-string-expression": "#b2d487",
-  "token-changed": "#d9b26c",
-};
-
-registerCustomCSSVariableTheme("muxy-diff", THEME_COLORS, false);
-
-function resolveThemeType(): "light" | "dark" {
-  return window.muxy?.theme?.colorScheme === "light" ? "light" : "dark";
-}
-
-function createWorkerPool() {
-  if (typeof Worker === "undefined") return undefined;
-
-  const workerUrl = new URL("../diffs-worker.js", document.baseURI);
-  const hardwareConcurrency = navigator.hardwareConcurrency || 4;
-  const poolSize = Math.max(2, Math.min(4, Math.floor(hardwareConcurrency / 2)));
-
-  try {
-    return getOrCreateWorkerPoolSingleton({
-      poolOptions: {
-        workerFactory: () => new Worker(workerUrl),
-        poolSize,
-        totalASTLRUCacheSize: 60,
-      },
-      highlighterOptions: {
-        theme: { dark: "muxy-diff", light: "muxy-diff" },
-        useTokenTransformer: false,
-        lineDiffType: "word",
-        maxLineDiffLength: 900,
-        tokenizeMaxLineLength: 800,
-        preferredHighlighter: "shiki-js",
-      },
-    });
-  } catch (error) {
-    console.warn("Diff worker pool unavailable; falling back to main thread.", error);
-    return undefined;
-  }
-}
-
-const workerPool = createWorkerPool();
-void workerPool?.initialize().catch((error) => {
-  console.warn("Diff worker pool failed to initialize.", error);
+const sidebar = new DiffFileListView(fileListNode, (itemId) => {
+  setActiveItem(itemId);
 });
 
-const CHEVRON_SVG = `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>`;
-
-const HEADER_CSS = [
-  `[data-diffs-header]{cursor:pointer;box-sizing:border-box;height:36px;padding:0 12px;border-bottom:1px solid var(--diffs-bg-separator);font-size:13px;line-height:36px;}`,
-  `[data-diffs-header]:hover{background:var(--diffs-bg-buffer);}`,
-  `[data-diffs-header] [data-title]{cursor:pointer;}`,
-].join("");
-
-function headerPrefix(file: { name: string; prevName?: string }): HTMLElement {
-  const item = currentItems.find(
-    (i) => i.fileDiff.name === file.name && i.fileDiff.prevName === file.prevName,
-  );
-  const span = document.createElement("span");
-  span.className = "file-chevron";
-  span.dataset.collapsed = item?.collapsed ? "true" : "false";
-  span.innerHTML = CHEVRON_SVG;
-  return span;
+function cleanPath(path: string): string {
+  const text = path.trim().replace(/^"|"$/g, "").replace(/\\"/g, '"');
+  if (text === "/dev/null") return text;
+  return text.replace(/^[ab]\//, "");
 }
 
-function viewerOptions() {
-  return {
-    diffStyle,
-    diffIndicators: "classic" as const,
-    hunkSeparators: "metadata" as const,
-    lineDiffType: largeDiffMode ? ("none" as const) : ("word" as const),
-    maxLineDiffLength: largeDiffMode ? 120 : 900,
-    tokenizeMaxLineLength: largeDiffMode ? 300 : 800,
-    tokenizeMaxLength: largeDiffMode ? 120000 : 450000,
-    overflow: largeDiffMode ? ("scroll" as const) : ("wrap" as const),
-    stickyHeaders: false,
-    pointerEventsOnScroll: true,
-    theme: { dark: "muxy-diff", light: "muxy-diff" },
-    themeType: resolveThemeType(),
-    itemMetrics: { lineHeight: Math.round(20 * zoom), diffHeaderHeight: 36, spacing: 8, paddingBottom: 0 },
-    layout: { paddingTop: 0, paddingBottom: 16, gap: 0 },
-    renderHeaderPrefix: headerPrefix as never,
-    unsafeCSS: HEADER_CSS,
+function parseHeaderPath(line: string): { oldPath: string; path: string } {
+  const body = line.slice("diff --git ".length);
+  if (body.startsWith("a/")) {
+    const index = body.lastIndexOf(" b/");
+    if (index > 0) return { oldPath: cleanPath(body.slice(0, index)), path: cleanPath(body.slice(index + 1)) };
+  }
+  const tokens = splitHeaderTokens(body);
+  return { oldPath: cleanPath(tokens[0] ?? "unknown"), path: cleanPath(tokens[1] ?? tokens[0] ?? "unknown") };
+}
+
+function splitHeaderTokens(text: string): string[] {
+  const tokens: string[] = [];
+  let token = "";
+  let quoted = false;
+  let escaped = false;
+
+  for (const char of text) {
+    if (escaped) {
+      token += char;
+      escaped = false;
+      continue;
+    }
+    if (char === "\\") {
+      escaped = true;
+      token += char;
+      continue;
+    }
+    if (char === '"') {
+      quoted = !quoted;
+      token += char;
+      continue;
+    }
+    if (char === " " && !quoted) {
+      if (token) tokens.push(token);
+      token = "";
+      continue;
+    }
+    token += char;
+  }
+
+  if (token) tokens.push(token);
+  return tokens;
+}
+
+function parsePatch(patch: string): PatchFile[] {
+  const result: PatchFile[] = [];
+  const lines = patch.replace(/\r\n/g, "\n").split("\n");
+  let current: PatchFile | null = null;
+  let oldLine = 0;
+  let newLine = 0;
+  let totalRows = 0;
+
+  const push = (row: DiffRow) => {
+    if (!current) return;
+    if (totalRows >= MAX_RENDER_ROWS) {
+      current.truncated = true;
+      return;
+    }
+    current.rows.push(row);
+    totalRows += 1;
   };
+
+  for (const raw of lines) {
+    if (raw.startsWith("diff --git ")) {
+      const paths = parseHeaderPath(raw);
+      current = {
+        id: `${result.length}:${paths.path}`,
+        path: paths.path,
+        oldPath: paths.oldPath === paths.path ? null : paths.oldPath,
+        status: "modified",
+        additions: 0,
+        deletions: 0,
+        rows: [],
+        truncated: false,
+      };
+      result.push(current);
+      oldLine = 0;
+      newLine = 0;
+      continue;
+    }
+
+    if (!current) continue;
+
+    if (raw.startsWith("new file mode")) {
+      current.status = "added";
+      continue;
+    }
+    if (raw.startsWith("deleted file mode")) {
+      current.status = "deleted";
+      continue;
+    }
+    if (raw.startsWith("rename from ")) {
+      current.status = "renamed";
+      current.oldPath = cleanPath(raw.slice("rename from ".length));
+      continue;
+    }
+    if (raw.startsWith("rename to ")) {
+      current.status = "renamed";
+      current.path = cleanPath(raw.slice("rename to ".length));
+      current.id = `${result.length - 1}:${current.path}`;
+      continue;
+    }
+    if (raw.startsWith("--- ")) {
+      const path = cleanPath(raw.slice(4));
+      current.oldPath = path === "/dev/null" ? null : path;
+      continue;
+    }
+    if (raw.startsWith("+++ ")) {
+      const path = cleanPath(raw.slice(4));
+      if (path !== "/dev/null") current.path = path;
+      continue;
+    }
+
+    const hunk = raw.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@ ?(.*)$/);
+    if (hunk) {
+      oldLine = Number(hunk[1]);
+      newLine = Number(hunk[2]);
+      push({ kind: "hunk", oldLineNumber: null, newLineNumber: null, text: raw });
+      continue;
+    }
+
+    if (raw.startsWith("+")) {
+      current.additions += 1;
+      push({ kind: "addition", oldLineNumber: null, newLineNumber: newLine, text: raw.slice(1) });
+      newLine += 1;
+      continue;
+    }
+    if (raw.startsWith("-")) {
+      current.deletions += 1;
+      push({ kind: "deletion", oldLineNumber: oldLine, newLineNumber: null, text: raw.slice(1) });
+      oldLine += 1;
+      continue;
+    }
+    if (raw.startsWith(" ")) {
+      push({ kind: "context", oldLineNumber: oldLine, newLineNumber: newLine, text: raw.slice(1) });
+      oldLine += 1;
+      newLine += 1;
+      continue;
+    }
+    if (raw.startsWith("Binary files") || raw.startsWith("\\")) {
+      push({ kind: "meta", oldLineNumber: null, newLineNumber: null, text: raw });
+    }
+  }
+
+  return result.map((file, index) => ({ ...file, id: `${index}:${file.path}` }));
 }
 
-const viewer = new CodeView(
-  viewerOptions(),
-  workerPool,
-);
-
-viewer.setup(viewerRoot);
-
-function fileStats(file: FileDiff) {
-  return file.hunks.reduce(
-    (stats, hunk) => {
-      stats.additions += hunk.additionLines;
-      stats.deletions += hunk.deletionLines;
-      return stats;
-    },
-    { additions: 0, deletions: 0 },
-  );
-}
-
-function summarize(files: FileDiff[]) {
-  return files.reduce(
+function summarize(nextFiles: PatchFile[]) {
+  return nextFiles.reduce(
     (stats, file) => {
-      const delta = fileStats(file);
-      stats.additions += delta.additions;
-      stats.deletions += delta.deletions;
+      stats.additions += file.additions;
+      stats.deletions += file.deletions;
+      stats.truncated ||= file.truncated;
       return stats;
     },
-    { files: files.length, additions: 0, deletions: 0 },
+    { files: nextFiles.length, additions: 0, deletions: 0, truncated: false },
   );
 }
 
-function gitStatusForFile(file: FileDiff): DiffFileStatus {
-  if (file.type === "new") return "added";
-  if (file.type === "deleted") return "deleted";
-  if (file.type.startsWith("rename")) return "renamed";
-  return "modified";
-}
-
-function renderStats(stats: { files: number; additions: number; deletions: number }) {
+function renderStats(stats: { files: number; additions: number; deletions: number; truncated: boolean }): void {
   fileCountNode.textContent = String(stats.files);
   statFilesNode.textContent = String(stats.files);
   statAdditionsNode.textContent = `+${stats.additions}`;
   statDeletionsNode.textContent = `-${stats.deletions}`;
-  const modeLabel = largeDiffMode ? " · optimized" : "";
-  summaryNode.innerHTML = `<span class="file-pill">${stats.files} ${stats.files === 1 ? "file" : "files"}${modeLabel}</span> <span class="added">+${stats.additions}</span> <span class="deleted">-${stats.deletions}</span>`;
-}
-
-function parsePatch(patch: string): FileDiff[] {
-  const parsed = parsePatchFiles(patch, `muxy-${version}`, true);
-  return parsed.flatMap((group) => group.files);
-}
-
-function getRenderedLineCount(files: FileDiff[]) {
-  return files.reduce(
-    (total, file) => total + Math.max(file.splitLineCount || 0, file.unifiedLineCount || 0),
-    0,
+  const mode = stats.truncated ? " · optimized" : "";
+  summaryNode.replaceChildren(
+    h("span", { class: "file-pill" }, `${stats.files} ${stats.files === 1 ? "file" : "files"}${mode}`),
+    h("span", { class: "added" }, `+${stats.additions}`),
+    h("span", { class: "deleted" }, `-${stats.deletions}`),
   );
 }
 
-function shouldUseLargeDiffMode(files: FileDiff[], patch: string) {
-  return (
-    patch.length > LARGE_DIFF_BYTE_LIMIT ||
-    files.length > LARGE_DIFF_FILE_LIMIT ||
-    getRenderedLineCount(files) > LARGE_DIFF_LINE_LIMIT
-  );
-}
-
-async function applyViewerOptions() {
-  const options = viewerOptions();
-  viewer.setOptions(options);
-
-  try {
-    await workerPool?.setRenderOptions({
-      theme: options.theme,
-      useTokenTransformer: false,
-      lineDiffType: options.lineDiffType,
-      maxLineDiffLength: options.maxLineDiffLength,
-      tokenizeMaxLineLength: options.tokenizeMaxLineLength,
-    });
-  } catch (error) {
-    console.warn("Diff worker pool rejected render options.", error);
-  }
-
-  viewer.render(true);
-}
-
-function nextFrame() {
-  return new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-}
-
-function itemOffsetFromTop(itemId: string): number | undefined {
-  const rendered = viewer.getRenderedItems().find((item) => item.id === itemId);
-  if (!rendered) return undefined;
-  return rendered.element.getBoundingClientRect().top - viewerRoot.getBoundingClientRect().top;
-}
-
-async function scrollToItemWhenSettled(itemId: string) {
-  suppressScrollSync = true;
-  try {
-    let alignedFrames = 0;
-    for (let attempt = 0; attempt < 60 && alignedFrames < 3; attempt += 1) {
-      viewer.scrollTo({ type: "item", id: itemId, align: "start", offset: SELECTED_FILE_TOP_OFFSET, behavior: "instant" });
-      await nextFrame();
-      const offset = itemOffsetFromTop(itemId);
-      const aligned = offset !== undefined && Math.abs(offset - SELECTED_FILE_TOP_OFFSET) <= 2;
-      alignedFrames = aligned ? alignedFrames + 1 : 0;
-    }
-  } finally {
-    suppressScrollSync = false;
-  }
-}
-
-async function waitForItemAtTop(itemId: string) {
-  let alignedFrames = 0;
-  for (let attempt = 0; attempt < 90 && alignedFrames < 3; attempt += 1) {
-    await nextFrame();
-    const offset = itemOffsetFromTop(itemId);
-    const aligned = offset !== undefined && Math.abs(offset - SELECTED_FILE_TOP_OFFSET) <= 4;
-    alignedFrames = aligned ? alignedFrames + 1 : 0;
-  }
-}
-
-let activeItemId = "";
-let suppressScrollSync = false;
-
-const sidebar = new DiffFileListView(fileListNode, (itemId) => {
-  suppressScrollSync = true;
-  setActiveItem(itemId);
-  void waitForItemAtTop(itemId).then(() => {
-    suppressScrollSync = false;
-  });
-});
-
-function setActiveItem(itemId: string, shouldScroll = true) {
-  activeItemId = itemId;
-  sidebar.setActive(itemId);
-
-  if (shouldScroll && itemId) {
-    viewer.scrollTo({ type: "item", id: itemId, align: "start", offset: SELECTED_FILE_TOP_OFFSET, behavior: "smooth-auto" });
-  }
-}
-
-function topVisibleItemId(): string {
-  const viewportTop = viewerRoot.getBoundingClientRect().top;
-  let bestId = "";
-  let bestTop = -Infinity;
-  for (const item of viewer.getRenderedItems()) {
-    const top = item.element.getBoundingClientRect().top - viewportTop;
-    if (top <= SELECTED_FILE_TOP_OFFSET + 4 && top > bestTop) {
-      bestTop = top;
-      bestId = item.id;
-    }
-  }
-  return bestId;
-}
-
-viewer.subscribeToScroll(() => {
-  if (suppressScrollSync) return;
-  const id = topVisibleItemId();
-  if (id && id !== activeItemId) setActiveItem(id, false);
-});
-
-function renderFileList(files: FileDiff[], items: DiffItem[], focusId: string) {
-  const listFiles: DiffFile[] = files.map((file, index) => ({
-    path: file.name,
-    itemId: items[index].id,
-    status: gitStatusForFile(file),
+function renderFileList(focusId: string): void {
+  const listFiles: DiffFile[] = files.map((file) => ({
+    path: file.path,
+    itemId: file.id,
+    status: file.status,
   }));
   sidebar.setFiles(listFiles);
-  setActiveItem(focusId || items[0]?.id || "", false);
+  setActiveItem(focusId || files[0]?.id || "", false);
 }
 
-async function setViewerItems(items: DiffItem[]) {
-  if (!largeDiffMode) {
-    viewer.setItems(items);
+async function renderViewer(): Promise<void> {
+  viewerRoot.replaceChildren();
+  const content = h("div", { class: `diff-content ${diffStyle}` });
+  viewerRoot.appendChild(content);
+  for (let index = 0; index < files.length; index += 1) {
+    content.appendChild(renderFile(files[index]));
+    if (index % 8 === 7) await nextFrame();
+  }
+}
+
+function renderFile(file: PatchFile): HTMLElement {
+  const isCollapsed = collapsed.has(file.id);
+  return h(
+    "section",
+    { class: "diff-file-section", "data-item-id": file.id },
+    h(
+      "button",
+      {
+        type: "button",
+        class: "diff-file-header",
+        "data-collapsed": isCollapsed ? "true" : "false",
+        onclick: () => toggleItemCollapsed(file.id),
+      },
+      h("span", { class: "file-chevron" }, chevronSvg()),
+      h("span", { class: "diff-file-title", title: file.path }, file.path),
+      file.oldPath ? h("span", { class: "diff-file-previous", title: file.oldPath }, file.oldPath) : null,
+      h("span", { class: "diff-file-stat added" }, `+${file.additions}`),
+      h("span", { class: "diff-file-stat deleted" }, `-${file.deletions}`),
+    ),
+    isCollapsed ? null : h("div", { class: "diff-file-body" }, renderRows(file)),
+  );
+}
+
+function renderRows(file: PatchFile): Node[] {
+  const rows = file.rows.map((row) => (diffStyle === "split" ? renderSplitRow(row) : renderUnifiedRow(row)));
+  if (file.truncated) {
+    rows.push(
+      h(
+        "div",
+        { class: "diff-row meta unified-row" },
+        h("span", { class: "line-no" }),
+        h("span", { class: "line-no" }),
+        h("span", { class: "code-cell" }, "Diff truncated for faster rendering."),
+      ),
+    );
+  }
+  return rows;
+}
+
+function renderUnifiedRow(row: DiffRow): HTMLElement {
+  if (row.kind === "hunk" || row.kind === "meta") {
+    return h(
+      "div",
+      { class: `diff-row ${row.kind} unified-row` },
+      h("span", { class: "line-no" }),
+      h("span", { class: "line-no" }),
+      h("span", { class: "code-cell" }, row.text),
+    );
+  }
+  const mark = row.kind === "addition" ? "+" : row.kind === "deletion" ? "-" : " ";
+  return h(
+    "div",
+    { class: `diff-row ${row.kind} unified-row` },
+    h("span", { class: "line-no" }, row.oldLineNumber === null ? "" : String(row.oldLineNumber)),
+    h("span", { class: "line-no" }, row.newLineNumber === null ? "" : String(row.newLineNumber)),
+    h("span", { class: "code-cell" }, `${mark}${row.text}`),
+  );
+}
+
+function renderSplitRow(row: DiffRow): HTMLElement {
+  if (row.kind === "hunk" || row.kind === "meta") {
+    return h("div", { class: `diff-row ${row.kind} split-row span-row` }, row.text);
+  }
+  const oldText = row.kind === "addition" ? "" : row.text;
+  const newText = row.kind === "deletion" ? "" : row.text;
+  return h(
+    "div",
+    { class: `diff-row ${row.kind} split-row` },
+    h("span", { class: "line-no" }, row.oldLineNumber === null ? "" : String(row.oldLineNumber)),
+    h("span", { class: "code-cell old-cell" }, oldText),
+    h("span", { class: "line-no" }, row.newLineNumber === null ? "" : String(row.newLineNumber)),
+    h("span", { class: "code-cell new-cell" }, newText),
+  );
+}
+
+function chevronSvg(): SVGSVGElement {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("width", "12");
+  svg.setAttribute("height", "12");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "2.5");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("d", "m6 9 6 6 6-6");
+  svg.appendChild(path);
+  return svg;
+}
+
+function findFocusId(focusPath: string): string {
+  if (!focusPath) return "";
+  const matches = (name: string) =>
+    name === focusPath || name.endsWith(`/${focusPath}`) || focusPath.endsWith(`/${name}`);
+  return files.find((file) => matches(file.path) || (file.oldPath ? matches(file.oldPath) : false))?.id ?? "";
+}
+
+async function renderPatch(patch: string, focusPath: string): Promise<void> {
+  const trimmed = patch.trim();
+  if (!trimmed) {
+    clearDiff("No changes");
     return;
   }
-
-  viewer.setItems([]);
-  await nextFrame();
-
-  for (let index = 0; index < items.length; index += LARGE_DIFF_ITEM_CHUNK_SIZE) {
-    viewer.addItems(items.slice(index, index + LARGE_DIFF_ITEM_CHUNK_SIZE));
-    await nextFrame();
+  files = parsePatch(trimmed);
+  collapsed = new Set([...collapsed].filter((id) => files.some((file) => file.id === id)));
+  if (!files.length) {
+    clearDiff("No changes");
+    return;
   }
+  const focusId = findFocusId(focusPath);
+  await renderViewer();
+  hideLoading();
+  emptyState.classList.add("hidden");
+  renderFileList(focusId);
+  renderStats(summarize(files));
+  if (focusId) setActiveItem(focusId);
 }
 
-function showLoading(label: string) {
+function setActiveItem(itemId: string, shouldScroll = true): void {
+  activeItemId = itemId;
+  sidebar.setActive(itemId);
+  if (!shouldScroll || !itemId) return;
+  const target = Array.from(viewerRoot.querySelectorAll<HTMLElement>("[data-item-id]"))
+    .find((section) => section.dataset.itemId === itemId);
+  if (!target) return;
+  suppressScrollSync = true;
+  target.scrollIntoView({ block: "start", behavior: "smooth" });
+  setTimeout(() => {
+    suppressScrollSync = false;
+  }, 180);
+}
+
+function syncActiveFromScroll(): void {
+  if (suppressScrollSync) return;
+  if (scrollFrame) cancelAnimationFrame(scrollFrame);
+  scrollFrame = requestAnimationFrame(() => {
+    scrollFrame = 0;
+    const viewportTop = viewerRoot.getBoundingClientRect().top;
+    let best = "";
+    let bestTop = -Infinity;
+    for (const section of viewerRoot.querySelectorAll<HTMLElement>("[data-item-id]")) {
+      const top = section.getBoundingClientRect().top - viewportTop;
+      if (top <= 4 && top > bestTop) {
+        bestTop = top;
+        best = section.dataset.itemId ?? "";
+      }
+    }
+    if (best && best !== activeItemId) setActiveItem(best, false);
+  });
+}
+
+function toggleItemCollapsed(itemId: string): void {
+  if (collapsed.has(itemId)) collapsed.delete(itemId);
+  else collapsed.add(itemId);
+  void renderViewer().then(() => setActiveItem(itemId, false));
+}
+
+function setAllCollapsed(value: boolean): void {
+  collapsed = value ? new Set(files.map((file) => file.id)) : new Set();
+  void renderViewer().then(() => setActiveItem(activeItemId, false));
+}
+
+function showLoading(label: string): void {
   loadingLabel.textContent = label;
   loadingState.classList.remove("hidden");
   emptyState.classList.add("hidden");
 }
 
-function hideLoading() {
+function hideLoading(): void {
   loadingState.classList.add("hidden");
 }
 
-function clearDiff(message: string) {
+function clearDiff(message: string): void {
   hideLoading();
-  currentItems = [];
-  largeDiffMode = false;
-  viewer.setItems([]);
+  files = [];
+  collapsed.clear();
+  viewerRoot.replaceChildren();
   sidebar.clear();
   emptyState.classList.remove("hidden");
   fileCountNode.textContent = "0";
@@ -380,52 +447,6 @@ function clearDiff(message: string) {
   statAdditionsNode.textContent = "+0";
   statDeletionsNode.textContent = "-0";
   summaryNode.textContent = message;
-}
-
-function findFocusIndex(files: FileDiff[], focusPath: string): number {
-  const matches = (name: string) =>
-    name === focusPath || name.endsWith(`/${focusPath}`) || focusPath.endsWith(`/${name}`);
-  const exact = files.findIndex((file) => file.name === focusPath);
-  if (exact >= 0) return exact;
-  return files.findIndex((file) => matches(file.name));
-}
-
-async function renderPatch(patch: string, focusPath: string) {
-  const trimmed = patch.trim();
-  if (!trimmed) {
-    clearDiff("No changes");
-    return;
-  }
-
-  const files = parsePatch(trimmed);
-  if (!files.length) {
-    clearDiff("No changes");
-    return;
-  }
-
-  version += 1;
-  largeDiffMode = shouldUseLargeDiffMode(files, trimmed);
-  currentItems = files.map((fileDiff, index) => ({
-    id: `${index}:${fileDiff.prevName || fileDiff.name}`,
-    type: "diff",
-    fileDiff,
-    version,
-  }));
-
-  const focusIndex = focusPath ? findFocusIndex(files, focusPath) : -1;
-  const focusId = focusIndex >= 0 ? currentItems[focusIndex].id : "";
-
-  await applyViewerOptions();
-  await setViewerItems(currentItems);
-  hideLoading();
-  emptyState.classList.add("hidden");
-  renderFileList(files, currentItems, focusId);
-  renderStats(summarize(files));
-
-  if (focusId) {
-    await scrollToItemWhenSettled(focusId);
-    setActiveItem(focusId, false);
-  }
 }
 
 function diffData() {
@@ -439,7 +460,7 @@ function diffData() {
   };
 }
 
-async function loadGitDiff() {
+async function loadGitDiff(): Promise<void> {
   if (!window.muxy?.git) {
     clearDiff("Muxy git unavailable");
     return;
@@ -447,17 +468,13 @@ async function loadGitDiff() {
 
   const data = diffData();
   const project = data.cwd;
-  summaryNode.textContent = "Loading diff…";
+  summaryNode.textContent = "Loading diff...";
 
   try {
     if (data.source === "pr" && data.prNumber) {
       sourceLabelNode.textContent = `PR #${data.prNumber}`;
-      showLoading(`Loading diff for PR #${data.prNumber}…`);
+      showLoading(`Loading diff for PR #${data.prNumber}...`);
       const { diff } = await window.muxy.git.pr.diff({ project, number: data.prNumber });
-      if (!diff.trim()) {
-        clearDiff("This pull request has no diff.");
-        return;
-      }
       await renderPatch(diff, data.focusPath ?? "");
       return;
     }
@@ -465,7 +482,7 @@ async function loadGitDiff() {
     if (data.source === "commit" && data.hash) {
       const label = data.shortHash || data.hash.slice(0, 7);
       sourceLabelNode.textContent = `Commit ${label}`;
-      showLoading(`Loading diff for ${label}…`);
+      showLoading(`Loading diff for ${label}...`);
       const res = await window.muxy.exec(
         ["git", "show", "--format=", "--no-color", data.hash],
         { cwd: project },
@@ -474,42 +491,55 @@ async function loadGitDiff() {
         clearDiff(res.stderr.trim() || "Could not load commit diff.");
         return;
       }
-      if (!res.stdout.trim()) {
-        clearDiff("This commit has no diff.");
-        return;
-      }
       await renderPatch(res.stdout, data.focusPath ?? "");
       return;
     }
 
     sourceLabelNode.textContent = "Working Tree";
-    showLoading("Loading changes…");
-    const { diff } = await window.muxy.git.diff({ project, raw: true });
+    showLoading("Loading changes...");
+    const { diff } = await window.muxy.git.diff({ project, raw: true, lineLimit: MAX_RENDER_ROWS });
     await renderPatch(diff, data.focusPath ?? "");
   } catch (error) {
     clearDiff(error instanceof Error ? error.message : String(error));
   }
 }
 
-const zoomInButton = document.querySelector<HTMLButtonElement>("#zoom-in")!;
-const zoomOutButton = document.querySelector<HTMLButtonElement>("#zoom-out")!;
-const zoomResetButton = document.querySelector<HTMLButtonElement>("#zoom-reset")!;
-const zoomLevelNode = document.querySelector<HTMLElement>("#zoom-reset")!;
-const toggleStyleButton = document.querySelector<HTMLButtonElement>("#toggle-style")!;
-const collapseAllButton = document.querySelector<HTMLButtonElement>("#collapse-all")!;
-const expandAllButton = document.querySelector<HTMLButtonElement>("#expand-all")!;
-const railResize = document.querySelector<HTMLElement>("#rail-resize")!;
+function nextFrame(): Promise<void> {
+  return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+}
 
-const RAIL_MIN = 180;
-const RAIL_MAX = 520;
-
-function applyRailWidth(width: number) {
+function applyRailWidth(width: number): number {
   const clamped = Math.min(RAIL_MAX, Math.max(RAIL_MIN, Math.round(width)));
   document.documentElement.style.setProperty("--rail-width", `${clamped}px`);
   return clamped;
 }
 
-applyRailWidth(Number(readPref("rail", "260")) || 260);
+function applyZoom(): void {
+  document.documentElement.style.setProperty("--diff-zoom", String(zoom));
+  zoomLevelNode.textContent = `${Math.round(zoom * 100)}%`;
+  zoomOutButton.disabled = zoom <= ZOOM_MIN + 1e-6;
+  zoomInButton.disabled = zoom >= ZOOM_MAX - 1e-6;
+}
+
+function setZoom(next: number): void {
+  zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(next * 100) / 100));
+  writePref("muxy.git.diff.zoom", String(zoom));
+  applyZoom();
+}
+
+function syncStyleButton(): void {
+  toggleStyleButton.classList.toggle("active", diffStyle === "split");
+  toggleStyleButton.title = diffStyle === "split" ? "Switch to unified view" : "Switch to split view";
+}
+
+function toggleStyle(): void {
+  diffStyle = diffStyle === "split" ? "unified" : "split";
+  writePref("muxy.git.diff.style", diffStyle);
+  syncStyleButton();
+  void renderViewer().then(() => setActiveItem(activeItemId, false));
+}
+
+applyRailWidth(Number(readPref("muxy.git.diff.rail", "260")) || 260);
 
 railResize.addEventListener("pointerdown", (event) => {
   event.preventDefault();
@@ -529,79 +559,20 @@ railResize.addEventListener("pointerdown", (event) => {
     railResize.removeEventListener("pointermove", onMove);
     railResize.removeEventListener("pointerup", onUp);
     const width = railResize.parentElement!.getBoundingClientRect().width;
-    writePref("rail", String(Math.round(width)));
+    writePref("muxy.git.diff.rail", String(Math.round(width)));
   };
   railResize.addEventListener("pointermove", onMove);
   railResize.addEventListener("pointerup", onUp);
 });
 
-function applyZoom() {
-  document.documentElement.style.setProperty("--diff-zoom", String(zoom));
-  zoomLevelNode.textContent = `${Math.round(zoom * 100)}%`;
-  zoomOutButton.disabled = zoom <= ZOOM_MIN + 1e-6;
-  zoomInButton.disabled = zoom >= ZOOM_MAX - 1e-6;
-}
-
-function setZoom(next: number) {
-  zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(next * 100) / 100));
-  writePref("zoom", String(zoom));
-  applyZoom();
-  if (currentItems.length) void applyViewerOptions();
-}
-
-function syncStyleButton() {
-  toggleStyleButton.classList.toggle("active", diffStyle === "split");
-  toggleStyleButton.title = diffStyle === "split" ? "Switch to unified view" : "Switch to split view";
-}
-
-function toggleStyle() {
-  diffStyle = diffStyle === "split" ? "unified" : "split";
-  writePref("style", diffStyle);
-  syncStyleButton();
-  if (currentItems.length) void applyViewerOptions();
-}
-
-function setAllCollapsed(collapsed: boolean) {
-  if (!currentItems.length) return;
-  version += 1;
-  currentItems = currentItems.map((item) => ({ ...item, collapsed, version }));
-  viewer.setItems(currentItems);
-}
-
-function toggleItemCollapsed(itemId: string) {
-  const index = currentItems.findIndex((item) => item.id === itemId);
-  if (index < 0) return;
-  version += 1;
-  const next = {
-    ...currentItems[index],
-    collapsed: !currentItems[index].collapsed,
-    version,
-  };
-  currentItems[index] = next;
-  viewer.updateItem(next);
-  setActiveItem(itemId, false);
-}
-
-viewerRoot.addEventListener("click", (event) => {
-  const header = event
-    .composedPath()
-    .find(
-      (node): node is HTMLElement =>
-        node instanceof HTMLElement && node.hasAttribute("data-diffs-header"),
-    );
-  if (!header) return;
-  const title = header.querySelector<HTMLElement>("[data-title]")?.textContent?.trim();
-  if (!title) return;
-  const item = currentItems.find((i) => i.fileDiff.name === title || i.fileDiff.prevName === title);
-  if (item) toggleItemCollapsed(item.id);
-});
-
+viewerRoot.addEventListener("scroll", syncActiveFromScroll);
 zoomInButton.addEventListener("click", () => setZoom(zoom + ZOOM_STEP));
 zoomOutButton.addEventListener("click", () => setZoom(zoom - ZOOM_STEP));
 zoomResetButton.addEventListener("click", () => setZoom(1));
 toggleStyleButton.addEventListener("click", toggleStyle);
 collapseAllButton.addEventListener("click", () => setAllCollapsed(true));
 expandAllButton.addEventListener("click", () => setAllCollapsed(false));
+reloadButton.addEventListener("click", () => void loadGitDiff());
 
 window.addEventListener("keydown", (event) => {
   if (!(event.metaKey || event.ctrlKey)) return;
@@ -615,13 +586,6 @@ window.addEventListener("keydown", (event) => {
     event.preventDefault();
     setZoom(1);
   }
-});
-
-reloadButton.addEventListener("click", () => void loadGitDiff());
-
-window.muxy?.onThemeChange?.(() => {
-  viewer.setOptions(viewerOptions());
-  viewer.onThemeChange();
 });
 
 window.muxy?.onDataChange?.(() => void loadGitDiff());

@@ -1,6 +1,105 @@
-import type { FileEntry, GitStatus } from "@/lib/git-status";
+import type { BranchList, FileEntry, GitStatus } from "@/lib/types";
 
-export async function active_worktree_path(): Promise<string | undefined> {
+interface ProjectCandidate {
+  path: string;
+  isActive?: boolean;
+}
+
+interface WorktreeCandidate {
+  path: string;
+  isPrimary: boolean;
+}
+
+let resolvedProject = false;
+let cachedProject: string | undefined;
+let inflightProject: Promise<string | undefined> | null = null;
+let busyDepth = 0;
+const busyListeners = new Set<(busy: boolean) => void>();
+
+function normalizePath(path: string): string {
+  return path.replace(/\/+$/, "");
+}
+
+function samePath(a: string, b: string): boolean {
+  return normalizePath(a) === normalizePath(b);
+}
+
+export function resolveGitProjectPath(
+  projects: ProjectCandidate[],
+  worktrees: WorktreeCandidate[],
+): string | undefined {
+  const project = projects.find((p) => p.isActive)?.path ?? projects[0]?.path;
+  const primary = worktrees.find((w) => w.isPrimary)?.path;
+  if (!project) return primary;
+  const selected = worktrees.find((w) => samePath(w.path, project));
+  if (selected && !selected.isPrimary) return primary;
+  return project;
+}
+
+export async function activeGitProjectPath(): Promise<string | undefined> {
+  const [projects, worktrees] = await Promise.all([
+    muxy.projects.list().catch(() => [] as MuxyProject[]),
+    muxy.worktrees.list().catch(() => [] as MuxyWorktree[]),
+  ]);
+  const project = resolveGitProjectPath(projects, worktrees);
+  if (!project) return undefined;
+  try {
+    await muxy.git.repoInfo({ project });
+    return project;
+  } catch {
+    return undefined;
+  }
+}
+
+function invalidateProject(): void {
+  resolvedProject = false;
+  inflightProject = null;
+  cachedProject = undefined;
+}
+
+muxy.events.subscribe("project.switched", invalidateProject);
+muxy.events.subscribe("worktree.switched", invalidateProject);
+
+export async function activeProject(): Promise<string | undefined> {
+  if (resolvedProject) return cachedProject;
+  if (!inflightProject) {
+    inflightProject = activeGitProjectPath().then((value) => {
+      cachedProject = value;
+      resolvedProject = true;
+      inflightProject = null;
+      return value;
+    });
+  }
+  return inflightProject;
+}
+
+export function isBusy(): boolean {
+  return busyDepth > 0;
+}
+
+export function onBusyChange(fn: (busy: boolean) => void): () => void {
+  busyListeners.add(fn);
+  return () => busyListeners.delete(fn);
+}
+
+function setBusyDepth(next: number): void {
+  const was = busyDepth > 0;
+  busyDepth = next;
+  const now = busyDepth > 0;
+  if (was !== now) for (const fn of busyListeners) fn(now);
+}
+
+export async function runPinned<T>(fn: (project?: string) => Promise<T>): Promise<T> {
+  const project = await activeProject();
+  setBusyDepth(busyDepth + 1);
+  try {
+    return await fn(project);
+  } finally {
+    setBusyDepth(busyDepth - 1);
+  }
+}
+
+export async function activeWorktreePath(): Promise<string | undefined> {
   try {
     const worktrees = await muxy.worktrees.list();
     const active = worktrees.find((w) => w.isActive) ?? worktrees.find((w) => w.isPrimary);
@@ -10,9 +109,9 @@ export async function active_worktree_path(): Promise<string | undefined> {
   }
 }
 
-export async function open_diff(focusPath: string): Promise<void> {
+export async function openDiff(focusPath: string): Promise<void> {
   try {
-    const cwd = await active_worktree_path();
+    const cwd = await activeWorktreePath();
     void muxy.tabs.open({
       kind: "extensionWebView",
       extension: {
@@ -23,13 +122,13 @@ export async function open_diff(focusPath: string): Promise<void> {
       },
     });
   } catch {
-    void 0;
+    return;
   }
 }
 
-export async function open_commit_diff(hash: string, shortHash: string): Promise<void> {
+export async function openCommitDiff(hash: string, shortHash: string): Promise<void> {
   try {
-    const cwd = await active_worktree_path();
+    const cwd = await activeWorktreePath();
     void muxy.tabs.open({
       kind: "extensionWebView",
       extension: {
@@ -40,13 +139,13 @@ export async function open_commit_diff(hash: string, shortHash: string): Promise
       },
     });
   } catch {
-    void 0;
+    return;
   }
 }
 
-export async function open_pr_diff(prNumber: number): Promise<void> {
+export async function openPrDiff(prNumber: number): Promise<void> {
   try {
-    const cwd = await active_worktree_path();
+    const cwd = await activeWorktreePath();
     void muxy.tabs.open({
       kind: "extensionWebView",
       extension: {
@@ -57,30 +156,22 @@ export async function open_pr_diff(prNumber: number): Promise<void> {
       },
     });
   } catch {
-    void 0;
+    return;
   }
 }
 
-export function open_url(url: string): void {
+export function openUrl(url: string): void {
   if (!url) return;
   void muxy.exec(["open", url]).catch(() => undefined);
 }
 
-export function close_panel(): void {
-  try {
-    void muxy.panels.close("scm");
-  } catch {
-    void 0;
-  }
-}
-
-export function error_message(err: unknown): string {
+export function errorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
   const text = String(err).trim();
   return text || "Unknown error";
 }
 
-export async function confirm_action(opts: {
+export async function confirmAction(opts: {
   title: string;
   message: string;
   confirmLabel: string;
@@ -101,47 +192,70 @@ export async function confirm_action(opts: {
   }
 }
 
-export async function alert_error(title: string, err: unknown): Promise<void> {
+export async function alertError(title: string, err: unknown): Promise<void> {
   try {
-    await muxy.dialog.alert({ title, message: error_message(err), style: "critical" });
+    await muxy.dialog.alert({ title, message: errorMessage(err), style: "critical" });
   } catch {
-    void 0;
+    return;
   }
 }
 
-export async function try_action(action: () => Promise<unknown>, error_title: string): Promise<boolean> {
+export async function tryAction(
+  action: () => Promise<unknown>,
+  errorTitle: string,
+): Promise<boolean> {
   try {
     await action();
     return true;
   } catch (err) {
-    await alert_error(error_title, err);
+    await alertError(errorTitle, err);
     return false;
   }
 }
 
-
-export function to_view_status(s: MuxyGitStatus): GitStatus {
+export function toViewStatus(s: MuxyGitStatus): GitStatus {
   return {
     branch: s.branch || null,
     defaultBranch: s.defaultBranch,
     ahead: s.aheadBehind.ahead,
     behind: s.aheadBehind.behind,
-    staged: s.stagedFiles.map(to_entry),
-    unstaged: s.unstagedFiles.map(to_entry),
+    staged: s.stagedFiles.map(toEntry),
+    unstaged: s.unstagedFiles.map(toEntry),
     pullRequest: s.pullRequest,
   };
 }
 
-function to_entry(f: MuxyGitFile): FileEntry {
+function toEntry(f: MuxyGitFile): FileEntry {
   return {
     path: f.path,
-    label: normalize_label(f.status),
+    label: normalizeLabel(f.status),
     added: f.additions,
     removed: f.deletions,
   };
 }
 
-function normalize_label(status: string): string {
+function normalizeLabel(status: string): string {
   const letter = status.trim().charAt(0).toUpperCase();
   return letter || "M";
+}
+
+export async function listBranches(): Promise<BranchList> {
+  const [branches, current] = await Promise.all([
+    muxy.git.branches().catch(() => [] as string[]),
+    muxy.git.currentBranch().catch(() => ""),
+  ]);
+  return { current: current || null, branches };
+}
+
+export async function hasPendingChanges(project?: string): Promise<boolean> {
+  const s = await muxy.git.status({ local: true, project }).catch(() => null);
+  if (!s) return false;
+  return s.stagedFiles.length > 0 || s.unstagedFiles.length > 0;
+}
+
+export function commitAll(message: string, project?: string): Promise<boolean> {
+  return tryAction(
+    () => muxy.git.commit({ message, stageAll: true, project }),
+    "Could not commit changes",
+  );
 }
