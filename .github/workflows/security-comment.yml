@@ -1,7 +1,14 @@
 name: Security comment
 
+# Uses pull_request_target so the job gets a writable GITHUB_TOKEN even for PRs
+# from forks (a plain `pull_request` token is read-only on forks, which 403s the
+# comment API). pull_request_target runs in the BASE repo's context, so we must
+# treat the PR's content as untrusted DATA only: we check the trusted base repo
+# out first (for the analysis script), then fetch the PR head into a separate
+# directory that we read but never execute. No `npm ci`, no extension build, no
+# fork-supplied script is ever run with this token.
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize, reopened]
     paths:
       - "extensions/**"
@@ -10,6 +17,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
   pull-requests: write
 
 concurrency:
@@ -21,10 +29,24 @@ jobs:
     name: Analyse changed extensions
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      # Trusted checkout: the base repo at the target branch. This is the code
+      # we will EXECUTE (scripts/security-comment.mjs).
+      - name: Checkout base repo (trusted)
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+
+      # Untrusted checkout: the PR head, including fork changes. This is the
+      # code we only READ as data. It is fetched into ./pr and never executed.
+      - name: Checkout PR head (untrusted, data only)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: pr
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -33,12 +55,24 @@ jobs:
 
       - name: Determine changed extensions
         id: changed
+        working-directory: pr
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          names="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- extensions/ \
+          # The base commit may not exist in a fork clone; fetch it so the diff
+          # has a merge base. Falls back to the recorded base ref name.
+          git fetch --no-tags --depth=1 \
+            "https://github.com/${{ github.repository }}.git" "$BASE_SHA" 2>/dev/null || true
+
+          if git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null; then
+            base="$BASE_SHA"
+          else
+            base="$(git rev-list --max-parents=0 HEAD | tail -n1)"
+          fi
+
+          names="$(git diff --name-only "$base" "$HEAD_SHA" -- extensions/ \
             | awk -F/ 'NF>1 && $1=="extensions" {print $2}' \
             | sort -u)"
 
@@ -56,14 +90,17 @@ jobs:
           echo "names=$valid" >> "$GITHUB_OUTPUT"
           echo "Changed extensions: ${valid:-<none>}"
 
+      # Run the TRUSTED base script against the UNTRUSTED PR working tree.
+      # MUXY_EXTENSIONS_DIR points the analysis at the PR checkout's extensions.
       - name: Generate security report
         id: report
         if: steps.changed.outputs.names != ''
         env:
           NAMES: ${{ steps.changed.outputs.names }}
+          MUXY_EXTENSIONS_DIR: ${{ github.workspace }}/pr/extensions
         run: |
           set -euo pipefail
-          node scripts/security-comment.mjs $NAMES > security-report.md
+          node base/scripts/security-comment.mjs $NAMES > security-report.md
           {
             echo "body<<MUXY_EOF"
             cat security-report.md
@@ -73,12 +110,14 @@ jobs:
       - name: Post or update PR comment
         if: steps.changed.outputs.names != ''
         uses: actions/github-script@v7
+        env:
+          REPORT_BODY: ${{ steps.report.outputs.body }}
         with:
           script: |
             const marker = "<!-- muxy-extension-security-report -->";
             const body = process.env.REPORT_BODY;
             const { owner, repo } = context.repo;
-            const issue_number = context.issue.number;
+            const issue_number = context.payload.pull_request.number;
 
             const comments = await github.paginate(
               github.rest.issues.listComments,
@@ -97,5 +136,3 @@ jobs:
                 owner, repo, issue_number, body,
               });
             }
-        env:
-          REPORT_BODY: ${{ steps.report.outputs.body }}

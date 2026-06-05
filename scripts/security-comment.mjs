@@ -11,12 +11,34 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   buildOutputDir,
-  extensionDir,
-  extensionsDir,
-  listExtensionNames,
+  extensionDir as defaultExtensionDir,
+  extensionsDir as defaultExtensionsDir,
+  listExtensionNames as defaultListExtensionNames,
   packageJSONPath,
   readPackageManifest,
 } from "./lib/paths.mjs";
+
+// In CI this script (from the trusted base repo) analyses a separate, untrusted
+// PR checkout. MUXY_EXTENSIONS_DIR points at that checkout's extensions/ so we
+// read the PR's manifests and source without executing any of its code. When
+// unset, fall back to this repo's own extensions/ (local / non-fork runs).
+const extensionsDir = process.env.MUXY_EXTENSIONS_DIR
+  ? path.resolve(process.env.MUXY_EXTENSIONS_DIR)
+  : defaultExtensionsDir;
+
+const usingOverride = extensionsDir !== defaultExtensionsDir;
+const extensionDir = (name) =>
+  usingOverride ? path.join(extensionsDir, name) : defaultExtensionDir(name);
+
+function listExtensionNames() {
+  if (!usingOverride) return defaultListExtensionNames();
+  if (!fs.existsSync(extensionsDir)) return [];
+  return fs
+    .readdirSync(extensionsDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && !entry.name.startsWith("."))
+    .map((entry) => entry.name)
+    .sort();
+}
 
 // Stable marker so the posting step can find and update its own comment.
 export const COMMENT_MARKER = "<!-- muxy-extension-security-report -->";
