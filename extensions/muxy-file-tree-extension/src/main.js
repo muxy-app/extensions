@@ -264,28 +264,6 @@ async function copyAbsolutePath(path) {
   await copyText(absolutePath, 'Copied absolute path');
 }
 
-async function runOpenCommand(argv, successLabel) {
-  const result = await muxy().exec(argv, { timeoutMs: 5000 });
-  if (result?.timedOut) {
-    throw new Error('Open command timed out.');
-  }
-  if (typeof result?.exitCode === 'number' && result.exitCode !== 0) {
-    const detail = result.stderr || result.stdout || `exit code ${result.exitCode}`;
-    throw new Error(detail.trim());
-  }
-  setTransientStatus(successLabel);
-}
-
-async function revealInFinder(path) {
-  const absolutePath = resolveEditorFilePath(path);
-  await runOpenCommand(['/usr/bin/open', '-R', absolutePath], 'Revealed in Finder');
-}
-
-async function openWithDefaultApp(path) {
-  const absolutePath = resolveEditorFilePath(path);
-  await runOpenCommand(['/usr/bin/open', absolutePath], 'Opened with default app');
-}
-
 async function sendPathToFocusedAgent(path) {
   const normalized = normalizePath(path);
   const panes = await muxy().panes.list();
@@ -581,8 +559,6 @@ function menuActionsFor(entry) {
     { label: 'Send @path to Agent', action: () => sendPathToFocusedAgent(path) },
     { label: 'Copy Relative Path', action: () => copyRelativePath(path) },
     { label: 'Copy Absolute Path', action: () => copyAbsolutePath(path) },
-    { label: 'Reveal in Finder', action: () => revealInFinder(path) },
-    { label: 'Open with Default App', action: () => openWithDefaultApp(path) },
   ];
 }
 

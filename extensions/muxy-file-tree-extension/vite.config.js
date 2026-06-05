@@ -5,9 +5,8 @@ export default defineConfig({
   build: {
     rollupOptions: {
       input: {
-        panel: resolve(__dirname, 'panel.html'),
+        panel: resolve(import.meta.dirname, 'panel.html'),
       },
     },
   },
 });
-

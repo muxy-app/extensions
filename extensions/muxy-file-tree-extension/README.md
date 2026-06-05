@@ -4,7 +4,7 @@ A lightweight file tree panel for Muxy `0.29.x` extension builds.
 
 This is a small, file-system read-only first pass:
 
-- Adds a topbar folder button.
+- Adds a top bar folder button.
 - Opens a pinned right-side `Files` panel.
 - Lists the active worktree with `muxy.files.list`.
 - Expands and collapses directories.
@@ -12,7 +12,7 @@ This is a small, file-system read-only first pass:
 - Opens files in Muxy's built-in editor.
 - Supports keyboard navigation with Up/Down, Enter, Home/End, and Escape to clear search.
 - Copies the selected relative path from the context menu, Cmd/Ctrl+C inside the tree, or the extension shortcut.
-- Adds a right-click menu for opening paths, revealing in Finder, copying relative/absolute paths, and inserting `@relative/path` into the focused agent pane for the active worktree.
+- Adds a right-click menu for opening files in Muxy, copying relative/absolute paths, and inserting `@relative/path` into the focused agent pane for the active worktree.
 - Preserves expanded folders per active worktree.
 - Refreshes on `file.changed`, project switch, and worktree switch events.
 
@@ -20,7 +20,7 @@ This is a small, file-system read-only first pass:
 
 Muxy's extension API is still marked as active development. The public docs and the Swift loader include `files:read`, but the checked-in JSON schema may lag behind that permission in some commits. This manifest follows the public docs and current Swift source.
 
-The extension does not request `files:write` and does not delete, rename, move, or modify workspace files. The context menu uses `commands:exec` for `/usr/bin/open` actions and `panes:read`/`panes:write` to insert `@relative/path` into the currently focused agent pane under the active worktree. Muxy may ask for runtime consent before those actions run.
+The extension does not request `files:write` and does not delete, rename, move, or modify workspace files. The context menu uses `panes:read`/`panes:write` to insert `@relative/path` into the currently focused agent pane under the active worktree. Muxy may ask for runtime consent before those actions run.
 
 ## Local Install
 
