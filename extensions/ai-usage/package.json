@@ -1,0 +1,36 @@
+{
+  "name": "ai-usage",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && node scripts/build-background.mjs",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  },
+  "muxy": {
+    "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
+    "description": "AI usage status bar and popover with live collectors for Claude Code, Codex, Copilot, Amp, Z.ai, MiniMax, Kimi, and Factory.",
+    "background": "background.js",
+    "permissions": ["commands:exec", "panels:write"],
+    "popovers": [
+      { "id": "usage", "title": "AI Usage", "entry": "popovers/usage.html", "width": 360, "height": 460 }
+    ],
+    "commands": [
+      { "id": "open-usage", "title": "AI Usage: Show", "action": { "kind": "openPopover", "popover": "usage" } }
+    ],
+    "statusBarItems": [
+      { "id": "ai-usage", "icon": { "symbol": "sparkles" }, "tooltip": "AI Usage", "side": "right", "command": "open-usage" }
+    ],
+    "marketplace": {
+      "author": "Muxy",
+      "github": "muxy-app",
+      "categories": ["productivity", "ai"],
+      "icon": "assets/icon.svg",
+      "screenshots": ["assets/screenshot-1.png"]
+    }
+  }
+}
