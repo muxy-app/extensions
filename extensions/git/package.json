@@ -158,7 +158,7 @@
   "name": "git",
   "private": true,
   "scripts": {
-    "build": "tsc --noEmit && vite build && vite build --config vite.diff-viewer.config.ts && vite build --config vite.background.config.ts",
+    "build": "tsc --noEmit && vite build && vite build --config vite.diff-viewer.config.ts && vite build --config vite.background.config.ts && node -e \"require('fs').copyFileSync('package.json','dist/package.json')\"",
     "build:surfaces": "vite build",
     "dev": "vite",
     "typecheck": "tsc --noEmit"

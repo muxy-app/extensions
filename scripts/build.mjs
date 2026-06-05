@@ -73,11 +73,13 @@ function buildExtension(name) {
     return false;
   }
 
-  // Muxy installs the build output and reads the manifest from a `package.json`
-  // inside it (ExtensionStore scans each installed `dist/` "with its
-  // package.json"). Vite never emits the manifest, so copy it in here; without
-  // it the unpacked zip is rejected as "not a valid muxy extension".
-  fs.copyFileSync(packageJSONPath(dir), packageJSONPath(distDir));
+  // Muxy reads the manifest from a `package.json` inside the installed build
+  // output. Each extension's own `build` script copies it into `dist/` (so any
+  // build path produces a complete dist); fail loudly if one forgot to.
+  if (!fs.existsSync(packageJSONPath(distDir))) {
+    fail(name, `build did not emit 'package.json' into '${buildOutputDir}/' — append the manifest copy to the extension's build script`);
+    return false;
+  }
 
   // Every file the muxy block references must exist in the build output.
   let ok = true;

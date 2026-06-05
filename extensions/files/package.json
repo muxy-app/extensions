@@ -1,11 +1,11 @@
 {
   "name": "files",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build && node -e \"require('fs').copyFileSync('package.json','dist/package.json')\"",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

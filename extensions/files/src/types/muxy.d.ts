@@ -90,7 +90,13 @@ declare global {
     onThemeChange(handler: (theme: MuxyTheme) => void): () => void;
     onDataChange(handler: (data: Record<string, unknown> | null) => void): () => void;
     files: MuxyFiles;
-    tabs: { open(target: MuxyOpenExtensionTab): Promise<void> };
+    tabs: {
+      open(target: MuxyOpenExtensionTab): Promise<void>;
+      /** Retitle this tab. An empty string resets to the manifest default. */
+      setTitle(title: string): Promise<void>;
+      /** Set this tab's icon. null resets to the default extension icon. */
+      setIcon(icon: MuxyIcon | null): Promise<void>;
+    };
     panels: {
       open(panelID: string, data?: Record<string, unknown>): Promise<void>;
       toggle(panelID: string, data?: Record<string, unknown>): Promise<void>;

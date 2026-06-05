@@ -13,6 +13,7 @@ import {
   try_action,
 } from "@/lib/files";
 import { is_markdown } from "@/lib/languages";
+import { icon_for } from "@/lib/file-icon";
 import { CodeEditor } from "@/editor/code-editor";
 import { MarkdownEditor, type MarkdownMode } from "@/editor/markdown-editor";
 import { SettingsSheet } from "@/editor/settings-sheet";
@@ -91,6 +92,20 @@ export function Editor() {
   const { filePath } = data;
   const replaceable = data.replaceable !== false;
   const markdown = filePath ? is_markdown(filePath) : false;
+
+  // Reflect the open file in the tab bar (title = file name, icon = file type).
+  // Overrides are runtime-only and reset to the manifest default on restart, so
+  // we re-assert on every filePath change — which includes the post-restore
+  // reload. With no file open, fall back to the manifest "Editor"/default icon.
+  useEffect(() => {
+    if (!filePath) {
+      void muxy.tabs.setTitle("");
+      void muxy.tabs.setIcon(null);
+      return;
+    }
+    void muxy.tabs.setTitle(basename(filePath));
+    void muxy.tabs.setIcon({ symbol: icon_for(filePath) });
+  }, [filePath]);
 
   const publishEditorState = useCallback(
     (nextDirty = dirtyRef.current) => {
