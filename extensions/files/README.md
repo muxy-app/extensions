@@ -1,10 +1,10 @@
-# Muxy Starter — React
+# Files
 
-A minimal Muxy extension in React + Vite. It adds a pinned **Hello** panel, a topbar icon, and a palette command (`cmd+shift+h`) that toggles the panel. The panel header's refresh button fires `command.refresh-hello`, which the panel listens for.
+Muxy file explorer and editor extension built with vanilla JavaScript, Vite, Tailwind CSS, `muxy.files`, and `muxy.tabs`.
 
 ```bash
 npm install
 npm run build
 ```
 
-Copy the folder to `~/.config/muxy/extensions/muxy-starter-react/` and rebuild to pick up changes. Theme colors use `var(--muxy-*)` and spacing follows a fixed scale; see the [extension docs](https://github.com/muxy-app/muxy/tree/main/docs/extensions).
+The panel entrypoint is `src/main.js`; the editor tab entrypoint is `src/editor/main.js`. Build output is written to `dist/`; reload the extension in Muxy after rebuilding.

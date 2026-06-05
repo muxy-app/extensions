@@ -1,0 +1,105 @@
+{
+  "name": "file-tree",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build && node scripts/copy-manifest.mjs",
+    "install:local": "npm run build && rm -rf ~/.config/muxy/extensions/file-tree && mkdir -p ~/.config/muxy/extensions && cp -R dist ~/.config/muxy/extensions/file-tree"
+  },
+  "devDependencies": {
+    "vite": "^7.3.5"
+  },
+  "muxy": {
+    "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
+    "description": "A lightweight file tree panel for the active Muxy worktree.",
+    "permissions": [
+      "files:read",
+      "tabs:write",
+      "projects:read",
+      "worktrees:read",
+      "panels:write",
+      "panes:read",
+      "panes:write"
+    ],
+    "events": [
+      "file.changed",
+      "project.switched",
+      "worktree.switched"
+    ],
+    "commands": [
+      {
+        "id": "toggle-tree",
+        "title": "File Tree: Toggle",
+        "subtitle": "Open or close the active worktree file tree",
+        "defaultShortcut": "cmd+e",
+        "action": {
+          "kind": "togglePanel",
+          "panel": "tree"
+        }
+      },
+      {
+        "id": "refresh-tree",
+        "title": "File Tree: Refresh",
+        "subtitle": "Reload the active worktree tree"
+      },
+      {
+        "id": "copy-relative-path",
+        "title": "File Tree: Copy Relative Path",
+        "subtitle": "Copy the selected file or folder path relative to the active worktree",
+        "defaultShortcut": "cmd+opt+c"
+      }
+    ],
+    "topbarItems": [
+      {
+        "id": "tree",
+        "icon": {
+          "symbol": "folder"
+        },
+        "tooltip": "Toggle File Tree",
+        "command": "toggle-tree"
+      }
+    ],
+    "panels": [
+      {
+        "id": "tree",
+        "title": "Files",
+        "icon": {
+          "symbol": "folder"
+        },
+        "entry": "panel.html",
+        "position": "right",
+        "mode": "pinned",
+        "hiddenControls": [
+          "position",
+          "pin"
+        ],
+        "headerButtons": [
+          {
+            "id": "refresh",
+            "icon": {
+              "symbol": "arrow.clockwise"
+            },
+            "tooltip": "Refresh",
+            "command": "refresh-tree"
+          }
+        ]
+      }
+    ],
+    "marketplace": {
+      "author": "Theoz",
+      "github": "Theoz001",
+      "homepage": "https://github.com/Theoz001/file-tree",
+      "repository": "https://github.com/Theoz001/file-tree",
+      "categories": [
+        "productivity",
+        "files"
+      ],
+      "icon": "marketplace/icon.svg",
+      "screenshots": [
+        "marketplace/screenshot-main.png"
+      ]
+    }
+  }
+}

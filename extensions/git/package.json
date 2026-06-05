@@ -1,18 +1,22 @@
 {
+  "name": "git",
+  "private": true,
+  "scripts": {
+    "build": "vite build && vite build --config vite.diff-viewer.config.js && node -e \"require('fs').copyFileSync('package.json','dist/package.json')\"",
+    "build:surfaces": "vite build",
+    "dev": "vite"
+  },
+  "type": "module",
+  "version": "1.1.0",
+  "dependencies": {},
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.0",
-    "@types/react": "^19.2.16",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^5.2.0",
     "tailwindcss": "^4.3.0",
-    "tailwindcss-animate": "^1.0.7",
-    "typescript": "^6.0.3",
     "vite": "^7.3.5"
   },
   "muxy": {
     "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
     "description": "Official Git extension for Muxy",
-    "background": "background.js",
     "permissions": [
       "git:read",
       "git:write",
@@ -34,33 +38,7 @@
         "entry": "panel/index.html",
         "position": "right",
         "mode": "pinned",
-        "hiddenControls": ["pin", "position"],
-        "headerButtons": [
-          {
-            "id": "refresh",
-            "icon": {
-              "symbol": "arrow.clockwise"
-            },
-            "tooltip": "Refresh",
-            "command": "refresh-scm"
-          }
-        ]
-      }
-    ],
-    "popovers": [
-      {
-        "id": "branch",
-        "title": "Branch",
-        "entry": "popover/branch.html",
-        "width": 256,
-        "height": 320
-      },
-      {
-        "id": "pr-info",
-        "title": "Pull Request",
-        "entry": "popover/pr-info.html",
-        "width": 300,
-        "height": 280
+        "hiddenControls": ["icon", "title", "close", "pin", "position"]
       }
     ],
     "tabTypes": [
@@ -68,11 +46,6 @@
         "id": "diff-viewer",
         "title": "Diff Viewer",
         "entry": "panel/diff-viewer.html"
-      },
-      {
-        "id": "pull-requests",
-        "title": "Pull Requests",
-        "entry": "panel/pull-requests.html"
       }
     ],
     "commands": [
@@ -88,30 +61,6 @@
       {
         "id": "refresh-scm",
         "title": "Refresh"
-      },
-      {
-        "id": "open-branch",
-        "title": "Switch Branch",
-        "action": {
-          "kind": "openPopover",
-          "popover": "branch"
-        }
-      },
-      {
-        "id": "open-pr-info",
-        "title": "Current Pull Request",
-        "action": {
-          "kind": "openPopover",
-          "popover": "pr-info"
-        }
-      },
-      {
-        "id": "open-prs",
-        "title": "Pull Requests",
-        "action": {
-          "kind": "openTab",
-          "tabType": "pull-requests"
-        }
       }
     ],
     "topbarItems": [
@@ -124,28 +73,6 @@
         "command": "toggle-scm"
       }
     ],
-    "statusBarItems": [
-      {
-        "id": "branch",
-        "icon": {
-          "symbol": "arrow.triangle.branch"
-        },
-        "tooltip": "Switch branch",
-        "side": "left",
-        "command": "open-branch",
-        "visible": false
-      },
-      {
-        "id": "pr-info",
-        "icon": {
-          "symbol": "arrow.triangle.pull"
-        },
-        "tooltip": "Current pull request",
-        "side": "left",
-        "command": "open-pr-info",
-        "visible": false
-      }
-    ],
     "marketplace": {
       "author": "Saeed Vaziry",
       "github": "saeedvaziry",
@@ -154,28 +81,5 @@
       "icon": "icon.svg",
       "screenshots": ["screenshots/screenshot-1.png", "screenshots/screenshot-2.png"]
     }
-  },
-  "name": "git",
-  "private": true,
-  "scripts": {
-    "build": "tsc --noEmit && vite build && vite build --config vite.diff-viewer.config.ts && vite build --config vite.background.config.ts",
-    "build:surfaces": "vite build",
-    "dev": "vite",
-    "typecheck": "tsc --noEmit"
-  },
-  "type": "module",
-  "version": "1.0.1",
-  "dependencies": {
-    "@pierre/diffs": "^1.2.7",
-    "@radix-ui/react-dropdown-menu": "^2.1.16",
-    "@radix-ui/react-popover": "^1.1.15",
-    "@radix-ui/react-slot": "^1.2.4",
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
-    "cmdk": "^1.1.1",
-    "lucide-react": "^1.17.0",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
-    "tailwind-merge": "^3.6.0"
   }
 }

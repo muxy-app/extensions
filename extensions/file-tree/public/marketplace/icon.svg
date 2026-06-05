@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Muxy File Tree">
+  <rect width="256" height="256" rx="56" fill="#f6f7f9"/>
+  <path d="M58 82c0-13.3 10.7-24 24-24h38l18 20h36c13.3 0 24 10.7 24 24v72c0 13.3-10.7 24-24 24H82c-13.3 0-24-10.7-24-24V82Z" fill="#ffffff" stroke="#1f2937" stroke-width="12" stroke-linejoin="round"/>
+  <path d="M58 106h140" stroke="#1f2937" stroke-width="12" stroke-linecap="round"/>
+  <path d="M92 136h72M92 164h48" stroke="#2f80ed" stroke-width="12" stroke-linecap="round"/>
+</svg>

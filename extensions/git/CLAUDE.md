@@ -5,16 +5,14 @@ Official Git extension for Muxy
 ## Stack
 
 - NPM
-- Shadcn
 - Tailwindcss
-- React
+- Vanilla JavaScript
 
 ## Building & editing
 
-Install deps with `npm install --ignore-scripts`, then `npm run build` (runs `tsc --noEmit`
-then `vite build`) to produce `dist/panel.js` + `dist/panel.css`. After
-rebuilding, click "Reload" in the Muxy Extensions modal to pick up the
-changes. `npm run typecheck` runs the type check alone.
+Install deps with `npm install --ignore-scripts`, then `npm run build` to produce
+the bundled files in `dist/`. After rebuilding, click "Reload" in the Muxy
+Extensions modal to pick up the changes.
 
 ## Guides
 

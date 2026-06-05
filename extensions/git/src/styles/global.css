@@ -1,7 +1,5 @@
 @import "tailwindcss";
 
-@plugin "tailwindcss-animate";
-
 @theme inline {
   --color-background: var(--muxy-background);
   --color-foreground: var(--muxy-foreground);
@@ -20,15 +18,34 @@
   --color-border: var(--muxy-border);
   --color-input: var(--muxy-border);
   --color-ring: var(--muxy-accent);
-
   --color-diff-add: var(--muxy-diff-add);
   --color-diff-remove: var(--muxy-diff-remove);
   --color-diff-hunk: var(--muxy-diff-hunk);
-
   --radius: 6px;
 }
 
 :root {
+  --s1: 2px;
+  --s2: 4px;
+  --s3: 6px;
+  --s4: 8px;
+  --s5: 10px;
+  --s6: 12px;
+  --s7: 16px;
+  --s8: 20px;
+  --s9: 24px;
+  --s10: 32px;
+  --font-caption: 10px;
+  --font-footnote: 11px;
+  --font-body: 12px;
+  --font-emphasis: 13px;
+  --font-title: 14px;
+  --icon-sm: 12px;
+  --icon: 14px;
+  --control: 24px;
+  --radius-control: 6px;
+  --radius-card: 8px;
+  --row-height: 34px;
   --lane-0: var(--muxy-accent);
   --lane-1: var(--muxy-diff-add);
   --lane-2: var(--muxy-diff-remove);
@@ -51,6 +68,20 @@ body {
   color: var(--muxy-foreground);
 }
 
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: default;
+}
+
 html:has(.popover-body),
 body.popover-body,
 body.popover-body #root {
@@ -64,4 +95,24 @@ body.popover-body #root {
   height: var(--muxy-topbar-height, 32px);
   flex-shrink: 0;
   border-bottom: 1px solid var(--color-border);
+}
+
+.floating-menu {
+  position: fixed;
+  z-index: 50;
+  overflow: hidden;
+  border: 1px solid var(--muxy-border);
+  border-radius: 8px;
+  background: var(--muxy-background);
+  color: var(--muxy-foreground);
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--muxy-background) 55%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
 }
