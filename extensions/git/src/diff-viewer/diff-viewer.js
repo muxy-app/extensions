@@ -394,8 +394,11 @@ async function loadGitDiff() {
         }
         sourceLabelNode.textContent = "Working Tree";
         showLoading("Loading changes...");
-        const { diff } = await window.muxy.git.diff({ project, raw: true, lineLimit: MAX_RENDER_ROWS });
-        await renderPatch(diff, data.focusPath ?? "");
+        const [staged, unstaged] = await Promise.all([
+            window.muxy.git.diff({ project, raw: true, staged: true, lineLimit: MAX_RENDER_ROWS }),
+            window.muxy.git.diff({ project, raw: true, staged: false, lineLimit: MAX_RENDER_ROWS }),
+        ]);
+        await renderPatch([staged.diff, unstaged.diff].filter((diff) => diff.trim()).join("\n"), data.focusPath ?? "");
     }
     catch (error) {
         clearDiff(error instanceof Error ? error.message : String(error));
