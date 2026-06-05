@@ -1,6 +1,6 @@
 import { clear, h, readPref, writePref } from "@/lib/dom";
 import { computeLanes, toCommitNode } from "@/lib/graph";
-import { alertError, activeWorktreePath, commitAll, confirmAction, hasPendingChanges, isBusy, onBusyChange, runPinned, toViewStatus, tryAction, } from "@/lib/git";
+import { alertError, activeGitProjectPath, activeWorktreePath, commitAll, confirmAction, hasPendingChanges, isBusy, onBusyChange, runPinned, toViewStatus, tryAction, } from "@/lib/git";
 import { checkoutPr, checkoutPrWorktree, cleanupBranch, closePr, confirmOpenExistingPr, createPr, mergePr, removeWorktreeOrBranch, } from "@/lib/pr";
 import { icon } from "@/lib/icons";
 import { button, emptyState, iconButton, loadingOverlay } from "@/ui/shared";
@@ -9,7 +9,28 @@ import { renderHistoryTab } from "@/panel/history";
 import { renderPrsTab } from "@/panel/prs";
 const TAB_KEY = "muxy.git.panel.tab";
 const FILTER_KEY = "muxy.git.prs.filter";
+const PR_CACHE_KEY = "muxy.git.prs.cache";
 const PAGE = 50;
+const PR_LIMIT = 50;
+function readPrListCache() {
+    try {
+        const entries = JSON.parse(localStorage.getItem(PR_CACHE_KEY) || "[]");
+        if (!Array.isArray(entries))
+            return new Map();
+        return new Map(entries.filter((entry) => Array.isArray(entry) && typeof entry[0] === "string" && Array.isArray(entry[1])));
+    }
+    catch {
+        return new Map();
+    }
+}
+function writePrListCache(cache) {
+    try {
+        localStorage.setItem(PR_CACHE_KEY, JSON.stringify([...cache]));
+    }
+    catch {
+        return;
+    }
+}
 export class GitPanelApp {
     root;
     repo = { kind: "loading" };
@@ -21,6 +42,9 @@ export class GitPanelApp {
     prPending = null;
     prFilter = readPref(FILTER_KEY, "open");
     prList = { kind: "idle" };
+    prListCache = readPrListCache();
+    prListKey = null;
+    prListLoadId = 0;
     prListRefreshing = false;
     prStarted = false;
     prRowPending = new Map();
@@ -49,6 +73,8 @@ export class GitPanelApp {
         this.render();
         void this.loadLocal(true);
         void this.resetGraph(false);
+        if (this.tab === "prs")
+            void this.hydratePrList();
         this.disposers = [
             muxy.events.subscribe("project.switched", () => void this.switchScope()),
             muxy.events.subscribe("worktree.switched", () => void this.switchScope()),
@@ -103,6 +129,8 @@ export class GitPanelApp {
         this.tab = tab;
         writePref(TAB_KEY, tab);
         this.render();
+        if (tab === "prs")
+            void this.hydratePrList();
     }
     setMessage(message) {
         this.message = message;
@@ -319,23 +347,67 @@ export class GitPanelApp {
             this.render();
     }
     async loadPrList(fresh = false) {
+        const id = ++this.prListLoadId;
+        const filter = this.prFilter;
+        const key = await this.prListCacheKey(filter);
+        const cached = key ? this.prListCache.get(key) : undefined;
+        if (this.prListLoadId !== id)
+            return;
         this.prStarted = true;
         this.prListRefreshing = true;
-        if (this.prList.kind !== "ready")
+        const sameList = this.prList.kind === "ready" && this.prListKey === key;
+        if (cached)
+            this.prList = { kind: "ready", prs: cached };
+        else if (!sameList)
             this.prList = { kind: "loading" };
+        this.prListKey = key;
         this.render();
         try {
-            const prs = await muxy.git.pr.list({ filter: this.prFilter, limit: 50, fresh });
+            const prs = await muxy.git.pr.list({ filter, limit: PR_LIMIT, fresh });
+            if (this.prListLoadId !== id)
+                return;
+            if (key) {
+                this.prListCache.delete(key);
+                this.prListCache.set(key, prs);
+                writePrListCache(this.prListCache);
+            }
+            this.prListKey = key;
             this.prList = { kind: "ready", prs };
         }
         catch (err) {
+            if (this.prListLoadId !== id)
+                return;
             const message = err instanceof Error ? err.message : String(err);
-            this.prList = { kind: "error", message: message.trim() || "Could not load pull requests." };
+            if (this.prList.kind !== "ready" || this.prListKey !== key) {
+                this.prListKey = key;
+                this.prList = { kind: "error", message: message.trim() || "Could not load pull requests." };
+            }
         }
         finally {
+            if (this.prListLoadId !== id)
+                return;
             this.prListRefreshing = false;
             this.render();
         }
+    }
+    async prListCacheKey(filter) {
+        const project = await activeGitProjectPath();
+        const scope = project ?? (await activeWorktreePath());
+        return scope ? `${scope}\n${filter}` : filter;
+    }
+    async hydratePrList() {
+        if (this.prListRefreshing)
+            return;
+        const id = this.prListLoadId;
+        const filter = this.prFilter;
+        const key = await this.prListCacheKey(filter);
+        const cached = key ? this.prListCache.get(key) : undefined;
+        if (!cached || this.prListLoadId !== id || this.prFilter !== filter || this.prListRefreshing)
+            return;
+        this.prStarted = true;
+        this.prListKey = key;
+        this.prList = { kind: "ready", prs: cached };
+        this.render();
     }
     async checkoutPrRow(number) {
         const ok = await confirmAction({

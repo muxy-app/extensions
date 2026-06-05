@@ -1,4 +1,14 @@
 {
+  "name": "git",
+  "private": true,
+  "scripts": {
+    "build": "vite build && vite build --config vite.diff-viewer.config.js && node -e \"require('fs').copyFileSync('package.json','dist/package.json')\"",
+    "build:surfaces": "vite build",
+    "dev": "vite"
+  },
+  "type": "module",
+  "version": "1.1.0",
+  "dependencies": {},
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.0",
     "tailwindcss": "^4.3.0",
@@ -71,15 +81,5 @@
       "icon": "icon.svg",
       "screenshots": ["screenshots/screenshot-1.png", "screenshots/screenshot-2.png"]
     }
-  },
-  "name": "git",
-  "private": true,
-  "scripts": {
-    "build": "vite build && vite build --config vite.diff-viewer.config.js && node -e \"require('fs').copyFileSync('package.json','dist/package.json')\"",
-    "build:surfaces": "vite build",
-    "dev": "vite"
-  },
-  "type": "module",
-  "version": "1.0.1",
-  "dependencies": {}
+  }
 }
