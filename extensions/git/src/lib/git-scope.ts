@@ -1,8 +1,30 @@
 import { active_git_project_path } from "@/lib/project-scope";
 
+let resolved = false;
+let cached: string | undefined;
+let inflight: Promise<string | undefined> | null = null;
+
 export async function active_project(): Promise<string | undefined> {
-  return active_git_project_path();
+  if (resolved) return cached;
+  if (!inflight) {
+    inflight = active_git_project_path().then((value) => {
+      cached = value;
+      resolved = true;
+      inflight = null;
+      return value;
+    });
+  }
+  return inflight;
 }
+
+function invalidate_project(): void {
+  resolved = false;
+  inflight = null;
+  cached = undefined;
+}
+
+muxy.events.subscribe("project.switched", invalidate_project);
+muxy.events.subscribe("worktree.switched", invalidate_project);
 
 let depth = 0;
 const listeners = new Set<(busy: boolean) => void>();

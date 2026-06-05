@@ -18,9 +18,6 @@ export default defineConfig({
     rollupOptions: {
       input: {
         scm: resolve(__dirname, "panel/index.html"),
-        "pull-requests": resolve(__dirname, "panel/pull-requests.html"),
-        branch: resolve(__dirname, "popover/branch.html"),
-        "pr-info": resolve(__dirname, "popover/pr-info.html"),
       },
     },
   },

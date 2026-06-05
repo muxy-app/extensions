@@ -5,7 +5,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 type SyncOp = "pull" | "push";
-export type PrimaryMode = "commit" | "pr";
 
 interface CommitBoxProps {
   canCommit: boolean;

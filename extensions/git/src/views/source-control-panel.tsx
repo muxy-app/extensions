@@ -1,15 +1,14 @@
-import { open_diff, confirm_action } from "@/lib/git";
 import type { GitStatus } from "@/lib/git-status";
 import type { CreatePrInput } from "@/hooks/use-create-pr";
-import { CommitBox } from "@/components/commit-box";
-import { CreatePrForm } from "@/components/create-pr-form";
-import { ModeToggle } from "@/components/mode-toggle";
-import { FileSection } from "@/components/file-section";
-import { GitGraphSection } from "@/components/git-graph-section";
-import { EmptyState } from "@/components/empty-state";
 import type { use_git_graph } from "@/hooks/use-git-graph";
+import type { use_pr_actions } from "@/hooks/use-pr-actions";
+import { RefreshCw } from "lucide-react";
 import { use_persistent_value } from "@/hooks/use-persistent-value";
-import type { PrimaryMode } from "@/components/commit-box";
+import { BranchSwitcher } from "@/components/branch-switcher";
+import { PanelTabs, type TabId } from "@/components/panel-tabs";
+import { BranchTab } from "@/views/tabs/branch-tab";
+import { PrsTab } from "@/views/tabs/prs-tab";
+import { HistoryTab } from "@/views/tabs/history-tab";
 
 interface SourceControlPanelProps {
   status: GitStatus;
@@ -22,104 +21,62 @@ interface SourceControlPanelProps {
   commit: (message: string) => Promise<boolean>;
   sync: (op: "push" | "pull") => Promise<boolean>;
   create_pr: (input: CreatePrInput) => Promise<boolean>;
+  pr_actions: ReturnType<typeof use_pr_actions>;
   graph: ReturnType<typeof use_git_graph>;
   message: string;
   on_message: (message: string) => void;
   refresh_all: () => void;
+  on_refresh: () => void;
 }
 
-export function SourceControlPanel({
-  status,
-  stage,
-  unstage,
-  stage_all,
-  unstage_all,
-  discard,
-  discard_all,
-  commit,
-  sync,
-  create_pr,
-  graph,
-  message,
-  on_message,
-  refresh_all,
-}: SourceControlPanelProps) {
-  const clean = status.staged.length === 0 && status.unstaged.length === 0;
-  const [mode, set_mode] = use_persistent_value<PrimaryMode>("muxy.git.commitMode", "commit");
-  const hasPr = !!status.pullRequest;
-  const creating = mode === "pr" && !hasPr;
-
-  async function discard_one(path: string) {
-    const ok = await confirm_action({
-      title: "Discard changes",
-      message: `Are you sure you want to discard changes in ${path}? This cannot be undone.`,
-      confirmLabel: "Discard",
-      critical: true,
-    });
-    if (ok) void discard(path);
-  }
-
-  async function discard_changes() {
-    const ok = await confirm_action({
-      title: "Discard all changes",
-      message: `Are you sure you want to discard all ${status.unstaged.length} changes? This cannot be undone.`,
-      confirmLabel: "Discard All",
-      critical: true,
-    });
-    if (ok) void discard_all();
-  }
+export function SourceControlPanel(props: SourceControlPanelProps) {
+  const { status, graph, message, on_message, refresh_all, on_refresh } = props;
+  const [tab, set_tab] = use_persistent_value<TabId>("muxy.git.panel.tab", "branch");
+  const changes = status.staged.length + status.unstaged.length;
 
   return (
-    <>
-      <section className="flex flex-col gap-2 border-b border-border p-2.5">
-        {!hasPr && <ModeToggle mode={mode} onChange={set_mode} />}
-        {creating ? (
-          <CreatePrForm baseBranch={status.defaultBranch} onSubmit={create_pr} />
-        ) : (
-          <CommitBox
-            canCommit={status.staged.length > 0}
-            message={message}
-            onMessage={on_message}
-            onCommit={commit}
-            onPull={() => sync("pull")}
-            onPush={() => sync("push")}
-          />
-        )}
-      </section>
+    <div className="flex h-full min-h-0 flex-col">
+      <header className="flex shrink-0 items-center border-b border-border pr-1">
+        <div className="min-w-0 flex-1">
+          <BranchSwitcher branch={status.branch} ahead={status.ahead} behind={status.behind} />
+        </div>
+        <button
+          type="button"
+          title="Refresh"
+          onClick={on_refresh}
+          className="flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground"
+        >
+          <RefreshCw size={13} strokeWidth={2} />
+        </button>
+      </header>
+      <PanelTabs value={tab} onChange={set_tab} changes={changes} />
 
-      <main className="flex min-h-0 flex-1 flex-col overflow-auto">
-        <FileSection
-          id="staged"
-          title="Staged Changes"
-          entries={status.staged}
-          staged
-          bulkLabel="Unstage all"
-          onBulk={() => void unstage_all()}
-          onAction={(path) => void unstage(path)}
-          onOpen={open_diff}
+      {tab === "branch" && (
+        <BranchTab
+          status={status}
+          stage={props.stage}
+          unstage={props.unstage}
+          stage_all={props.stage_all}
+          unstage_all={props.unstage_all}
+          discard={props.discard}
+          discard_all={props.discard_all}
+          commit={props.commit}
+          sync={props.sync}
+          message={message}
+          on_message={on_message}
         />
-        <FileSection
-          id="changes"
-          title="Changes"
-          entries={status.unstaged}
-          staged={false}
-          bulkLabel="Stage all"
-          onBulk={() => void stage_all()}
-          onAction={(path) => void stage(path)}
-          onDiscard={(path) => void discard_one(path)}
-          onBulkDiscard={() => void discard_changes()}
-          onOpen={open_diff}
+      )}
+      {tab === "prs" && (
+        <PrsTab
+          status={status}
+          create_pr={props.create_pr}
+          pr_actions={props.pr_actions}
+          refresh_all={refresh_all}
         />
-        <GitGraphSection
-          rows={graph.rows}
-          hasMore={graph.hasMore}
-          loading={graph.loading}
-          onLoadMore={graph.load_more}
-          onPrefillMessage={on_message}
-          onRefresh={refresh_all}
-        />
-        {clean && graph.rows.length === 0 && <EmptyState>No changes.</EmptyState>}
-      </main>
-    </>
+      )}
+      {tab === "history" && (
+        <HistoryTab graph={graph} on_message={on_message} refresh_all={refresh_all} />
+      )}
+    </div>
   );
 }

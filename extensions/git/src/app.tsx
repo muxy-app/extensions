@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { try_action } from "@/lib/git";
 import { use_git_panel } from "@/hooks/use-git-panel";
 import { use_git_graph } from "@/hooks/use-git-graph";
 import { use_create_pr } from "@/hooks/use-create-pr";
+import { use_pr_actions } from "@/hooks/use-pr-actions";
 import { NoRepo } from "@/components/no-repo";
 import { LoadingOverlay } from "@/components/loading-overlay";
 import { SourceControlPanel } from "@/views/source-control-panel";
@@ -23,6 +24,7 @@ export function App() {
   } = use_git_panel();
   const graph = use_git_graph();
   const create = use_create_pr(refresh);
+  const pr_actions = use_pr_actions();
   const [refreshing, set_refreshing] = useState(false);
   const [message, set_message] = useState("");
 
@@ -43,16 +45,18 @@ export function App() {
     return ok;
   };
 
-  useEffect(() => {
-    const off = muxy.events.subscribe("command.refresh-scm", () => {
-      set_refreshing(true);
-      graph.refresh();
-      void Promise.all([refresh(), new Promise((r) => setTimeout(r, 400))]).finally(() =>
-        set_refreshing(false),
-      );
-    });
-    return () => off?.();
+  const run_refresh = useCallback(() => {
+    set_refreshing(true);
+    graph.refresh();
+    void Promise.all([refresh(), new Promise((r) => setTimeout(r, 400))]).finally(() =>
+      set_refreshing(false),
+    );
   }, [refresh, graph]);
+
+  useEffect(() => {
+    const off = muxy.events.subscribe("command.refresh-scm", run_refresh);
+    return () => off?.();
+  }, [run_refresh]);
 
   async function init() {
     if (await try_action(() => muxy.git.init(), "Could not initialize repository")) {
@@ -84,10 +88,12 @@ export function App() {
         commit={commit_and_refresh}
         sync={sync_and_refresh}
         create_pr={create}
+        pr_actions={pr_actions}
         graph={graph}
         message={message}
         on_message={set_message}
         refresh_all={refresh_all}
+        on_refresh={run_refresh}
       />
     </div>
   );

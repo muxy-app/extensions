@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { Check, GitBranch, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, ChevronDown, GitBranch, Plus, Trash2 } from "lucide-react";
 import { list_branches } from "@/lib/git-branches";
 import { try_action, confirm_action } from "@/lib/git";
 import { run_pinned } from "@/lib/git-scope";
 import { cn } from "@/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Command,
   CommandEmpty,
@@ -13,7 +14,14 @@ import {
   CommandList,
 } from "@/components/ui/command";
 
-export function BranchPanel() {
+interface BranchSwitcherProps {
+  branch: string | null;
+  ahead: number;
+  behind: number;
+}
+
+export function BranchSwitcher({ branch, ahead, behind }: BranchSwitcherProps) {
+  const [open, set_open] = useState(false);
   const [current, set_current] = useState<string | null>(null);
   const [branches, set_branches] = useState<string[]>([]);
   const [query, set_query] = useState("");
@@ -34,8 +42,14 @@ export function BranchPanel() {
     };
   }, []);
 
+  useEffect(() => {
+    if (open) void reload();
+  }, [open]);
+
   async function select(name: string, create: boolean) {
-    const ok = await try_action(
+    set_query("");
+    set_open(false);
+    await try_action(
       () =>
         run_pinned((project) =>
           create
@@ -44,7 +58,6 @@ export function BranchPanel() {
         ),
       create ? "Could not create branch" : "Could not switch branch",
     );
-    if (ok) void muxy.popover.close();
   }
 
   async function remove(name: string) {
@@ -66,43 +79,71 @@ export function BranchPanel() {
   const exact = branches.includes(term);
 
   return (
-    <div className="w-64 text-popover-foreground">
-      <Command>
-        <CommandInput
-          placeholder="Switch or create branch…"
-          value={query}
-          onValueChange={set_query}
-          autoFocus
-          autoCorrect="off"
-          autoCapitalize="off"
-          spellCheck={false}
-        />
-        <CommandList className="min-h-[9rem]">
-          <CommandEmpty>No branches</CommandEmpty>
-          {term && !exact && (
-            <CommandGroup>
-              <CommandItem value={`create-${term}`} onSelect={() => void select(term, true)}>
-                <Plus size={14} className="text-primary" />
-                <span className="truncate">
-                  Create branch <span className="font-medium">“{term}”</span>
+    <Popover open={open} onOpenChange={set_open}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="flex h-8 w-full items-center gap-1.5 px-2.5 text-[12px] text-foreground outline-none hover:bg-accent"
+        >
+          <GitBranch size={13} strokeWidth={2} className="shrink-0 text-muted-foreground" />
+          <span className="truncate font-medium">{branch ?? "No branch"}</span>
+          {(ahead > 0 || behind > 0) && (
+            <span className="flex shrink-0 items-center gap-1 font-mono text-[10px] text-muted-foreground">
+              {behind > 0 && (
+                <span className="flex items-center">
+                  <ArrowDown size={10} strokeWidth={2.5} />
+                  {behind}
                 </span>
-              </CommandItem>
-            </CommandGroup>
+              )}
+              {ahead > 0 && (
+                <span className="flex items-center">
+                  <ArrowUp size={10} strokeWidth={2.5} />
+                  {ahead}
+                </span>
+              )}
+            </span>
           )}
-          <CommandGroup>
-            {branches.map((name) => (
-              <BranchRow
-                key={name}
-                name={name}
-                active={name === current}
-                onSelect={() => void select(name, false)}
-                onDelete={() => void remove(name)}
-              />
-            ))}
-          </CommandGroup>
-        </CommandList>
-      </Command>
-    </div>
+          <ChevronDown size={12} strokeWidth={2.5} className="ml-auto shrink-0 text-muted-foreground" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-64 p-0 text-popover-foreground">
+        <Command>
+          <CommandInput
+            placeholder="Switch or create branch…"
+            value={query}
+            onValueChange={set_query}
+            autoFocus
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+          />
+          <CommandList className="min-h-[9rem]">
+            <CommandEmpty>No branches</CommandEmpty>
+            {term && !exact && (
+              <CommandGroup>
+                <CommandItem value={`create-${term}`} onSelect={() => void select(term, true)}>
+                  <Plus size={14} className="text-primary" />
+                  <span className="truncate">
+                    Create branch <span className="font-medium">“{term}”</span>
+                  </span>
+                </CommandItem>
+              </CommandGroup>
+            )}
+            <CommandGroup>
+              {branches.map((name) => (
+                <BranchRow
+                  key={name}
+                  name={name}
+                  active={name === current}
+                  onSelect={() => void select(name, false)}
+                  onDelete={() => void remove(name)}
+                />
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }
 

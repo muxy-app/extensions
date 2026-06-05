@@ -12,7 +12,6 @@
   "muxy": {
     "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
     "description": "Official Git extension for Muxy",
-    "background": "background.js",
     "permissions": [
       "git:read",
       "git:write",
@@ -34,33 +33,7 @@
         "entry": "panel/index.html",
         "position": "right",
         "mode": "pinned",
-        "hiddenControls": ["pin", "position"],
-        "headerButtons": [
-          {
-            "id": "refresh",
-            "icon": {
-              "symbol": "arrow.clockwise"
-            },
-            "tooltip": "Refresh",
-            "command": "refresh-scm"
-          }
-        ]
-      }
-    ],
-    "popovers": [
-      {
-        "id": "branch",
-        "title": "Branch",
-        "entry": "popover/branch.html",
-        "width": 256,
-        "height": 320
-      },
-      {
-        "id": "pr-info",
-        "title": "Pull Request",
-        "entry": "popover/pr-info.html",
-        "width": 300,
-        "height": 280
+        "hiddenControls": ["icon", "title", "close", "pin", "position"]
       }
     ],
     "tabTypes": [
@@ -68,11 +41,6 @@
         "id": "diff-viewer",
         "title": "Diff Viewer",
         "entry": "panel/diff-viewer.html"
-      },
-      {
-        "id": "pull-requests",
-        "title": "Pull Requests",
-        "entry": "panel/pull-requests.html"
       }
     ],
     "commands": [
@@ -88,30 +56,6 @@
       {
         "id": "refresh-scm",
         "title": "Refresh"
-      },
-      {
-        "id": "open-branch",
-        "title": "Switch Branch",
-        "action": {
-          "kind": "openPopover",
-          "popover": "branch"
-        }
-      },
-      {
-        "id": "open-pr-info",
-        "title": "Current Pull Request",
-        "action": {
-          "kind": "openPopover",
-          "popover": "pr-info"
-        }
-      },
-      {
-        "id": "open-prs",
-        "title": "Pull Requests",
-        "action": {
-          "kind": "openTab",
-          "tabType": "pull-requests"
-        }
       }
     ],
     "topbarItems": [
@@ -122,28 +66,6 @@
         },
         "tooltip": "Toggle Source Control",
         "command": "toggle-scm"
-      }
-    ],
-    "statusBarItems": [
-      {
-        "id": "branch",
-        "icon": {
-          "symbol": "arrow.triangle.branch"
-        },
-        "tooltip": "Switch branch",
-        "side": "left",
-        "command": "open-branch",
-        "visible": false
-      },
-      {
-        "id": "pr-info",
-        "icon": {
-          "symbol": "arrow.triangle.pull"
-        },
-        "tooltip": "Current pull request",
-        "side": "left",
-        "command": "open-pr-info",
-        "visible": false
       }
     ],
     "marketplace": {
@@ -158,7 +80,7 @@
   "name": "git",
   "private": true,
   "scripts": {
-    "build": "tsc --noEmit && vite build && vite build --config vite.diff-viewer.config.ts && vite build --config vite.background.config.ts && node -e \"require('fs').copyFileSync('package.json','dist/package.json')\"",
+    "build": "tsc --noEmit && vite build && vite build --config vite.diff-viewer.config.ts && node -e \"require('fs').copyFileSync('package.json','dist/package.json')\"",
     "build:surfaces": "vite build",
     "dev": "vite",
     "typecheck": "tsc --noEmit"

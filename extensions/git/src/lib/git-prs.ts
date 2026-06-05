@@ -5,10 +5,6 @@ export function pr_state(pr: { state: string }): "open" | "closed" | "merged" {
   return "open";
 }
 
-export async function fetch_resolved_status(fresh = false): Promise<MuxyGitStatus> {
-  return muxy.git.status({ fresh });
-}
-
 export type MergeMethod = "merge" | "squash" | "rebase";
 
 export function merge_pr(
