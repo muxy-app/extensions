@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Muxy File Tree</title>
+    <script type="module" src="/src/main.js"></script>
+  </head>
+  <body>
+    <main class="shell">
+      <div class="toolbar">
+        <label class="search">
+          <span class="visually-hidden">Filter files</span>
+          <input id="filter" type="search" spellcheck="false" autocomplete="off" placeholder="Filter files" />
+        </label>
+      </div>
+      <div id="status" class="status" aria-live="polite">Loading files...</div>
+      <section id="tree" class="tree" aria-label="File tree" role="tree"></section>
+      <div id="menu" class="menu" role="menu" hidden></div>
+    </main>
+  </body>
+</html>
