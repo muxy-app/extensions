@@ -83,12 +83,36 @@ export function renderBranchTab(app: GitPanelApp, status: GitStatus): DocumentFr
 }
 
 function renderCommitBox(app: GitPanelApp, status: GitStatus): HTMLDivElement {
-  const disabled = status.staged.length === 0 || app.message.trim() === "" || app.commitBusy !== null;
+  const canCommit = status.staged.length > 0;
+  const isDisabled = () => !canCommit || app.message.trim() === "" || app.commitBusy !== null;
+  const primaryClass =
+    "flex h-7 items-center justify-center gap-1.5 rounded-md px-2.5 text-[11px] font-medium outline-none transition-colors disabled:pointer-events-none disabled:opacity-50 flex-1 rounded-l-md rounded-r-none";
+  const menuClass =
+    "flex h-7 w-6 items-center justify-center rounded-l-none rounded-r-md border-l border-border/40 outline-none transition-colors";
+  let primary: HTMLButtonElement;
+  let menu: HTMLButtonElement;
+  const sync = () => {
+    const disabled = isDisabled();
+    primary.disabled = disabled;
+    primary.className = cls(
+      primaryClass,
+      disabled
+        ? "bg-secondary text-muted-foreground hover:bg-accent hover:text-foreground"
+        : "bg-primary text-primary-foreground hover:opacity-95",
+    );
+    menu.className = cls(
+      menuClass,
+      disabled ? "bg-secondary text-muted-foreground" : "bg-primary text-primary-foreground",
+    );
+  };
   const area = textarea(
     app.message,
     "Commit message (Cmd+Enter to commit on branch)",
     1,
-    (value) => app.setMessage(value),
+    (value) => {
+      app.setMessage(value);
+      sync();
+    },
     "min-h-[48px]",
   );
   area.addEventListener("keydown", (event) => {
@@ -104,27 +128,27 @@ function renderCommitBox(app: GitPanelApp, status: GitStatus): HTMLDivElement {
     h(
       "div",
       { class: "flex" },
-      button(app.commitBusy === "pull" ? "Pulling..." : app.commitBusy === "push" ? "Pushing..." : "Commit", {
+      (primary = button(app.commitBusy === "pull" ? "Pulling..." : app.commitBusy === "push" ? "Pushing..." : "Commit", {
         iconName: app.commitBusy === "pull" ? "arrowDown" : app.commitBusy === "push" ? "arrowUp" : "check",
         loading: app.commitBusy === "commit",
-        variant: disabled ? "secondary" : "default",
-        disabled,
+        variant: isDisabled() ? "secondary" : "default",
+        disabled: isDisabled(),
         className: "flex-1 rounded-l-md rounded-r-none",
         onClick: () => void commit(app),
-      }),
-      h(
+      })),
+      (menu = h(
         "button",
         {
           type: "button",
           title: "Pull / Push",
           class: cls(
-            "flex h-7 w-6 items-center justify-center rounded-l-none rounded-r-md border-l border-border/40 outline-none transition-colors",
-            disabled ? "bg-secondary text-muted-foreground" : "bg-primary text-primary-foreground",
+            menuClass,
+            isDisabled() ? "bg-secondary text-muted-foreground" : "bg-primary text-primary-foreground",
           ),
           onclick: (event) => openSyncMenu(app, event.currentTarget as HTMLElement),
         },
         icon("chevronDown", 12, "", 2.5),
-      ),
+      )),
     ),
   );
 }
