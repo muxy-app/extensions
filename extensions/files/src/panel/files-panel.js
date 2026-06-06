@@ -515,9 +515,16 @@ export class FilesPanelApp {
   showContextMenu(item, x, y) {
     this.closeContextMenu();
     const menu = create_context_menu(item, this.ops, () => this.closeContextMenu());
-    menu.style.left = `${x}px`;
-    menu.style.top = `${y}px`;
     document.body.appendChild(menu);
+    // Clamp to the viewport so a right-click near the bottom/right edge doesn't
+    // push the menu (or its lower items, e.g. Delete) out of reach. Measured
+    // after appending; coords and the fixed-position menu are viewport-relative.
+    const MARGIN = 8;
+    const rect = menu.getBoundingClientRect();
+    const left = Math.max(MARGIN, Math.min(x, window.innerWidth - rect.width - MARGIN));
+    const top = Math.max(MARGIN, Math.min(y, window.innerHeight - rect.height - MARGIN));
+    menu.style.left = `${left}px`;
+    menu.style.top = `${top}px`;
     const closeOnPointer = (event) => {
       if (event.target instanceof Node && menu.contains(event.target)) return;
       this.closeContextMenu();
