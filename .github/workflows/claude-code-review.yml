@@ -34,6 +34,8 @@ jobs:
       - name: Run Claude Code Review
         id: claude-review
         uses: anthropics/claude-code-action@v1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -58,8 +60,10 @@ jobs:
             5. Naming — the extension name is simple kebab-case with NO "muxy-" or
                "extension-" prefix, and screenshots follow the standard naming convention.
 
-            Output EXACTLY this format as your final message — nothing else, no prose,
-            no inline comments. Keep each line to one short sentence:
+            Then post EXACTLY ONE PR comment using
+            `gh pr comment ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --body "..."`
+            in this format — nothing else, no prose, no inline comments.
+            Keep each line to one short sentence:
 
             **Extension review** — <New extension | Update vX.Y.Z>
 
@@ -73,7 +77,5 @@ jobs:
             Use [x] for pass and [ ] for fail. Omit the "New vs Update" row from the
             checkbox list since it's already in the header. Be terse — the whole comment
             should fit in a few lines.
-          use_sticky_comment: true
-          show_full_output: true
-          claude_args: '--allowed-tools "Read,Glob,Grep"'
+          claude_args: '--allowed-tools "Bash(gh:*),Read,Glob,Grep"'
 
