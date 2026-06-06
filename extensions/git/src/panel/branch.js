@@ -60,7 +60,7 @@ function renderCommitBox(app, status) {
     const area = textarea(app.message, "Commit message (Cmd+Enter to commit on branch)", 1, (value) => {
         app.setMessage(value);
         sync();
-    }, "min-h-[48px]");
+    }, "min-h-[48px]", "commit-message");
     area.addEventListener("keydown", (event) => {
         if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
             event.preventDefault();
@@ -171,6 +171,7 @@ function openBranchMenu(app, anchor) {
         placeholder: "Switch or create branch...",
         autocorrect: "off",
         autocapitalize: "off",
+        autocomplete: "off",
         spellcheck: "false",
     });
     const content = h("div", { class: "text-popover-foreground" }, search, list);

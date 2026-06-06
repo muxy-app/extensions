@@ -62,18 +62,28 @@ export function button(label, opts) {
             ? icon(opts.iconName, 11, "", 2.5)
             : null, label);
 }
-export function input(value, placeholder, onInput, className = "") {
+export function input(value, placeholder, onInput, className = "", focusKey = null) {
     return h("input", {
         value,
         placeholder,
+        spellcheck: "false",
+        autocorrect: "off",
+        autocapitalize: "off",
+        autocomplete: "off",
+        "data-focus-key": focusKey,
         class: cls("flex h-8 w-full rounded-md border border-input bg-secondary px-2 text-[12px] text-foreground outline-none placeholder:text-muted-foreground focus:border-primary", className),
         oninput: (event) => onInput(event.target.value),
     });
 }
-export function textarea(value, placeholder, rows, onInput, className = "") {
+export function textarea(value, placeholder, rows, onInput, className = "", focusKey = null) {
     return h("textarea", {
         rows,
         placeholder,
+        spellcheck: "false",
+        autocorrect: "off",
+        autocapitalize: "off",
+        autocomplete: "off",
+        "data-focus-key": focusKey,
         class: cls("flex w-full resize-none rounded-md border border-input bg-secondary px-2 py-1.5 text-[12px] text-foreground outline-none placeholder:text-muted-foreground focus:border-primary", className),
         oninput: (event) => onInput(event.target.value),
     }, value);

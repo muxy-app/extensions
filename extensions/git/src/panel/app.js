@@ -100,6 +100,10 @@ export class GitPanelApp {
             clearTimeout(this.reconcileTimer);
     }
     render() {
+        const active = document.activeElement;
+        const focusKey = active?.getAttribute?.("data-focus-key");
+        const selStart = focusKey ? active.selectionStart : null;
+        const selEnd = focusKey ? active.selectionEnd : null;
         clear(this.root);
         if (this.repo.kind === "loading") {
             this.root.appendChild(h("div", { class: "relative h-screen" }, loadingOverlay()));
@@ -125,6 +129,14 @@ export class GitPanelApp {
         else if (this.refreshing)
             shell.appendChild(loadingOverlay("Refreshing..."));
         this.root.appendChild(shell);
+        if (focusKey) {
+            const next = this.root.querySelector(`[data-focus-key="${focusKey}"]`);
+            if (next) {
+                next.focus();
+                if (selStart !== null && next.setSelectionRange)
+                    next.setSelectionRange(selStart, selEnd);
+            }
+        }
     }
     setTab(tab) {
         this.tab = tab;
@@ -288,10 +300,11 @@ export class GitPanelApp {
     async mergeCurrentPr(number, method, target) {
         this.prPending = method;
         this.render();
+        let cleanupCwd;
         try {
-            await runPinned(async (cwd) => {
-                await mergePr(number, method, false, cwd);
-                await removeWorktreeOrBranch({ branch: target.branch, defaultBranch: target.defaultBranch, dirty: false }, cwd);
+            await runPinned((cwd) => {
+                cleanupCwd = cwd;
+                return mergePr(number, method, false, cwd);
             });
         }
         catch (err) {
@@ -299,6 +312,12 @@ export class GitPanelApp {
             this.prPending = null;
             this.render();
             return false;
+        }
+        try {
+            await removeWorktreeOrBranch({ branch: target.branch, defaultBranch: target.defaultBranch, dirty: false }, cleanupCwd);
+        }
+        catch (err) {
+            await alertError(`PR #${number} merged, but branch cleanup failed`, err);
         }
         finally {
             this.prPending = null;
