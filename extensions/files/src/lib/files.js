@@ -73,13 +73,15 @@ export async function open_in_editor(rel) {
       kind: "extensionWebView",
       extension: {
         id: muxy.extensionID,
-        tabType: "editor",
+        tabType: "code-editor",
         singleton,
         data: { filePath: rel, replaceable: singleton },
       },
     });
-  } catch {
-    return;
+  } catch (err) {
+    await muxy
+      .toast({ title: "Open file", body: error_message(err), variant: "error" })
+      .catch(() => undefined);
   }
 }
 
