@@ -42,7 +42,7 @@ jobs:
 
             Muxy extensions are npm + Vite projects. The manifest is the "muxy" key in
             package.json; source lives in src/ and builds to dist/. Read the extension's
-            package.json and source before judging.
+            package.json and the muxy-extension skill guidance before judging.
 
             Evaluate ONLY these checks, each as a single pass/fail line:
 
@@ -58,7 +58,7 @@ jobs:
             5. Naming — the extension name is simple kebab-case with NO "muxy-" or
                "extension-" prefix, and screenshots follow the standard naming convention.
 
-            Output EXACTLY this format as your final message — nothing else, no prose,
+            Then post EXACTLY ONE PR comment (use gh) in this format — nothing else, no prose,
             no inline comments. Keep each line to one short sentence:
 
             **Extension review** — <New extension | Update vX.Y.Z>
@@ -73,4 +73,8 @@ jobs:
             Use [x] for pass and [ ] for fail. Omit the "New vs Update" row from the
             checkbox list since it's already in the header. Be terse — the whole comment
             should fit in a few lines.
-          use_sticky_comment: true
+          # Tools Claude may run during the review (post a comment; inspect the PR):
+          claude_args: '--allowed-tools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,Glob,Grep"'
+          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
+          # or https://code.claude.com/docs/en/cli-reference for available options
+
