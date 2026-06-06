@@ -73,4 +73,4 @@ jobs:
             Use [x] for pass and [ ] for fail. Omit the "New vs Update" row from the
             checkbox list since it's already in the header. Be terse — the whole comment
             should fit in a few lines.
-          claude_args: '--allowed-tools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,Glob,Grep"'
+          claude_args: '--allowed-tools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(cat:*),Bash(ls:*),Bash(find:*),Read,Glob,Grep"'
