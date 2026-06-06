@@ -74,4 +74,6 @@ jobs:
             checkbox list since it's already in the header. Be terse — the whole comment
             should fit in a few lines.
           use_sticky_comment: true
+          show_full_output: true
+          claude_args: '--allowed-tools "Read,Glob,Grep"'
 
