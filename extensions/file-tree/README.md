@@ -5,7 +5,7 @@ A lightweight file tree panel for Muxy `0.29.x` extension builds.
 This is a small, file-system read-only first pass:
 
 - Adds a top bar folder button.
-- Opens a pinned right-side `Files` panel.
+- Opens a pinned right-side `File Tree` panel.
 - Lists the active worktree with `muxy.files.list`.
 - Expands and collapses directories.
 - Shows folder and common file type icons.
@@ -34,10 +34,9 @@ Restart Muxy or use Settings -> Extensions -> Reload Extensions.
 
 Default extension shortcuts:
 
-- `Cmd+E`: toggle the file tree panel.
 - `Cmd+Opt+C`: copy the selected relative path.
 
-Both can be remapped in Settings -> Keyboard Shortcuts -> App Shortcuts under the extension group.
+The tree panel command does not ship with a default shortcut in the marketplace build, so it does not conflict with Muxy's built-in `Files` extension. You can map it in Settings -> Keyboard Shortcuts -> App Shortcuts under the extension group.
 
 Muxy loads extensions from:
 

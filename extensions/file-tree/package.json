@@ -1,6 +1,6 @@
 {
   "name": "file-tree",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -33,7 +33,6 @@
         "id": "toggle-tree",
         "title": "File Tree: Toggle",
         "subtitle": "Open or close the active worktree file tree",
-        "defaultShortcut": "cmd+e",
         "action": {
           "kind": "togglePanel",
           "panel": "tree"
@@ -64,7 +63,7 @@
     "panels": [
       {
         "id": "tree",
-        "title": "Files",
+        "title": "File Tree",
         "icon": {
           "symbol": "folder"
         },
