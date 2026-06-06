@@ -42,7 +42,7 @@ jobs:
 
             Muxy extensions are npm + Vite projects. The manifest is the "muxy" key in
             package.json; source lives in src/ and builds to dist/. Read the extension's
-            package.json and the muxy-extension skill guidance before judging.
+            package.json and source before judging.
 
             Evaluate ONLY these checks, each as a single pass/fail line:
 
@@ -74,4 +74,3 @@ jobs:
             checkbox list since it's already in the header. Be terse — the whole comment
             should fit in a few lines.
           use_sticky_comment: true
-          claude_args: '--allowed-tools "Bash(gh pr diff:*),Bash(gh pr view:*),Bash(cat:*),Bash(ls:*),Bash(find:*),Bash(grep:*),Bash(head:*),Bash(tail:*),Bash(git log:*),Bash(git show:*),Bash(git diff:*),Bash(npm view:*),Read,Glob,Grep,Skill"'
