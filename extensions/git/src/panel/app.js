@@ -47,6 +47,7 @@ export class GitPanelApp {
     prListKey = null;
     prListLoadId = 0;
     prListRefreshing = false;
+    prRefreshing = false;
     prStarted = false;
     prRowPending = new Map();
     graph = { rows: [], hasMore: false, loading: true };
@@ -251,6 +252,8 @@ export class GitPanelApp {
         if (ok) {
             await this.loadLocal(true);
             void this.resetGraph(true);
+            if (op === "push" && this.repo.kind === "ready" && this.repo.status.pullRequest)
+                void this.refreshCurrentPr();
         }
         return ok;
     }
@@ -514,6 +517,20 @@ export class GitPanelApp {
         if (cwd)
             this.statusCache.set(cwd, this.repo);
         this.render();
+    }
+    async refreshCurrentPr() {
+        if (this.prRefreshing || this.repo.kind !== "ready")
+            return;
+        this.prRefreshing = true;
+        this.render();
+        try {
+            const cwd = await activeWorktreePath();
+            await this.resolvePr(cwd, this.repo.status.branch);
+        }
+        finally {
+            this.prRefreshing = false;
+            this.render();
+        }
     }
     async switchScope() {
         if (isBusy()) {

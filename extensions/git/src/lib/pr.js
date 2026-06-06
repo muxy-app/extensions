@@ -59,6 +59,7 @@ async function removeWorktree(branch, dirty, cwd) {
     const replacement = replacementWorktree(worktrees, cwd);
     if (!replacement)
         throw new Error("No other worktree to remove from.");
+    await muxy.worktrees.switchTo(replacement.path).catch(() => undefined);
     await cmd.worktreeRemove(replacement.path, cwd, dirty);
     if (branch)
         await cmd.branchDeleteRemote(replacement.path, branch).catch(() => undefined);

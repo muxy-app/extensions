@@ -406,14 +406,28 @@ export async function prList(cwd, { filter, limit } = {}) {
     }
 }
 
+async function prInfoFor(cwd, ref) {
+    const res = await muxy.exec(["gh", "pr", "view", ...(ref ? [ref] : []), "--json", PR_FIELDS], { cwd });
+    if (res.exitCode !== 0 || !res.stdout.trim())
+        return null;
+    return toPr(JSON.parse(res.stdout));
+}
+
+async function storedPrNumber(cwd) {
+    const branch = (await tryRun(["git", "branch", "--show-current"], cwd)).trim();
+    if (!branch)
+        return null;
+    const number = (await tryRun(["git", "config", "--get", `branch.${branch}.muxy-pr-number`], cwd)).trim();
+    return number || null;
+}
+
 export async function prInfo(cwd) {
     try {
-        const res = await muxy.exec(["gh", "pr", "view", "--json", PR_FIELDS], { cwd });
-        if (res.exitCode !== 0)
-            return null;
-        if (!res.stdout.trim())
-            return null;
-        return toPr(JSON.parse(res.stdout));
+        const direct = await prInfoFor(cwd, null);
+        if (direct)
+            return direct;
+        const number = await storedPrNumber(cwd);
+        return number ? await prInfoFor(cwd, number) : null;
     }
     catch {
         return null;
@@ -448,14 +462,83 @@ export function prClose(cwd, number) {
     return run(["gh", "pr", "close", String(number)], cwd);
 }
 
-export function prCheckout(cwd, number) {
-    return run(["gh", "pr", "checkout", String(number)], cwd);
+function safeRefComponent(value) {
+    const segments = String(value)
+        .split("/")
+        .map((segment) => segment.replace(/[^A-Za-z0-9_-]+/g, "-").replace(/^-+|-+$/g, ""))
+        .filter(Boolean);
+    return segments.length ? segments.join("/") : "head";
+}
+
+function localPrBranchName(checkout) {
+    return `pr/${checkout.number}/${safeRefComponent(checkout.headBranch)}`;
+}
+
+function prRemoteName(checkout) {
+    return `pr-${checkout.number}-${safeRefComponent(checkout.headRepositoryNameWithOwner).replace(/\//g, "-")}`;
+}
+
+async function prCheckoutInfo(cwd, number) {
+    const out = await run(["gh", "pr", "view", String(number), "--json", "number,headRefName,headRepository,headRepositoryOwner"], cwd);
+    const raw = JSON.parse(out);
+    const owner = raw.headRepositoryOwner?.login ?? "";
+    const name = raw.headRepository?.name ?? "";
+    return {
+        number: raw.number,
+        headBranch: raw.headRefName,
+        headRepositoryNameWithOwner: owner && name ? `${owner}/${name}` : (raw.headRepository?.nameWithOwner ?? ""),
+    };
+}
+
+async function remoteExists(cwd, remote) {
+    const out = await tryRun(["git", "remote"], cwd);
+    return out.split("\n").map((line) => line.trim()).includes(remote);
+}
+
+async function localBranchExists(cwd, branch) {
+    const res = await muxy.exec(["git", "show-ref", "--verify", "--quiet", `refs/heads/${branch}`], { cwd });
+    return res.exitCode === 0;
+}
+
+async function originOwner(cwd) {
+    const url = (await tryRun(["git", "remote", "get-url", "origin"], cwd)).trim();
+    const match = url.match(/[:/]([^/]+)\/[^/]+?(?:\.git)?$/);
+    return match ? match[1].toLowerCase() : "";
+}
+
+async function ensurePrRemote(cwd, checkout) {
+    const owner = checkout.headRepositoryNameWithOwner.split("/")[0]?.toLowerCase() ?? "";
+    if (!owner || owner === (await originOwner(cwd)))
+        return "origin";
+    const remote = prRemoteName(checkout);
+    if (!(await remoteExists(cwd, remote)))
+        await run(["git", "remote", "add", remote, `https://github.com/${checkout.headRepositoryNameWithOwner}.git`], cwd);
+    return remote;
+}
+
+async function preparePrBranch(cwd, checkout) {
+    const remote = await ensurePrRemote(cwd, checkout);
+    const branch = localPrBranchName(checkout);
+    const startPoint = `refs/remotes/${remote}/${checkout.headBranch}`;
+    await run(["git", "fetch", remote, `refs/heads/${checkout.headBranch}:${startPoint}`], cwd);
+    if (await localBranchExists(cwd, branch))
+        await run(["git", "branch", `--set-upstream-to=${remote}/${checkout.headBranch}`, branch], cwd);
+    else
+        await run(["git", "branch", "--track", branch, startPoint], cwd);
+    await run(["git", "config", `branch.${branch}.muxy-pr-number`, String(checkout.number)], cwd);
+    return branch;
+}
+
+export async function prCheckout(cwd, number) {
+    const checkout = await prCheckoutInfo(cwd, number);
+    const branch = await preparePrBranch(cwd, checkout);
+    await run(["git", "switch", branch], cwd);
+    return { branch };
 }
 
 export async function prCheckoutWorktree(cwd, number, path) {
-    const out = await run(["gh", "pr", "view", String(number), "--json", "headRefName"], cwd);
-    const branch = JSON.parse(out).headRefName;
-    await run(["git", "fetch", "origin"], cwd);
+    const checkout = await prCheckoutInfo(cwd, number);
+    const branch = await preparePrBranch(cwd, checkout);
     await run(["git", "worktree", "add", path, branch], cwd);
     return { branch };
 }
