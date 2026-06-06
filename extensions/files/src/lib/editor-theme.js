@@ -26,10 +26,15 @@ export function muxy_cm_theme(is_dark) {
         padding: "0 8px",
       },
       ".cm-cursor, .cm-dropCursor": {
-        borderLeftColor: "var(--muxy-foreground)",
+        borderLeftColor: "var(--muxy-accent)",
+        borderLeftWidth: "2px",
       },
-      "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection": {
+      "&.cm-focused .cm-selectionBackground, .cm-selectionBackground": {
+        backgroundColor: "var(--muxy-accent-soft) !important",
+      },
+      ".cm-content ::selection": {
         backgroundColor: "var(--muxy-accent-soft)",
+        color: "var(--muxy-foreground)",
       },
       ".cm-searchMatch": {
         backgroundColor: "var(--muxy-accent-soft)",

@@ -196,9 +196,10 @@ export class MarkdownView {
     this.fontSize = fontSize;
     this.element.style.fontSize = `${fontSize}px`;
     this.element.replaceChildren();
+    const documentElement = h("div", { class: "md-preview-document" });
     const { fields, body } = split_frontmatter(source);
     if (fields.length > 0) {
-      this.element.appendChild(
+      documentElement.appendChild(
         h(
           "dl",
           { class: "md-frontmatter" },
@@ -208,7 +209,8 @@ export class MarkdownView {
         ),
       );
     }
-    render_markdown(this.element, body);
+    render_markdown(documentElement, body);
+    this.element.appendChild(documentElement);
   }
 
   destroy() {

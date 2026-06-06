@@ -21,6 +21,12 @@ function read_data() {
   return window.muxy?.data ?? {};
 }
 
+function is_text_entry(target) {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+  return Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
+}
+
 export class EditorApp {
   constructor(root) {
     this.root = root;
@@ -105,6 +111,22 @@ export class EditorApp {
     );
 
     this.keyHandler = (event) => {
+      const key = event.key.toLowerCase();
+      if (this.isMarkdown() && this.mdMode === "preview") {
+        const modified = event.metaKey || event.ctrlKey;
+        const isFindKey = modified && !event.shiftKey && key === "f";
+        const isReplaceKey = modified && !event.shiftKey && !event.altKey && key === "r";
+        const isEditKey = !modified && !event.altKey && !event.shiftKey && key === "e" && !is_text_entry(event.target);
+        if (isFindKey || isReplaceKey || isEditKey) {
+          event.preventDefault();
+          event.stopPropagation();
+          this.setMarkdownMode("edit");
+          if (isFindKey) requestAnimationFrame(() => this.child?.openSearch?.());
+          if (isReplaceKey) requestAnimationFrame(() => this.child?.openReplace?.());
+          return;
+        }
+      }
+
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
         if (event.shiftKey || event.altKey) return;
         event.preventDefault();
@@ -117,12 +139,17 @@ export class EditorApp {
 
     this.heartbeat = window.setInterval(() => this.publishEditorState(), 2000);
     const clearState = () => clear_editor_state(this.editorStateId);
+    const guardUnsavedClose = (event) => {
+      if (!this.dirty) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
     window.addEventListener("pagehide", clearState);
-    window.addEventListener("beforeunload", clearState);
+    window.addEventListener("beforeunload", guardUnsavedClose);
     this.disposers.push(() => {
       window.clearInterval(this.heartbeat);
       window.removeEventListener("pagehide", clearState);
-      window.removeEventListener("beforeunload", clearState);
+      window.removeEventListener("beforeunload", guardUnsavedClose);
       clearState();
     });
 

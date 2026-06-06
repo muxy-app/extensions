@@ -60,6 +60,11 @@ body {
   font: var(--font-body) -apple-system, "SF Pro", system-ui, sans-serif;
 }
 
+::selection {
+  background: color-mix(in srgb, var(--muxy-accent) 34%, var(--muxy-background));
+  color: var(--muxy-foreground);
+}
+
 button,
 input,
 textarea {
@@ -454,7 +459,14 @@ textarea {
   line-height: 1.7;
 }
 
-.md-preview > :first-child {
+.md-preview-document {
+  box-sizing: border-box;
+  width: min(76ch, 100%);
+  margin-right: auto;
+  margin-left: auto;
+}
+
+.md-preview-document > :first-child {
   margin-top: 0;
 }
 
@@ -555,8 +567,11 @@ textarea {
 }
 
 .md-preview table {
+  display: block;
+  max-width: 100%;
   margin: 0 0 0.85em;
   border-collapse: collapse;
+  overflow-x: auto;
 }
 
 .md-preview th,

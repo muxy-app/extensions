@@ -305,6 +305,7 @@ export class CodeEditor {
       highlightActiveLine(),
       highlightActiveLineGutter(),
       rectangularSelection(),
+      EditorState.allowMultipleSelections.of(true),
       bracketMatching(),
       search({ top: true, createPanel: (view) => new FindPanel(view) }),
       keymap.of([...searchKeymap, ...historyKeymap, ...defaultKeymap]),
