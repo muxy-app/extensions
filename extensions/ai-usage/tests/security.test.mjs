@@ -9,6 +9,8 @@ test("security: popover exec commands use absolute binaries", async () => {
 
   for (const content of [source, cacheSource, background]) {
     assert.doesNotMatch(content, /printenv/);
+    assert.doesNotMatch(content, /\/bin\/sh/);
+    assert.doesNotMatch(content, /"-c"/);
     assert.doesNotMatch(content, /muxy\.exec\(\["[^/]/);
   }
 });

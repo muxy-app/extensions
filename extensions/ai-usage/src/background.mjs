@@ -1,7 +1,8 @@
-const readCacheShell = "CACHE=\"$HOME/.config/muxy/extensions/ai-usage/status-cache.json\"; test -f \"$CACHE\" && /bin/cat \"$CACHE\" || true";
-
 try {
-  const result = muxy.exec(["/bin/sh", "-c", readCacheShell], { timeoutMs: 3000 });
+  const home = readHome();
+  const result = home
+    ? muxy.exec(["/bin/cat", `${home}/.config/muxy/extensions/ai-usage/status-cache.json`], { timeoutMs: 3000 })
+    : null;
   if (result && result.exitCode === 0 && String(result.stdout || "").trim()) {
     const payload = JSON.parse(result.stdout);
     const presentation = statusBarPresentation(payload);
@@ -16,6 +17,13 @@ try {
   }
 } catch (error) {
   console.warn("ai-usage background restore failed", error);
+}
+
+function readHome() {
+  const result = muxy.exec(["/usr/bin/env"], { timeoutMs: 3000 });
+  if (!result || result.exitCode !== 0) return "";
+  const line = String(result.stdout || "").split("\n").find((entry) => entry.startsWith("HOME="));
+  return line ? line.slice(5) : "";
 }
 
 function statusBarPresentation(payload) {
