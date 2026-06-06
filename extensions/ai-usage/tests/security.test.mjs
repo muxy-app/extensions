@@ -56,7 +56,9 @@ test("regression: popover chrome follows the Muxy extension theme scale", async 
   assert.match(css, /--control: 24px/);
   assert.match(css, /--radius: 6px/);
   assert.match(css, /--radius-card: 8px/);
-  assert.match(css, /body \{ margin: 0; min-height: 100%; width: 100%; overflow-x: hidden; background: transparent; \}/);
+  assert.match(css, /scrollbar-gutter: stable/);
+  assert.match(css, /\.wrap \{[^}]*width: 360px/s);
+  assert.match(css, /background: transparent/);
   assert.doesNotMatch(chrome, /var\(--muxy-[^)]+,\s*#[0-9a-fA-F]{3,8}/);
   assert.doesNotMatch(chrome, /linear-gradient/);
   assert.doesNotMatch(chrome, /translateY/);
