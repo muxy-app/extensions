@@ -1,4 +1,5 @@
-import { activeGitProjectPath, activeWorktreePath, alertError, confirmAction, errorMessage, openUrl } from "@/lib/git";
+import * as cmd from "@/lib/cmd";
+import { alertError, confirmAction, errorMessage, openUrl, samePath } from "@/lib/git";
 const MAX_SLUG_WORDS = 5;
 const MAX_SLUG_LENGTH = 30;
 export function prState(pr) {
@@ -9,14 +10,14 @@ export function prState(pr) {
         return "closed";
     return "open";
 }
-export function mergePr(number, method, deleteBranch, project) {
-    return muxy.git.pr.merge({ number, method, deleteBranch, project });
+export function mergePr(number, method, deleteBranch, cwd) {
+    return cmd.prMerge(cwd, { number, method, deleteBranch });
 }
-export function closePr(number, project) {
-    return muxy.git.pr.close({ number, project });
+export function closePr(number, cwd) {
+    return cmd.prClose(cwd, number);
 }
-export function createPr(title, body, baseBranch, draft, project) {
-    return muxy.git.pr.create({ title, body, baseBranch, draft, project });
+export function createPr(title, body, baseBranch, draft, cwd) {
+    return cmd.prCreate(cwd, { title, body, baseBranch, draft });
 }
 function slugify(text) {
     return text
@@ -42,49 +43,31 @@ export function existingPrUrl(err) {
     const match = message.match(/https?:\/\/\S+/);
     return match ? match[0].replace(/[.,)\]]+$/, "") : null;
 }
-async function pullQuietly(project) {
-    await muxy.git.pull({ project }).catch(() => undefined);
+async function pullQuietly(cwd) {
+    await cmd.pull(cwd).catch(() => undefined);
 }
-async function activeWorktree(project) {
-    const worktrees = await muxy.worktrees.list(project).catch(() => []);
-    const active = worktrees.find((w) => w.isActive);
-    if (active)
-        return active;
-    const info = await muxy.git.repoInfo({ project }).catch(() => null);
-    const toplevel = info?.root;
-    return ((toplevel ? worktrees.find((w) => w.path === toplevel) : undefined) ??
-        worktrees.find((w) => w.isPrimary));
+async function isOnWorktree(cwd) {
+    const info = await cmd.repoInfo(cwd).catch(() => null);
+    return !!info?.isWorktree;
 }
-async function isOnWorktree(project) {
-    const info = await muxy.git.repoInfo({ project }).catch(() => null);
-    if (info)
-        return info.isWorktree;
-    const active = await activeWorktree(project);
-    return !!active && !active.isPrimary;
+function replacementWorktree(worktrees, cwd) {
+    const others = worktrees.filter((w) => !samePath(w.path, cwd));
+    return others.find((w) => w.isPrimary) ?? others[0];
 }
-async function removeActiveWorktree(branch, force, project) {
-    const worktrees = await muxy.worktrees.list(project).catch(() => []);
-    const active = await activeWorktree(project);
-    if (!active || active.isPrimary)
-        throw new Error("No active worktree to remove.");
-    const replacement = worktrees.find((w) => w.isPrimary && w.id !== active.id) ??
-        worktrees.find((w) => w.id !== active.id);
-    if (replacement) {
-        await muxy.git.worktree
-            .switchTo({ project, identifier: replacement.path })
-            .catch(() => muxy.worktrees.switchTo(replacement.path, project));
-    }
-    await muxy.git.worktree.remove({ project, path: active.path, force });
+async function removeWorktree(branch, dirty, cwd) {
+    const worktrees = await cmd.worktreesList(cwd).catch(() => []);
+    const replacement = replacementWorktree(worktrees, cwd);
+    if (!replacement)
+        throw new Error("No other worktree to remove from.");
+    await cmd.worktreeRemove(replacement.path, cwd, dirty);
     if (branch)
-        await muxy.git.branch.deleteRemote({ project, branch }).catch(() => undefined);
-    if (replacement)
-        await pullQuietly(project);
-    await muxy.worktrees.refresh(project);
+        await cmd.branchDeleteRemote(replacement.path, branch).catch(() => undefined);
+    await pullQuietly(replacement.path);
+    await muxy.worktrees.refresh().catch(() => undefined);
 }
-export async function removeWorktreeOrBranch({ branch, defaultBranch, dirty }, project) {
-    project ??= await activeGitProjectPath();
-    if (await isOnWorktree(project)) {
-        await removeActiveWorktree(branch, dirty, project);
+export async function removeWorktreeOrBranch({ branch, defaultBranch, dirty }, cwd) {
+    if (await isOnWorktree(cwd)) {
+        await removeWorktree(branch, dirty, cwd);
         return;
     }
     if (!branch)
@@ -93,21 +76,21 @@ export async function removeWorktreeOrBranch({ branch, defaultBranch, dirty }, p
         throw new Error(`"${branch}" is the default branch and won't be deleted.`);
     }
     const target = defaultBranch ?? "main";
-    await muxy.git.branch.switchTo({ project, branch: target });
-    const { currentBranch } = await muxy.git.repoInfo({ project });
+    await cmd.branchSwitch(cwd, target);
+    const { currentBranch } = await cmd.repoInfo(cwd);
     if (currentBranch === branch) {
         throw new Error(`Still on "${branch}" after switching to ${target}.`);
     }
-    await muxy.git.branch.delete({ project, name: branch, force: true });
-    await muxy.git.branch.deleteRemote({ project, branch }).catch(() => undefined);
-    await pullQuietly(project);
-    await muxy.worktrees.refresh(project);
+    await cmd.branchDelete(cwd, branch, true);
+    await cmd.branchDeleteRemote(cwd, branch).catch(() => undefined);
+    await pullQuietly(cwd);
+    await muxy.worktrees.refresh().catch(() => undefined);
 }
-export async function cleanupBranch(target, project) {
+export async function cleanupBranch(target, cwd) {
     if (!target.branch)
         return false;
     try {
-        await removeWorktreeOrBranch(target, project);
+        await removeWorktreeOrBranch(target, cwd);
         return true;
     }
     catch (err) {
@@ -115,30 +98,31 @@ export async function cleanupBranch(target, project) {
         return false;
     }
 }
-export function checkoutPr(number, project) {
-    return muxy.git.pr.checkout({ number, project });
+export function checkoutPr(number, cwd) {
+    return cmd.prCheckout(cwd, number);
 }
-export async function suggestWorktreePath(number) {
-    const base = await activeWorktreePath();
+export function suggestWorktreePath(number, cwd) {
+    const base = cwd ?? "";
     const parent = base ? base.replace(/\/+$/, "").replace(/\/[^/]+$/, "") : "";
     const name = `pr-${number}`;
     return parent ? `${parent}/${name}` : name;
 }
-export async function checkoutPrWorktree(number, project) {
-    const suggested = await suggestWorktreePath(number);
+export async function checkoutPrWorktree(number, cwd) {
+    const suggested = suggestWorktreePath(number, cwd);
     const path = await promptPath(number, suggested);
     if (!path)
         return null;
-    const { branch } = await muxy.git.pr.checkoutWorktree({ number, path, project });
+    const { branch } = await cmd.prCheckoutWorktree(cwd, number, path);
     await muxy.worktrees.refresh().catch(() => undefined);
-    await muxy.git.worktree.switchTo({ identifier: path }).catch(() => undefined);
     return branch;
 }
 async function promptPath(number, suggested) {
     const res = await muxy
-        .exec({
-        shell: `osascript -e 'set r to text returned of (display dialog "Worktree path for PR #${number}" default answer "${suggested}" with title "Checkout to Worktree")' 2>/dev/null`,
-    })
+        .exec([
+        "osascript",
+        "-e",
+        `set r to text returned of (display dialog "Worktree path for PR #${number}" default answer "${suggested}" with title "Checkout to Worktree")`,
+    ])
         .catch(() => null);
     if (!res || res.exitCode !== 0)
         return null;

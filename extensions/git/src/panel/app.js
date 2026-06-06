@@ -1,7 +1,8 @@
 import { clear, h, readPref, writePref } from "@/lib/dom";
 import { computeLanes, toCommitNode } from "@/lib/graph";
-import { alertError, activeGitProjectPath, activeWorktreePath, commitAll, confirmAction, hasPendingChanges, isBusy, onBusyChange, runPinned, toViewStatus, tryAction, } from "@/lib/git";
+import { alertError, activeWorktreePath, commitAll, confirmAction, hasPendingChanges, isBusy, onBusyChange, runPinned, toViewStatus, tryAction, } from "@/lib/git";
 import { checkoutPr, checkoutPrWorktree, cleanupBranch, closePr, confirmOpenExistingPr, createPr, mergePr, removeWorktreeOrBranch, } from "@/lib/pr";
+import * as cmd from "@/lib/cmd";
 import { icon } from "@/lib/icons";
 import { button, emptyState, iconButton, loadingOverlay } from "@/ui/shared";
 import { renderBranchSwitcher, renderBranchTab } from "@/panel/branch";
@@ -136,7 +137,8 @@ export class GitPanelApp {
         this.message = message;
     }
     async initRepo() {
-        if (await tryAction(() => muxy.git.init(), "Could not initialize repository")) {
+        const cwd = await activeWorktreePath();
+        if (await tryAction(() => cmd.init(cwd), "Could not initialize repository")) {
             await this.loadLocal(true);
         }
     }
@@ -159,7 +161,7 @@ export class GitPanelApp {
         const cwd = await activeWorktreePath();
         let next;
         try {
-            const status = toViewStatus(await muxy.git.status({ local: true }));
+            const status = toViewStatus(await cmd.status(cwd));
             const prev = cwd ? this.statusCache.get(cwd) : undefined;
             if (prev?.kind === "ready" && prev.status.branch === status.branch) {
                 status.pullRequest = prev.status.pullRequest;
@@ -182,7 +184,7 @@ export class GitPanelApp {
     }
     async stage(path) {
         this.moveEntry(path, "unstaged", "staged");
-        const ok = await tryAction(() => runPinned((project) => muxy.git.stage({ paths: [path], project })), "Could not stage file");
+        const ok = await tryAction(() => runPinned((cwd) => cmd.stage(cwd, [path])), "Could not stage file");
         if (ok)
             this.reconcile();
         else
@@ -191,7 +193,7 @@ export class GitPanelApp {
     }
     async unstage(path) {
         this.moveEntry(path, "staged", "unstaged");
-        const ok = await tryAction(() => runPinned((project) => muxy.git.unstage({ paths: [path], project })), "Could not unstage file");
+        const ok = await tryAction(() => runPinned((cwd) => cmd.unstage(cwd, [path])), "Could not unstage file");
         if (ok)
             this.reconcile();
         else
@@ -201,7 +203,7 @@ export class GitPanelApp {
     async discard(path) {
         const entry = this.repo.kind === "ready" ? this.repo.status.unstaged.find((file) => file.path === path) : undefined;
         const untracked = entry?.label === "?";
-        const ok = await tryAction(() => runPinned((project) => muxy.git.discard(untracked ? { untrackedPaths: [path], project } : { paths: [path], project })), "Could not discard file");
+        const ok = await tryAction(() => runPinned((cwd) => cmd.discard(cwd, untracked ? { untrackedPaths: [path] } : { paths: [path] })), "Could not discard file");
         await this.loadLocal(false);
         return ok;
     }
@@ -210,22 +212,22 @@ export class GitPanelApp {
             return false;
         const paths = this.repo.status.unstaged.filter((file) => file.label !== "?").map((file) => file.path);
         const untrackedPaths = this.repo.status.unstaged.filter((file) => file.label === "?").map((file) => file.path);
-        const ok = await tryAction(() => runPinned((project) => muxy.git.discard({ paths, untrackedPaths, project })), "Could not discard changes");
+        const ok = await tryAction(() => runPinned((cwd) => cmd.discard(cwd, { paths, untrackedPaths })), "Could not discard changes");
         await this.loadLocal(false);
         return ok;
     }
     async stageAll() {
-        const ok = await tryAction(() => runPinned((project) => muxy.git.stage({ paths: [], project })), "Could not stage changes");
+        const ok = await tryAction(() => runPinned((cwd) => cmd.stage(cwd, [])), "Could not stage changes");
         await this.loadLocal(false);
         return ok;
     }
     async unstageAll() {
-        const ok = await tryAction(() => runPinned((project) => muxy.git.unstage({ paths: [], project })), "Could not unstage changes");
+        const ok = await tryAction(() => runPinned((cwd) => cmd.unstage(cwd, [])), "Could not unstage changes");
         await this.loadLocal(false);
         return ok;
     }
     async commit(message) {
-        const ok = await tryAction(() => runPinned((project) => muxy.git.commit({ message, project })), "Commit failed");
+        const ok = await tryAction(() => runPinned((cwd) => cmd.commit(cwd, { message })), "Commit failed");
         if (ok) {
             await this.loadLocal(false);
             void this.resetGraph(true);
@@ -233,7 +235,7 @@ export class GitPanelApp {
         return ok;
     }
     async sync(op) {
-        const ok = await tryAction(() => runPinned((project) => op === "push" ? muxy.git.push({ project }) : muxy.git.pull({ project })), op === "push" ? "Push failed" : "Pull failed");
+        const ok = await tryAction(() => runPinned((cwd) => op === "push" ? cmd.push(cwd, {}) : cmd.pull(cwd)), op === "push" ? "Push failed" : "Pull failed");
         if (ok) {
             await this.loadLocal(true);
             void this.resetGraph(true);
@@ -241,9 +243,9 @@ export class GitPanelApp {
         return ok;
     }
     async switchBranch(name, create) {
-        const ok = await tryAction(() => runPinned((project) => create
-            ? muxy.git.branch.create({ name, project })
-            : muxy.git.branch.switchTo({ branch: name, project })), create ? "Could not create branch" : "Could not switch branch");
+        const ok = await tryAction(() => runPinned((cwd) => create
+            ? cmd.branchCreate(cwd, name)
+            : cmd.branchSwitch(cwd, name)), create ? "Could not create branch" : "Could not switch branch");
         if (ok) {
             await this.loadLocal(true);
             void this.resetGraph(true);
@@ -258,20 +260,20 @@ export class GitPanelApp {
         });
         if (!confirmed)
             return false;
-        return tryAction(() => runPinned((project) => muxy.git.branch.delete({ name, force: true, project })), "Could not delete branch");
+        return tryAction(() => runPinned((cwd) => cmd.branchDelete(cwd, name, true)), "Could not delete branch");
     }
     async createPullRequest(input) {
         try {
-            return await runPinned(async (project) => {
+            return await runPinned(async (cwd) => {
                 if (input.newBranch)
-                    await muxy.git.branch.create({ name: input.newBranch, project });
-                if (await hasPendingChanges(project)) {
-                    const committed = await commitAll(input.title, project);
+                    await cmd.branchCreate(cwd, input.newBranch);
+                if (await hasPendingChanges(cwd)) {
+                    const committed = await commitAll(input.title, cwd);
                     if (!committed)
                         return false;
                 }
-                await muxy.git.push({ setUpstream: true, project });
-                await createPr(input.title, input.body, input.baseBranch, input.draft ?? false, project);
+                await cmd.push(cwd, { setUpstream: true });
+                await createPr(input.title, input.body, input.baseBranch, input.draft ?? false, cwd);
                 await this.loadLocal(true);
                 return true;
             });
@@ -286,11 +288,10 @@ export class GitPanelApp {
     async mergeCurrentPr(number, method, target) {
         this.prPending = method;
         this.render();
-        let cleanupProject;
         try {
-            await runPinned((project) => {
-                cleanupProject = project;
-                return mergePr(number, method, false, project);
+            await runPinned(async (cwd) => {
+                await mergePr(number, method, false, cwd);
+                await removeWorktreeOrBranch({ branch: target.branch, defaultBranch: target.defaultBranch, dirty: false }, cwd);
             });
         }
         catch (err) {
@@ -298,12 +299,6 @@ export class GitPanelApp {
             this.prPending = null;
             this.render();
             return false;
-        }
-        try {
-            await removeWorktreeOrBranch({ branch: target.branch, defaultBranch: target.defaultBranch, dirty: false }, cleanupProject);
-        }
-        catch (err) {
-            await alertError(`PR #${number} merged, but branch cleanup failed`, err);
         }
         finally {
             this.prPending = null;
@@ -315,7 +310,7 @@ export class GitPanelApp {
         this.prPending = "close";
         this.render();
         try {
-            await runPinned((project) => closePr(number, project));
+            await runPinned((cwd) => closePr(number, cwd));
             return true;
         }
         catch (err) {
@@ -331,7 +326,7 @@ export class GitPanelApp {
         this.prPending = "cleanup";
         this.render();
         try {
-            return await cleanupBranch(target);
+            return await runPinned((cwd) => cleanupBranch(target, cwd));
         }
         finally {
             this.prPending = null;
@@ -349,7 +344,8 @@ export class GitPanelApp {
     async loadPrList(fresh = false) {
         const id = ++this.prListLoadId;
         const filter = this.prFilter;
-        const key = await this.prListCacheKey(filter);
+        const cwd = await activeWorktreePath();
+        const key = this.prListCacheKey(cwd, filter);
         const cached = key ? this.prListCache.get(key) : undefined;
         if (this.prListLoadId !== id)
             return;
@@ -363,7 +359,7 @@ export class GitPanelApp {
         this.prListKey = key;
         this.render();
         try {
-            const prs = await muxy.git.pr.list({ filter, limit: PR_LIMIT, fresh });
+            const prs = await cmd.prList(cwd, { filter, limit: PR_LIMIT });
             if (this.prListLoadId !== id)
                 return;
             if (key) {
@@ -390,17 +386,16 @@ export class GitPanelApp {
             this.render();
         }
     }
-    async prListCacheKey(filter) {
-        const project = await activeGitProjectPath();
-        const scope = project ?? (await activeWorktreePath());
-        return scope ? `${scope}\n${filter}` : filter;
+    prListCacheKey(cwd, filter) {
+        return cwd ? `${cwd}\n${filter}` : filter;
     }
     async hydratePrList() {
         if (this.prListRefreshing)
             return;
         const id = this.prListLoadId;
         const filter = this.prFilter;
-        const key = await this.prListCacheKey(filter);
+        const cwd = await activeWorktreePath();
+        const key = this.prListCacheKey(cwd, filter);
         const cached = key ? this.prListCache.get(key) : undefined;
         if (!cached || this.prListLoadId !== id || this.prFilter !== filter || this.prListRefreshing)
             return;
@@ -418,7 +413,7 @@ export class GitPanelApp {
         if (!ok)
             return;
         await this.runRowAction(number, "checkout", async () => {
-            await runPinned((project) => checkoutPr(number, project));
+            await runPinned((cwd) => checkoutPr(number, cwd));
             await muxy.worktrees.refresh().catch(() => undefined);
         }, `Could not checkout PR #${number}`);
     }
@@ -431,7 +426,7 @@ export class GitPanelApp {
         if (!ok)
             return;
         await this.runRowAction(number, "worktree", async () => {
-            await runPinned((project) => checkoutPrWorktree(number, project));
+            await runPinned((cwd) => checkoutPrWorktree(number, cwd));
         }, `Could not create worktree for PR #${number}`);
     }
     async closePrRow(number) {
@@ -443,7 +438,7 @@ export class GitPanelApp {
         if (!ok)
             return;
         await this.runRowAction(number, "close", async () => {
-            await runPinned((project) => closePr(number, project));
+            await runPinned((cwd) => closePr(number, cwd));
             await this.loadPrList(true);
         }, `Could not close PR #${number}`);
     }
@@ -453,15 +448,15 @@ export class GitPanelApp {
         this.graph = { ...this.graph, loading: true };
         this.render();
         try {
-            const batch = await this.fetchGraphPage(skip, false);
+            const cwd = await activeWorktreePath();
+            const batch = await this.fetchGraphPage(cwd, skip);
             if (this.graphLoadId !== id)
                 return;
             const next = [...this.graphCommits, ...batch];
             this.graphCommits = next;
             const hasMore = batch.length === PAGE;
-            const key = await activeWorktreePath();
-            if (key)
-                this.graphCache.set(key, { commits: next, hasMore });
+            if (cwd)
+                this.graphCache.set(cwd, { commits: next, hasMore });
             this.publishGraph(next, hasMore, false);
         }
         catch {
@@ -489,7 +484,7 @@ export class GitPanelApp {
     async resolvePr(cwd, branch) {
         let pr = null;
         try {
-            pr = await muxy.git.pr.info({ fresh: true });
+            pr = await cmd.prInfo(cwd);
         }
         catch {
             return;
@@ -534,7 +529,7 @@ export class GitPanelApp {
         let next;
         let branchChanged = false;
         try {
-            const status = toViewStatus(await muxy.git.status({ local: true }));
+            const status = toViewStatus(await cmd.status(cwd));
             const prev = cwd ? this.statusCache.get(cwd) : undefined;
             if (prev?.kind === "ready" && prev.status.branch === status.branch) {
                 status.pullRequest = prev.status.pullRequest;
@@ -596,14 +591,14 @@ export class GitPanelApp {
         this.graph = { rows: computeLanes(commits), hasMore, loading };
         this.render();
     }
-    async fetchGraphPage(skip, fresh) {
-        const batch = await muxy.git.log({ maxCount: PAGE, skip, fresh });
+    async fetchGraphPage(cwd, skip) {
+        const batch = await cmd.log(cwd, { maxCount: PAGE, skip });
         return batch.map(toCommitNode);
     }
     async resetGraph(fresh) {
         const id = ++this.graphLoadId;
-        const key = await activeWorktreePath();
-        const cached = key ? this.graphCache.get(key) : undefined;
+        const cwd = await activeWorktreePath();
+        const cached = cwd ? this.graphCache.get(cwd) : undefined;
         if (cached)
             this.publishGraph(cached.commits, cached.hasMore, true);
         else {
@@ -611,13 +606,13 @@ export class GitPanelApp {
             this.publishGraph([], false, true);
         }
         try {
-            const batch = await this.fetchGraphPage(0, fresh);
+            const batch = await this.fetchGraphPage(cwd, 0);
             if (this.graphLoadId !== id)
                 return;
             this.graphCommits = batch;
             const hasMore = batch.length === PAGE;
-            if (key)
-                this.graphCache.set(key, { commits: batch, hasMore });
+            if (cwd)
+                this.graphCache.set(cwd, { commits: batch, hasMore });
             this.publishGraph(batch, hasMore, false);
         }
         catch {

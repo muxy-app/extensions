@@ -1,4 +1,5 @@
-import { activeWorktreePath, alertError, openUrl, runPinned } from "@/lib/git";
+import { alertError, openUrl, runPinned } from "@/lib/git";
+import * as cmd from "@/lib/cmd";
 export async function copyHash(commit) {
     try {
         await navigator.clipboard.writeText(commit.hash);
@@ -26,11 +27,10 @@ function githubCommitUrl(remote, hash) {
 }
 export async function openCommitOnGithub(commit) {
     try {
-        const cwd = await activeWorktreePath();
-        const res = await muxy.exec(["git", "remote", "get-url", "origin"], { cwd });
-        if (res.exitCode !== 0)
-            throw new Error(res.stderr.trim() || "No remote found");
-        const url = githubCommitUrl(res.stdout, commit.hash);
+        const remote = await runPinned((cwd) => cmd.remoteUrl(cwd));
+        if (!remote)
+            throw new Error("No remote found");
+        const url = githubCommitUrl(remote, commit.hash);
         if (!url)
             throw new Error("Could not parse remote URL");
         openUrl(url);
@@ -41,7 +41,7 @@ export async function openCommitOnGithub(commit) {
 }
 export async function cherryPickCommit(commit, onDone) {
     try {
-        await runPinned((project) => muxy.git.cherryPick({ hash: commit.hash, project }));
+        await runPinned((cwd) => cmd.cherryPick(cwd, commit.hash));
         await muxy.toast({ body: `Cherry-picked ${commit.shortHash}`, variant: "success" }).catch(() => undefined);
         onDone();
     }
@@ -51,10 +51,7 @@ export async function cherryPickCommit(commit, onDone) {
 }
 export async function revertCommit(commit, prefill, onDone) {
     try {
-        const cwd = await activeWorktreePath();
-        const res = await muxy.exec(["git", "revert", "--no-commit", commit.hash], { cwd });
-        if (res.exitCode !== 0)
-            throw new Error(res.stderr.trim() || "Revert failed");
+        await runPinned((cwd) => cmd.revert(cwd, commit.hash));
         prefill(`Revert: ${commit.subject}`);
         onDone();
     }

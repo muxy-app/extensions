@@ -1,4 +1,5 @@
 import { h, readPref, writePref } from "@/lib/dom";
+import * as cmd from "@/lib/cmd";
 import { DiffFileListView } from "./diff-file-list";
 import "@/styles/global.css";
 import "./diff-viewer.css";
@@ -365,18 +366,18 @@ function diffData() {
     return (window.muxy?.data ?? {});
 }
 async function loadGitDiff() {
-    if (!window.muxy?.git) {
-        clearDiff("Muxy git unavailable");
+    if (!window.muxy?.exec) {
+        clearDiff("Muxy unavailable");
         return;
     }
     const data = diffData();
-    const project = data.cwd;
+    const cwd = data.cwd;
     summaryNode.textContent = "Loading diff...";
     try {
         if (data.source === "pr" && data.prNumber) {
             sourceLabelNode.textContent = `PR #${data.prNumber}`;
             showLoading(`Loading diff for PR #${data.prNumber}...`);
-            const { diff } = await window.muxy.git.pr.diff({ project, number: data.prNumber });
+            const { diff } = await cmd.prDiff(cwd, data.prNumber);
             await renderPatch(diff, data.focusPath ?? "");
             return;
         }
@@ -384,7 +385,7 @@ async function loadGitDiff() {
             const label = data.shortHash || data.hash.slice(0, 7);
             sourceLabelNode.textContent = `Commit ${label}`;
             showLoading(`Loading diff for ${label}...`);
-            const res = await window.muxy.exec(["git", "show", "--format=", "--no-color", data.hash], { cwd: project });
+            const res = await window.muxy.exec(["git", "show", "--format=", "--no-color", data.hash], { cwd });
             if (res.exitCode !== 0) {
                 clearDiff(res.stderr.trim() || "Could not load commit diff.");
                 return;
@@ -395,8 +396,8 @@ async function loadGitDiff() {
         sourceLabelNode.textContent = "Working Tree";
         showLoading("Loading changes...");
         const [staged, unstaged] = await Promise.all([
-            window.muxy.git.diff({ project, raw: true, staged: true, lineLimit: MAX_RENDER_ROWS }),
-            window.muxy.git.diff({ project, raw: true, staged: false, lineLimit: MAX_RENDER_ROWS }),
+            cmd.diff(cwd, { staged: true, lineLimit: MAX_RENDER_ROWS }),
+            cmd.diff(cwd, { staged: false, lineLimit: MAX_RENDER_ROWS }),
         ]);
         await renderPatch([staged.diff, unstaged.diff].filter((diff) => diff.trim()).join("\n"), data.focusPath ?? "");
     }
