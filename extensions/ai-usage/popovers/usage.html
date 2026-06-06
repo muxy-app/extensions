@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <link rel="icon" href="../assets/icon.svg" />
+  <link rel="stylesheet" href="usage.css" />
+  <link rel="stylesheet" href="provider-groups.css" />
+</head>
+<body>
+  <main class="wrap">
+    <header class="header">
+      <div class="title">
+        <span class="spark">✦</span>
+        <span>AI Usage</span>
+      </div>
+      <button id="refresh" class="icon-button" type="button" aria-label="Refresh">↻</button>
+    </header>
+
+    <section class="settings">
+      <label class="field">
+        <span>Display</span>
+        <select id="displayMode">
+          <option value="used">Used</option>
+          <option value="remaining">Remaining</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Refresh</span>
+        <select id="autoRefresh">
+          <option value="300">5 min</option>
+          <option value="900">15 min</option>
+          <option value="1800">30 min</option>
+          <option value="3600">1h</option>
+        </select>
+      </label>
+    </section>
+
+    <section id="status" class="status">No usage data yet.</section>
+    <section id="providers" class="providers"></section>
+  </main>
+  <script type="module" src="usage.js"></script>
+</body>
+</html>

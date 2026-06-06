@@ -1,7 +1,7 @@
 name: Claude Code Review
 
 on:
-  pull_request_target:
+  pull_request:
     types: [opened, synchronize, ready_for_review, reopened]
     # Optional: Only run on specific file changes
     # paths:
@@ -21,15 +21,14 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: write
-      issues: write
+      pull-requests: read
+      issues: read
       id-token: write
 
     steps:
-      - name: Checkout PR code
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 1
 
       - name: Run Claude Code Review
@@ -74,5 +73,4 @@ jobs:
             Use [x] for pass and [ ] for fail. Omit the "New vs Update" row from the
             checkbox list since it's already in the header. Be terse — the whole comment
             should fit in a few lines.
-          plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
-          plugins: 'code-review@claude-code-plugins'
+          claude_args: '--allowed-tools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,Glob,Grep"'
