@@ -250,9 +250,30 @@ export async function commit(cwd, { message, stageAll } = {}) {
     return run(["git", "commit", "-m", message], cwd);
 }
 
-export function push(cwd, { setUpstream } = {}) {
+async function pushPrBranch(cwd) {
+    const branch = (await tryRun(["git", "branch", "--show-current"], cwd)).trim();
+    if (!branch)
+        return false;
+    const prNumber = (await tryRun(["git", "config", "--get", `branch.${branch}.muxy-pr-number`], cwd)).trim();
+    if (!prNumber)
+        return false;
+    const upstream = (await tryRun(["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], cwd)).trim();
+    const separator = upstream.indexOf("/");
+    if (separator <= 0)
+        return false;
+    const remote = upstream.slice(0, separator);
+    const remoteBranch = upstream.slice(separator + 1);
+    if (!remote || !remoteBranch)
+        return false;
+    await run(["git", "push", remote, `HEAD:refs/heads/${remoteBranch}`], cwd);
+    return true;
+}
+
+export async function push(cwd, { setUpstream } = {}) {
     if (setUpstream)
         return run(["git", "push", "-u", "origin", "HEAD"], cwd);
+    if (await pushPrBranch(cwd))
+        return "";
     return run(["git", "push"], cwd);
 }
 

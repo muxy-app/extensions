@@ -19,8 +19,6 @@
     "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
     "description": "Official Git extension for Muxy",
     "permissions": [
-      "git:read",
-      "git:write",
       "commands:exec",
       "panels:write",
       "tabs:write",
