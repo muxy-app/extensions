@@ -1,5 +1,13 @@
 import { bracketMatching, codeFolding, foldGutter, foldKeymap, indentOnInput, indentUnit } from "@codemirror/language";
-import { autocompletion, closeBrackets, closeBracketsKeymap, completeAnyWord, completionKeymap } from "@codemirror/autocomplete";
+import {
+  acceptCompletion,
+  autocompletion,
+  closeBrackets,
+  closeBracketsKeymap,
+  completeAnyWord,
+  completionKeymap,
+  completionStatus,
+} from "@codemirror/autocomplete";
 import { lintGutter, lintKeymap } from "@codemirror/lint";
 import {
   closeSearchPanel,
@@ -15,7 +23,7 @@ import {
   selectMatches,
   setSearchQuery,
 } from "@codemirror/search";
-import { Compartment, EditorState, Prec } from "@codemirror/state";
+import { Compartment, EditorSelection, EditorState, Prec } from "@codemirror/state";
 import {
   drawSelection,
   dropCursor,
@@ -28,7 +36,7 @@ import {
   rectangularSelection,
   runScopeHandlers,
 } from "@codemirror/view";
-import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
+import { defaultKeymap, history, historyKeymap, indentLess, indentMore } from "@codemirror/commands";
 import { cls, h, icon_svg } from "@/lib/dom";
 import { muxy_cm_theme } from "@/lib/editor-theme";
 import { muxy_highlight_style } from "@/lib/syntax-theme";
@@ -367,12 +375,51 @@ export class CodeEditor {
     }
     if (config.linting !== false) keymaps.push(...lintKeymap);
 
+    // Tab behavior. CodeMirror leaves Tab unbound by default so it can move
+    // focus out of the editor (an a11y choice); we opt in:
+    //   - autocomplete popup open  -> accept the highlighted suggestion
+    //   - non-empty selection      -> indent the selected block (indentMore)
+    //   - cursor only              -> insert spaces to the next tab stop
+    // Shift-Tab dedents the line/selection.
+    keymaps.push({
+      key: "Tab",
+      preventDefault: true,
+      run: (view) => {
+        if (config.autocomplete !== false && completionStatus(view.state) === "active") {
+          return acceptCompletion(view);
+        }
+        if (view.state.selection.ranges.some((range) => !range.empty)) {
+          return indentMore(view);
+        }
+        return this.insertIndentAtCursor(view);
+      },
+      shift: indentLess,
+    });
+
     keymaps.push(...defaultKeymap);
     extensions.push(keymap.of(keymaps));
 
     if (config.lineNumbers) extensions.push(lineNumbers());
     if (config.wordWrap) extensions.push(EditorView.lineWrapping);
     return extensions;
+  }
+
+  // Insert spaces at each cursor up to the next tab stop, so Tab aligns to
+  // columns (e.g. at column 2 with tabSize 4 it inserts 2 spaces, not 4) instead
+  // of indenting the whole line the way indentMore would.
+  insertIndentAtCursor(view) {
+    const tabSize = view.state.tabSize;
+    const changes = view.state.changeByRange((range) => {
+      const col = range.head - view.state.doc.lineAt(range.head).from;
+      const count = tabSize - (col % tabSize);
+      const insert = " ".repeat(count);
+      return {
+        changes: { from: range.from, insert },
+        range: EditorSelection.cursor(range.from + count),
+      };
+    });
+    view.dispatch(view.state.update(changes, { scrollIntoView: true, userEvent: "input" }));
+    return true;
   }
 
   async loadLanguage(filePath) {
