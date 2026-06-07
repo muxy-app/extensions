@@ -39,6 +39,21 @@ export class SettingsSheet {
       type: "checkbox",
       onChange: (event) => this.update({ wordWrap: event.target.checked }),
     });
+    this.autocomplete = h("input", {
+      id: "cfg-autocomplete",
+      type: "checkbox",
+      onChange: (event) => this.update({ autocomplete: event.target.checked }),
+    });
+    this.codeFolding = h("input", {
+      id: "cfg-code-folding",
+      type: "checkbox",
+      onChange: (event) => this.update({ codeFolding: event.target.checked }),
+    });
+    this.linting = h("input", {
+      id: "cfg-linting",
+      type: "checkbox",
+      onChange: (event) => this.update({ linting: event.target.checked }),
+    });
 
     this.overlay = h(
       "div",
@@ -69,6 +84,24 @@ export class SettingsSheet {
           { class: "sheet-row" },
           h("label", { class: "sheet-label", for: "cfg-word-wrap" }, "Word wrap"),
           this.wordWrap,
+        ),
+        h(
+          "div",
+          { class: "sheet-row" },
+          h("label", { class: "sheet-label", for: "cfg-autocomplete" }, "Autocomplete"),
+          this.autocomplete,
+        ),
+        h(
+          "div",
+          { class: "sheet-row" },
+          h("label", { class: "sheet-label", for: "cfg-code-folding" }, "Code folding"),
+          this.codeFolding,
+        ),
+        h(
+          "div",
+          { class: "sheet-row" },
+          h("label", { class: "sheet-label", for: "cfg-linting" }, "Linting"),
+          this.linting,
         ),
         h(
           "div",
@@ -110,6 +143,9 @@ export class SettingsSheet {
     this.fontValue.textContent = `${config.fontSize}px`;
     this.lineNumbers.checked = Boolean(config.lineNumbers);
     this.wordWrap.checked = Boolean(config.wordWrap);
+    this.autocomplete.checked = config.autocomplete !== false;
+    this.codeFolding.checked = config.codeFolding !== false;
+    this.linting.checked = config.linting !== false;
 
     for (const [size, button] of this.tabButtons) {
       button.className = cls("segment", config.tabSize === size && "segment-active");

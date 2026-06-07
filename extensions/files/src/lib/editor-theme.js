@@ -159,6 +159,145 @@ export function muxy_cm_theme(is_dark) {
         width: "14px",
         height: "14px",
       },
+
+      // --- Code folding gutter ---
+      ".cm-foldGutter": {
+        color: "color-mix(in srgb, var(--muxy-foreground-muted) 55%, transparent)",
+      },
+      ".cm-foldGutter .cm-gutterElement": {
+        padding: "0 2px",
+      },
+      ".cm-fold-marker": {
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: "14px",
+        height: "14px",
+        cursor: "pointer",
+        borderRadius: "4px",
+        color: "var(--muxy-foreground-muted)",
+        transition: "transform 120ms ease, background-color 120ms ease",
+      },
+      ".cm-fold-marker svg": {
+        width: "12px",
+        height: "12px",
+      },
+      ".cm-fold-marker:hover": {
+        backgroundColor: "var(--muxy-hover)",
+        color: "var(--muxy-foreground)",
+      },
+      ".cm-fold-marker-closed": {
+        transform: "rotate(-90deg)",
+      },
+      ".cm-foldPlaceholder": {
+        backgroundColor: "var(--muxy-surface)",
+        border: "1px solid var(--muxy-border)",
+        borderRadius: "4px",
+        color: "var(--muxy-foreground-muted)",
+        margin: "0 4px",
+        padding: "0 6px",
+      },
+
+      // --- Autocomplete ---
+      // The popup must be fully opaque — --muxy-surface can carry alpha, so
+      // stack it over an opaque --muxy-background fill (and override the base
+      // .cm-tooltip color, which CodeMirror otherwise paints semi-transparent).
+      ".cm-tooltip": {
+        backgroundColor: "var(--muxy-background)",
+      },
+      ".cm-tooltip.cm-tooltip-autocomplete": {
+        background: "var(--muxy-background)",
+        backgroundImage: "linear-gradient(var(--muxy-surface), var(--muxy-surface))",
+        border: "1px solid var(--muxy-border)",
+        borderRadius: "8px",
+        boxShadow: "0 8px 24px color-mix(in srgb, black 24%, transparent)",
+        overflow: "hidden",
+      },
+      ".cm-tooltip.cm-tooltip-autocomplete > ul": {
+        fontFamily: '"SF Mono", Menlo, monospace',
+        maxHeight: "16em",
+        backgroundColor: "transparent",
+      },
+      ".cm-tooltip.cm-tooltip-autocomplete > ul > li": {
+        padding: "3px 8px",
+        color: "var(--muxy-foreground)",
+        lineHeight: "1.4",
+      },
+      ".cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected]": {
+        backgroundColor: "color-mix(in srgb, var(--muxy-accent) 28%, var(--muxy-background))",
+        color: "var(--muxy-foreground)",
+      },
+      ".cm-completionLabel": {
+        color: "var(--muxy-foreground)",
+      },
+      ".cm-completionMatchedText": {
+        textDecoration: "none",
+        fontWeight: "600",
+        color: "var(--muxy-accent)",
+      },
+      ".cm-completionDetail": {
+        color: "var(--muxy-foreground-muted)",
+        fontStyle: "normal",
+        marginLeft: "var(--s4)",
+      },
+      ".cm-tooltip.cm-completionInfo": {
+        background: "var(--muxy-background)",
+        backgroundImage: "linear-gradient(var(--muxy-surface), var(--muxy-surface))",
+        border: "1px solid var(--muxy-border)",
+        borderRadius: "8px",
+        color: "var(--muxy-foreground)",
+        padding: "var(--s4) var(--s5)",
+      },
+
+      // --- Lint / diagnostics ---
+      ".cm-lintRange-error": {
+        backgroundImage: "none",
+        textDecoration: "underline wavy var(--muxy-diff-remove, #e5534b)",
+        textDecorationSkipInk: "none",
+      },
+      ".cm-lintRange-warning": {
+        backgroundImage: "none",
+        textDecoration: "underline wavy color-mix(in srgb, var(--muxy-accent) 70%, var(--muxy-foreground))",
+        textDecorationSkipInk: "none",
+      },
+      ".cm-lint-marker": {
+        width: "12px",
+        height: "12px",
+      },
+      ".cm-lint-marker-error": {
+        color: "var(--muxy-diff-remove, #e5534b)",
+      },
+      ".cm-lint-marker-warning": {
+        color: "color-mix(in srgb, var(--muxy-accent) 80%, var(--muxy-foreground))",
+      },
+      ".cm-tooltip.cm-tooltip-lint": {
+        background: "var(--muxy-background)",
+        backgroundImage: "linear-gradient(var(--muxy-surface), var(--muxy-surface))",
+        border: "1px solid var(--muxy-border)",
+        borderRadius: "8px",
+        boxShadow: "0 8px 24px color-mix(in srgb, black 24%, transparent)",
+      },
+      ".cm-diagnostic": {
+        fontFamily: '-apple-system, "SF Pro", system-ui, sans-serif',
+        fontSize: "var(--font-body)",
+        color: "var(--muxy-foreground)",
+        padding: "var(--s2) var(--s5)",
+        borderLeft: "3px solid transparent",
+      },
+      ".cm-diagnostic-error": {
+        borderLeftColor: "var(--muxy-diff-remove, #e5534b)",
+      },
+      ".cm-diagnostic-warning": {
+        borderLeftColor: "color-mix(in srgb, var(--muxy-accent) 80%, var(--muxy-foreground))",
+      },
+      ".cm-panel.cm-panel-lint": {
+        backgroundColor: "var(--muxy-background)",
+        color: "var(--muxy-foreground)",
+        fontFamily: '-apple-system, "SF Pro", system-ui, sans-serif',
+      },
+      ".cm-panel.cm-panel-lint ul [aria-selected]": {
+        backgroundColor: "var(--muxy-accent-soft)",
+      },
     },
     { dark: is_dark },
   );

@@ -3,6 +3,9 @@ export const DEFAULT_CONFIG = {
   lineNumbers: true,
   wordWrap: false,
   tabSize: 2,
+  autocomplete: true,
+  codeFolding: true,
+  linting: true,
 };
 
 export const FONT_SIZE_MIN = 10;

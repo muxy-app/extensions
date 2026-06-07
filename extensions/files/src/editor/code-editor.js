@@ -1,4 +1,6 @@
-import { bracketMatching, indentUnit } from "@codemirror/language";
+import { bracketMatching, codeFolding, foldGutter, foldKeymap, indentOnInput, indentUnit } from "@codemirror/language";
+import { autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap } from "@codemirror/autocomplete";
+import { lintGutter, lintKeymap } from "@codemirror/lint";
 import {
   closeSearchPanel,
   findNext,
@@ -27,10 +29,11 @@ import {
   runScopeHandlers,
 } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
-import { h, icon_svg } from "@/lib/dom";
+import { cls, h, icon_svg } from "@/lib/dom";
 import { muxy_cm_theme } from "@/lib/editor-theme";
 import { muxy_highlight_style } from "@/lib/syntax-theme";
 import { language_for } from "@/lib/languages";
+import { linter_for } from "@/lib/linters";
 import { gitGutterExtension, setGitBaseline } from "@/editor/git-gutter";
 import { head_baseline } from "@/lib/git-baseline";
 
@@ -55,6 +58,16 @@ function closeIcon() {
     { d: "M6 6l12 12" },
     { d: "M18 6L6 18" },
   ]);
+}
+
+// Chevron used in the fold gutter: points down when the section is open
+// (click to fold), right when folded (click to unfold).
+function foldMarker(open) {
+  const svg = icon_svg([{ d: "M6 9l6 6 6-6" }]);
+  const wrap = h("span", { class: cls("cm-fold-marker", !open && "cm-fold-marker-closed") }, svg);
+  wrap.setAttribute("title", open ? "Fold" : "Unfold");
+  wrap.setAttribute("aria-hidden", "true");
+  return wrap;
 }
 
 class FindPanel {
@@ -234,6 +247,7 @@ export class CodeEditor {
     this.destroyed = false;
     this.languageLoadId = 0;
     this.languageCompartment = new Compartment();
+    this.lintCompartment = new Compartment();
     this.configCompartment = new Compartment();
 
     this.container = h("div", { class: "editor-host" });
@@ -246,6 +260,7 @@ export class CodeEditor {
         extensions: [
           this.configCompartment.of(this.configExtensions(config, isDark)),
           this.languageCompartment.of([]),
+          this.lintCompartment.of([]),
           gitGutterExtension(),
           EditorView.updateListener.of((update) => {
             if (!update.docChanged) return;
@@ -269,6 +284,7 @@ export class CodeEditor {
     };
     window.addEventListener("keydown", this.keyHandler, true);
     this.loadLanguage(filePath);
+    this.loadLinter();
     this.loadGitBaseline(filePath);
     this.gitBaselineDisposer = muxy.events.subscribe("file.changed", () => this.loadGitBaseline(filePath));
   }
@@ -318,8 +334,9 @@ export class CodeEditor {
       rectangularSelection(),
       EditorState.allowMultipleSelections.of(true),
       bracketMatching(),
+      closeBrackets(),
+      indentOnInput(),
       search({ top: true, createPanel: (view) => new FindPanel(view) }),
-      keymap.of([...searchKeymap, ...historyKeymap, ...defaultKeymap]),
       muxy_cm_theme(isDark),
       muxy_highlight_style(),
       EditorView.theme({
@@ -330,6 +347,21 @@ export class CodeEditor {
       indentUnit.of(" ".repeat(config.tabSize)),
       EditorState.tabSize.of(config.tabSize),
     ];
+
+    const keymaps = [...closeBracketsKeymap, ...searchKeymap, ...historyKeymap];
+
+    if (config.autocomplete !== false) {
+      extensions.push(autocompletion({ defaultKeymap: false, icons: false }));
+      keymaps.push(...completionKeymap);
+    }
+    if (config.codeFolding !== false) {
+      extensions.push(codeFolding(), foldGutter({ markerDOM: (open) => foldMarker(open) }));
+      keymaps.push(...foldKeymap);
+    }
+    if (config.linting !== false) keymaps.push(...lintKeymap);
+
+    keymaps.push(...defaultKeymap);
+    extensions.push(keymap.of(keymaps));
 
     if (config.lineNumbers) extensions.push(lineNumbers());
     if (config.wordWrap) extensions.push(EditorView.lineWrapping);
@@ -345,12 +377,28 @@ export class CodeEditor {
     });
   }
 
+  lintExtension() {
+    if (this.config.linting === false) return [];
+    const lint = linter_for(this.filePath);
+    return lint ? [lint, lintGutter()] : [];
+  }
+
+  loadLinter() {
+    if (this.destroyed || !this.view) return;
+    this.view.dispatch({
+      effects: this.lintCompartment.reconfigure(this.lintExtension()),
+    });
+  }
+
   updateConfig(config, isDark) {
     this.config = config;
     this.isDark = isDark;
     if (!this.view) return;
     this.view.dispatch({
-      effects: this.configCompartment.reconfigure(this.configExtensions(config, isDark)),
+      effects: [
+        this.configCompartment.reconfigure(this.configExtensions(config, isDark)),
+        this.lintCompartment.reconfigure(this.lintExtension()),
+      ],
     });
   }
 
