@@ -73,13 +73,15 @@ async function submitCreate(app, status) {
     app.createForm.busy = true;
     app.render();
     try {
-        await app.createPullRequest({
+        const created = await app.createPullRequest({
             title: app.createForm.title.trim(),
             body: app.createForm.body.trim(),
             baseBranch: status.defaultBranch ?? undefined,
             newBranch: app.createForm.newBranch.trim() || undefined,
             draft: app.createForm.draft,
         });
+        if (created)
+            app.resetCreateForm();
     }
     finally {
         app.createForm.busy = false;

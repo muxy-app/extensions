@@ -13,6 +13,17 @@ const FILTER_KEY = "muxy.git.prs.filter";
 const PR_CACHE_KEY = "muxy.git.prs.cache";
 const PAGE = 50;
 const PR_LIMIT = 50;
+function emptyCreateForm() {
+    return {
+        title: "",
+        body: "",
+        newBranch: "",
+        branchEdited: false,
+        draft: false,
+        advanced: false,
+        busy: false,
+    };
+}
 function readPrListCache() {
     try {
         const entries = JSON.parse(localStorage.getItem(PR_CACHE_KEY) || "[]");
@@ -51,15 +62,7 @@ export class GitPanelApp {
     prStarted = false;
     prRowPending = new Map();
     graph = { rows: [], hasMore: false, loading: true };
-    createForm = {
-        title: "",
-        body: "",
-        newBranch: "",
-        branchEdited: false,
-        draft: false,
-        advanced: false,
-        busy: false,
-    };
+    createForm = emptyCreateForm();
     refreshId = 0;
     statusCache = new Map();
     pendingSwitch = false;
@@ -148,6 +151,9 @@ export class GitPanelApp {
     }
     setMessage(message) {
         this.message = message;
+    }
+    resetCreateForm() {
+        this.createForm = emptyCreateForm();
     }
     async initRepo() {
         const cwd = await activeWorktreePath();
@@ -317,7 +323,7 @@ export class GitPanelApp {
             return false;
         }
         try {
-            await removeWorktreeOrBranch({ branch: target.branch, defaultBranch: target.defaultBranch, dirty: false }, cleanupCwd);
+            await removeWorktreeOrBranch({ branch: target.branch, defaultBranch: target.defaultBranch, dirty: true }, cleanupCwd);
         }
         catch (err) {
             await alertError(`PR #${number} merged, but branch cleanup failed`, err);
