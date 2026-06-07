@@ -1,7 +1,7 @@
 import { cls, h } from "@/lib/dom";
 import { confirmAction, openUrl } from "@/lib/git";
 import { openPrDiff } from "@/lib/git";
-import { branchNameFromTitle, prState } from "@/lib/pr";
+import { branchNameFromTitle, parentDir, prState } from "@/lib/pr";
 import { icon } from "@/lib/icons";
 import { button, centered, iconButton, input, smallIconButton, textarea, } from "@/ui/shared";
 import { chooseFolder } from "@/ui/folder-picker";
@@ -37,7 +37,7 @@ function renderWorktreeForm(app) {
         size: "md",
         disabled: form.busy,
         onClick: async () => {
-            const picked = await chooseFolder(parentOf(form.path));
+            const picked = await chooseFolder(parentDir(form.path));
             if (picked) {
                 form.path = `${picked}/pr-${form.number}`;
                 app.render();
@@ -54,9 +54,6 @@ function renderWorktreeForm(app) {
         disabled: form.busy || form.path.trim() === "",
         onClick: () => void app.submitWorktreeForm(),
     })));
-}
-function parentOf(path) {
-    return (path ?? "").replace(/\/+$/, "").replace(/\/[^/]+$/, "");
 }
 function renderCreatePrForm(app, status) {
     let branchInput;
@@ -189,7 +186,7 @@ function renderPrRow(app, pr) {
     const pending = app.prRowPending.get(pr.number) ?? null;
     const busy = pending !== null;
     const open = prState(pr) === "open";
-    return h("li", { class: "group flex items-center gap-2 border-b border-border px-3 py-1.5" }, prStateIcon(pr, 13), h("div", { class: "flex min-w-0 flex-1 flex-col" }, h("div", { class: "flex items-center gap-1.5" }, h("span", { class: "font-mono text-[11px] font-semibold text-muted-foreground" }, `#${pr.number}`), h("span", { class: "truncate text-[12px] font-medium text-foreground" }, pr.title)), h("span", { class: "truncate font-mono text-[10px] text-muted-foreground" }, `${pr.author} · ${pr.headBranch} -> ${pr.baseBranch}`)), h("div", { class: "shrink-0 group-hover:hidden" }, checksBadge(pr.checks)), h("div", { class: "hidden shrink-0 items-center gap-0.5 group-hover:flex" }, iconButton("Checkout this branch", "branchPlus", () => void app.checkoutPrRow(pr.number), "", busy), iconButton("Checkout to worktree", "folderGit", (event) => void app.checkoutPrWorktreeRow(pr.number, event.currentTarget), "", busy), iconButton("View diff", "fileDiff", () => void openPrDiff(pr.number), "", busy), iconButton("Open on GitHub", "external", () => openUrl(pr.url), "", busy), iconButton("Close PR", "xCircle", () => void app.closePrRow(pr.number), "", busy || !open, "danger")));
+    return h("li", { class: "group flex items-center gap-2 border-b border-border px-3 py-1.5" }, prStateIcon(pr, 13), h("div", { class: "flex min-w-0 flex-1 flex-col" }, h("div", { class: "flex items-center gap-1.5" }, h("span", { class: "font-mono text-[11px] font-semibold text-muted-foreground" }, `#${pr.number}`), h("span", { class: "truncate text-[12px] font-medium text-foreground" }, pr.title)), h("span", { class: "truncate font-mono text-[10px] text-muted-foreground" }, `${pr.author} · ${pr.headBranch} -> ${pr.baseBranch}`)), h("div", { class: "shrink-0 group-hover:hidden" }, checksBadge(pr.checks)), h("div", { class: "hidden shrink-0 items-center gap-0.5 group-hover:flex" }, iconButton("Checkout this branch", "branchPlus", () => void app.checkoutPrRow(pr.number), "", busy), iconButton("Checkout to worktree", "folderGit", () => void app.checkoutPrWorktreeRow(pr.number), "", busy), iconButton("View diff", "fileDiff", () => void openPrDiff(pr.number), "", busy), iconButton("Open on GitHub", "external", () => openUrl(pr.url), "", busy), iconButton("Close PR", "xCircle", () => void app.closePrRow(pr.number), "", busy || !open, "danger")));
 }
 function prStateIcon(pr, size) {
     if (pr.isDraft)
