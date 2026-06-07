@@ -338,21 +338,6 @@ export async function worktreesList(cwd) {
     }));
 }
 
-export function worktreeRemove(cwd, path, force) {
-    const argv = ["git", "worktree", "remove"];
-    if (force)
-        argv.push("--force");
-    argv.push(path);
-    return run(argv, cwd);
-}
-
-export function worktreeAdd(cwd, path, branch) {
-    const argv = ["git", "worktree", "add", path];
-    if (branch)
-        argv.push(branch);
-    return run(argv, cwd);
-}
-
 const PR_FIELDS = "number,title,author,headRefName,baseRefName,state,url,isDraft,mergeable,mergeStateStatus,statusCheckRollup";
 
 export function aggregateChecks(statusCheckRollup) {
@@ -541,7 +526,7 @@ async function preparePrBranch(cwd, checkout) {
     const remote = await ensurePrRemote(cwd, checkout);
     const branch = localPrBranchName(checkout);
     const startPoint = `refs/remotes/${remote}/${checkout.headBranch}`;
-    await run(["git", "fetch", remote, `refs/heads/${checkout.headBranch}:${startPoint}`], cwd);
+    await run(["git", "fetch", remote, `+refs/heads/${checkout.headBranch}:${startPoint}`], cwd);
     if (await localBranchExists(cwd, branch))
         await run(["git", "branch", `--set-upstream-to=${remote}/${checkout.headBranch}`, branch], cwd);
     else
@@ -557,11 +542,9 @@ export async function prCheckout(cwd, number) {
     return { branch };
 }
 
-export async function prCheckoutWorktree(cwd, number, path) {
+export async function prepareWorktreeBranch(cwd, number) {
     const checkout = await prCheckoutInfo(cwd, number);
-    const branch = await preparePrBranch(cwd, checkout);
-    await run(["git", "worktree", "add", path, branch], cwd);
-    return { branch };
+    return preparePrBranch(cwd, checkout);
 }
 
 export async function prDiff(cwd, number) {

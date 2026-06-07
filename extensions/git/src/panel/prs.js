@@ -4,6 +4,7 @@ import { openPrDiff } from "@/lib/git";
 import { branchNameFromTitle, prState } from "@/lib/pr";
 import { icon } from "@/lib/icons";
 import { button, centered, iconButton, input, smallIconButton, textarea, } from "@/ui/shared";
+import { chooseFolder } from "@/ui/folder-picker";
 import { updateCreateTitle } from "@/panel/branch";
 const FILTERS = [
     { value: "open", label: "Open" },
@@ -14,7 +15,48 @@ const FILTERS = [
 export function renderPrsTab(app, status) {
     const pr = status.pullRequest;
     const dirty = status.staged.length > 0 || status.unstaged.length > 0;
-    return h("div", { class: "flex min-h-0 flex-1 flex-col" }, h("section", { class: "flex flex-col gap-2 border-b border-border p-2.5" }, pr ? renderCurrentPr(app, pr, status, dirty) : renderCreatePrForm(app, status)), renderPrList(app));
+    const top = app.worktreeForm
+        ? renderWorktreeForm(app)
+        : pr
+            ? renderCurrentPr(app, pr, status, dirty)
+            : renderCreatePrForm(app, status);
+    return h("div", { class: "flex min-h-0 flex-1 flex-col" }, h("section", { class: "flex flex-col gap-2 border-b border-border p-2.5" }, top), renderPrList(app));
+}
+function renderWorktreeForm(app) {
+    const form = app.worktreeForm;
+    const field = input(form.path, "Worktree path", (value) => {
+        form.path = value;
+    }, "font-mono", "worktree-path");
+    field.addEventListener("keydown", (event) => {
+        if (event.key === "Enter")
+            void app.submitWorktreeForm();
+    });
+    return h("div", { class: "flex flex-col gap-2" }, h("div", { class: "flex items-center gap-1.5" }, icon("folderGit", 13, "text-muted-foreground", 2), h("span", { class: "text-[12px] font-semibold text-foreground" }, `Checkout PR #${form.number} to worktree`)), h("div", { class: "flex items-center gap-1" }, field, button("Browse", {
+        iconName: "folderGit",
+        variant: "outline",
+        size: "md",
+        disabled: form.busy,
+        onClick: async () => {
+            const picked = await chooseFolder(parentOf(form.path));
+            if (picked) {
+                form.path = `${picked}/pr-${form.number}`;
+                app.render();
+                app.root.querySelector('[data-focus-key="worktree-path"]')?.focus();
+            }
+        },
+    })), h("div", { class: "flex items-center justify-end gap-1.5" }, button("Cancel", {
+        variant: "ghost",
+        disabled: form.busy,
+        onClick: () => app.cancelWorktreeForm(),
+    }), button("Create worktree", {
+        iconName: "folderGit",
+        loading: form.busy,
+        disabled: form.busy || form.path.trim() === "",
+        onClick: () => void app.submitWorktreeForm(),
+    })));
+}
+function parentOf(path) {
+    return (path ?? "").replace(/\/+$/, "").replace(/\/[^/]+$/, "");
 }
 function renderCreatePrForm(app, status) {
     let branchInput;
@@ -147,7 +189,7 @@ function renderPrRow(app, pr) {
     const pending = app.prRowPending.get(pr.number) ?? null;
     const busy = pending !== null;
     const open = prState(pr) === "open";
-    return h("li", { class: "group flex items-center gap-2 border-b border-border px-3 py-1.5" }, prStateIcon(pr, 13), h("div", { class: "flex min-w-0 flex-1 flex-col" }, h("div", { class: "flex items-center gap-1.5" }, h("span", { class: "font-mono text-[11px] font-semibold text-muted-foreground" }, `#${pr.number}`), h("span", { class: "truncate text-[12px] font-medium text-foreground" }, pr.title)), h("span", { class: "truncate font-mono text-[10px] text-muted-foreground" }, `${pr.author} · ${pr.headBranch} -> ${pr.baseBranch}`)), h("div", { class: "shrink-0 group-hover:hidden" }, checksBadge(pr.checks)), h("div", { class: "hidden shrink-0 items-center gap-0.5 group-hover:flex" }, iconButton("Checkout this branch", "branchPlus", () => void app.checkoutPrRow(pr.number), "", busy), iconButton("Checkout to worktree", "folderGit", () => void app.checkoutPrWorktreeRow(pr.number), "", busy), iconButton("View diff", "fileDiff", () => void openPrDiff(pr.number), "", busy), iconButton("Open on GitHub", "external", () => openUrl(pr.url), "", busy), iconButton("Close PR", "xCircle", () => void app.closePrRow(pr.number), "", busy || !open, "danger")));
+    return h("li", { class: "group flex items-center gap-2 border-b border-border px-3 py-1.5" }, prStateIcon(pr, 13), h("div", { class: "flex min-w-0 flex-1 flex-col" }, h("div", { class: "flex items-center gap-1.5" }, h("span", { class: "font-mono text-[11px] font-semibold text-muted-foreground" }, `#${pr.number}`), h("span", { class: "truncate text-[12px] font-medium text-foreground" }, pr.title)), h("span", { class: "truncate font-mono text-[10px] text-muted-foreground" }, `${pr.author} · ${pr.headBranch} -> ${pr.baseBranch}`)), h("div", { class: "shrink-0 group-hover:hidden" }, checksBadge(pr.checks)), h("div", { class: "hidden shrink-0 items-center gap-0.5 group-hover:flex" }, iconButton("Checkout this branch", "branchPlus", () => void app.checkoutPrRow(pr.number), "", busy), iconButton("Checkout to worktree", "folderGit", (event) => void app.checkoutPrWorktreeRow(pr.number, event.currentTarget), "", busy), iconButton("View diff", "fileDiff", () => void openPrDiff(pr.number), "", busy), iconButton("Open on GitHub", "external", () => openUrl(pr.url), "", busy), iconButton("Close PR", "xCircle", () => void app.closePrRow(pr.number), "", busy || !open, "danger")));
 }
 function prStateIcon(pr, size) {
     if (pr.isDraft)

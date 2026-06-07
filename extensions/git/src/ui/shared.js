@@ -45,6 +45,7 @@ export function smallIconButton(title, iconName, onClick, extra = "", disabled =
 }
 export function button(label, opts) {
     const variant = opts.variant ?? "default";
+    const height = opts.size === "md" ? "h-8" : "h-7";
     const variants = {
         default: "bg-primary text-primary-foreground hover:opacity-95",
         secondary: "bg-secondary text-muted-foreground hover:bg-accent hover:text-foreground",
@@ -54,7 +55,7 @@ export function button(label, opts) {
     return h("button", {
         type: "button",
         disabled: opts.disabled,
-        class: cls("flex h-7 items-center justify-center gap-1.5 rounded-md px-2.5 text-[11px] font-medium outline-none transition-colors disabled:pointer-events-none disabled:opacity-50", variants[variant], opts.className),
+        class: cls(`flex ${height} items-center justify-center gap-1.5 rounded-md px-2.5 text-[11px] font-medium outline-none transition-colors disabled:pointer-events-none disabled:opacity-50`, variants[variant], opts.className),
         onclick: (event) => opts.onClick(event),
     }, opts.loading
         ? icon("loader", 11, "animate-spin", 2.4)

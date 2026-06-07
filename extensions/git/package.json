@@ -24,7 +24,8 @@
       "tabs:write",
       "worktrees:read",
       "worktrees:write",
-      "notifications:write"
+      "notifications:write",
+      "git:write"
     ],
     "events": [
       "project.switched",

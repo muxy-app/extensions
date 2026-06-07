@@ -59,8 +59,8 @@ async function removeWorktree(branch, dirty, cwd) {
     const replacement = replacementWorktree(worktrees, cwd);
     if (!replacement)
         throw new Error("No other worktree to remove from.");
-    await muxy.worktrees.switchTo(replacement.path).catch(() => undefined);
-    await cmd.worktreeRemove(replacement.path, cwd, dirty);
+    await muxy.git.worktree.switchTo({ identifier: replacement.path }).catch(() => undefined);
+    await muxy.git.worktree.remove({ path: cwd, force: dirty });
     if (branch)
         await cmd.branchDeleteRemote(replacement.path, branch).catch(() => undefined);
     await pullQuietly(replacement.path);
@@ -102,33 +102,18 @@ export async function cleanupBranch(target, cwd) {
 export function checkoutPr(number, cwd) {
     return cmd.prCheckout(cwd, number);
 }
-export function suggestWorktreePath(number, cwd) {
-    const base = cwd ?? "";
-    const parent = base ? base.replace(/\/+$/, "").replace(/\/[^/]+$/, "") : "";
-    const name = `pr-${number}`;
-    return parent ? `${parent}/${name}` : name;
+export function parentDir(path) {
+    return (path ?? "").replace(/\/+$/, "").replace(/\/[^/]+$/, "");
 }
-export async function checkoutPrWorktree(number, cwd) {
-    const suggested = suggestWorktreePath(number, cwd);
-    const path = await promptPath(number, suggested);
-    if (!path)
-        return null;
-    const { branch } = await cmd.prCheckoutWorktree(cwd, number, path);
+export function worktreePathIn(dir, number) {
+    const name = `pr-${number}`;
+    return dir ? `${dir.replace(/\/+$/, "")}/${name}` : name;
+}
+export async function checkoutPrWorktree(number, path, cwd) {
+    const branch = await cmd.prepareWorktreeBranch(cwd, number);
+    await muxy.git.worktree.add({ path, branch, createBranch: false });
     await muxy.worktrees.refresh().catch(() => undefined);
     return branch;
-}
-async function promptPath(number, suggested) {
-    const res = await muxy
-        .exec([
-        "osascript",
-        "-e",
-        `set r to text returned of (display dialog "Worktree path for PR #${number}" default answer "${suggested}" with title "Checkout to Worktree")`,
-    ])
-        .catch(() => null);
-    if (!res || res.exitCode !== 0)
-        return null;
-    const path = res.stdout.trim();
-    return path || null;
 }
 export async function confirmOpenExistingPr(err, refresh) {
     const url = existingPrUrl(err);
