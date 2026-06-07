@@ -1,13 +1,11 @@
 import { LanguageDescription } from "@codemirror/language";
 import { languages } from "@codemirror/language-data";
-import { basename } from "@/lib/files";
+import { basename, extname } from "@/lib/files";
 
 const MARKDOWN_EXT = new Set([".md", ".markdown", ".mdx"]);
 
 export function is_markdown(path) {
-  const name = basename(path).toLowerCase();
-  const dot = name.lastIndexOf(".");
-  return dot !== -1 && MARKDOWN_EXT.has(name.slice(dot));
+  return MARKDOWN_EXT.has(extname(path));
 }
 
 // Rich language packages. Unlike the highlight-only grammars from
@@ -38,51 +36,46 @@ const RICH_LANGUAGES = {
   yaml: () => import("@codemirror/lang-yaml").then((m) => m.yaml()),
 };
 
+// Keyed by extname() output (leading dot, lowercased).
 const RICH_BY_EXT = {
-  js: "javascript",
-  cjs: "javascript",
-  mjs: "javascript",
-  jsx: "jsx",
-  ts: "typescript",
-  cts: "typescript",
-  mts: "typescript",
-  tsx: "tsx",
-  css: "css",
-  html: "html",
-  htm: "html",
-  json: "json",
-  jsonc: "json",
-  json5: "json",
-  webmanifest: "json",
-  py: "python",
-  pyw: "python",
-  pyi: "python",
-  md: "markdown",
-  markdown: "markdown",
-  mdx: "markdown",
-  sql: "sql",
-  rs: "rust",
-  php: "php",
-  xml: "xml",
-  svg: "xml",
-  vue: "vue",
-  java: "java",
-  c: "cpp",
-  h: "cpp",
-  cc: "cpp",
-  cpp: "cpp",
-  cxx: "cpp",
-  hpp: "cpp",
-  go: "go",
-  yaml: "yaml",
-  yml: "yaml",
+  ".js": "javascript",
+  ".cjs": "javascript",
+  ".mjs": "javascript",
+  ".jsx": "jsx",
+  ".ts": "typescript",
+  ".cts": "typescript",
+  ".mts": "typescript",
+  ".tsx": "tsx",
+  ".css": "css",
+  ".html": "html",
+  ".htm": "html",
+  ".json": "json",
+  ".jsonc": "json",
+  ".json5": "json",
+  ".webmanifest": "json",
+  ".py": "python",
+  ".pyw": "python",
+  ".pyi": "python",
+  ".md": "markdown",
+  ".markdown": "markdown",
+  ".mdx": "markdown",
+  ".sql": "sql",
+  ".rs": "rust",
+  ".php": "php",
+  ".xml": "xml",
+  ".svg": "xml",
+  ".vue": "vue",
+  ".java": "java",
+  ".c": "cpp",
+  ".h": "cpp",
+  ".cc": "cpp",
+  ".cpp": "cpp",
+  ".cxx": "cpp",
+  ".hpp": "cpp",
+  ".go": "go",
+  ".yaml": "yaml",
+  ".yml": "yaml",
 };
-
-function ext_of(path) {
-  const name = basename(path).toLowerCase();
-  const dot = name.lastIndexOf(".");
-  return dot === -1 ? "" : name.slice(dot + 1);
-}
 
 async function fallback_for_filename(name) {
   const desc = LanguageDescription.matchFilename(languages, name);
@@ -90,14 +83,17 @@ async function fallback_for_filename(name) {
 }
 
 export async function language_for(path) {
-  const rich = RICH_LANGUAGES[RICH_BY_EXT[ext_of(path)]];
+  const rich = RICH_LANGUAGES[RICH_BY_EXT[extname(path)]];
   if (rich) return rich();
   return fallback_for_filename(basename(path));
 }
 
 export async function language_for_name(name) {
   const key = name.toLowerCase();
-  const rich = RICH_LANGUAGES[key] ?? RICH_LANGUAGES[RICH_BY_EXT[key]];
+  // `name` is a fence token like "javascript" (language name) or "js" (bare
+  // extension). Try the rich registry by name, then by extension (dot-prefixed
+  // to match RICH_BY_EXT), before falling back to language-data.
+  const rich = RICH_LANGUAGES[key] ?? RICH_LANGUAGES[RICH_BY_EXT[`.${key}`]];
   if (rich) return rich();
   const desc =
     LanguageDescription.matchLanguageName(languages, name, true) ??

@@ -1,7 +1,7 @@
 import { linter } from "@codemirror/lint";
 import { parse as parseJsonc } from "jsonc-parser";
 import { parseDocument } from "yaml";
-import { basename } from "@/lib/files";
+import { extname } from "@/lib/files";
 
 // Strict JSON (.json, manifests) flags comments and trailing commas; JSONC/JSON5
 // permit them. jsonc-parser reports precise offsets either way — unlike V8's
@@ -29,12 +29,6 @@ const JSONC_ERROR_MESSAGE = {
   15: "Invalid escape character",
   16: "Invalid character",
 };
-
-function ext_of(path) {
-  const name = basename(path).toLowerCase();
-  const dot = name.lastIndexOf(".");
-  return dot === -1 ? "" : name.slice(dot);
-}
 
 // Clamp an offset into the document so a stale/odd position from a parser can
 // never throw when CodeMirror builds the diagnostic range.
@@ -96,7 +90,7 @@ const yamlLinter = linter((view) => {
 });
 
 export function linter_for(path) {
-  const ext = ext_of(path);
+  const ext = extname(path);
   if (STRICT_JSON_EXT.has(ext)) return strictJsonLinter;
   if (LOOSE_JSON_EXT.has(ext)) return looseJsonLinter;
   if (YAML_EXT.has(ext)) return yamlLinter;
