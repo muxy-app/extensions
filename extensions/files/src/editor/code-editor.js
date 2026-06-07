@@ -1,5 +1,5 @@
 import { bracketMatching, codeFolding, foldGutter, foldKeymap, indentOnInput, indentUnit } from "@codemirror/language";
-import { autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap } from "@codemirror/autocomplete";
+import { autocompletion, closeBrackets, closeBracketsKeymap, completeAnyWord, completionKeymap } from "@codemirror/autocomplete";
 import { lintGutter, lintKeymap } from "@codemirror/lint";
 import {
   closeSearchPanel,
@@ -351,7 +351,14 @@ export class CodeEditor {
     const keymaps = [...closeBracketsKeymap, ...searchKeymap, ...historyKeymap];
 
     if (config.autocomplete !== false) {
-      extensions.push(autocompletion({ defaultKeymap: false, icons: false }));
+      extensions.push(
+        autocompletion({ defaultKeymap: false, icons: false, activateOnTyping: true }),
+        // Document-word completion as a baseline for every language (and for
+        // plain text / grammars with no completion source of their own). The
+        // active language's source — keywords, scope identifiers, CSS props,
+        // etc. — is merged on top and ranks above these via its own boost.
+        EditorState.languageData.of(() => [{ autocomplete: completeAnyWord }]),
+      );
       keymaps.push(...completionKeymap);
     }
     if (config.codeFolding !== false) {
