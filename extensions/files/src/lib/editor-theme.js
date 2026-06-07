@@ -160,27 +160,69 @@ export function muxy_cm_theme(is_dark) {
         height: "14px",
       },
 
+      // --- Go to line dialog (built-in gotoLine command) ---
+      ".cm-panel.cm-dialog": {
+        display: "flex",
+        alignItems: "center",
+        gap: "var(--s2)",
+        padding: "var(--s2) var(--s5)",
+        backgroundColor: "var(--muxy-background)",
+        color: "var(--muxy-foreground)",
+        fontFamily: '-apple-system, "SF Pro", system-ui, sans-serif',
+      },
+      ".cm-dialog label": {
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "var(--s2)",
+        fontSize: "var(--font-body)",
+        color: "var(--muxy-foreground-muted)",
+        whiteSpace: "nowrap",
+      },
+      ".cm-dialog input[name=line]": {
+        width: "120px",
+      },
+      ".cm-dialog-close": {
+        position: "static",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: "var(--control)",
+        height: "var(--control)",
+        marginLeft: "auto",
+        padding: "0",
+        border: "0",
+        borderRadius: "var(--radius)",
+        background: "transparent",
+        color: "var(--muxy-foreground-muted)",
+        fontSize: "var(--icon)",
+        cursor: "pointer",
+      },
+      ".cm-dialog-close:hover": {
+        backgroundColor: "var(--muxy-hover)",
+        color: "var(--muxy-foreground)",
+      },
+
       // --- Code folding gutter ---
       ".cm-foldGutter": {
         color: "color-mix(in srgb, var(--muxy-foreground-muted) 55%, transparent)",
       },
       ".cm-foldGutter .cm-gutterElement": {
-        padding: "0 2px",
+        padding: "0 var(--s1)",
       },
       ".cm-fold-marker": {
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
-        width: "14px",
-        height: "14px",
+        width: "var(--icon)",
+        height: "var(--icon)",
         cursor: "pointer",
-        borderRadius: "4px",
+        borderRadius: "var(--s2)",
         color: "var(--muxy-foreground-muted)",
         transition: "transform 120ms ease, background-color 120ms ease",
       },
       ".cm-fold-marker svg": {
-        width: "12px",
-        height: "12px",
+        width: "var(--icon-sm)",
+        height: "var(--icon-sm)",
       },
       ".cm-fold-marker:hover": {
         backgroundColor: "var(--muxy-hover)",
@@ -192,10 +234,10 @@ export function muxy_cm_theme(is_dark) {
       ".cm-foldPlaceholder": {
         backgroundColor: "var(--muxy-surface)",
         border: "1px solid var(--muxy-border)",
-        borderRadius: "4px",
+        borderRadius: "var(--s2)",
         color: "var(--muxy-foreground-muted)",
-        margin: "0 4px",
-        padding: "0 6px",
+        margin: "0 var(--s2)",
+        padding: "0 var(--s3)",
       },
 
       // --- Autocomplete ---
@@ -209,8 +251,8 @@ export function muxy_cm_theme(is_dark) {
         background: "var(--muxy-background)",
         backgroundImage: "linear-gradient(var(--muxy-surface), var(--muxy-surface))",
         border: "1px solid var(--muxy-border)",
-        borderRadius: "8px",
-        boxShadow: "0 8px 24px color-mix(in srgb, black 24%, transparent)",
+        borderRadius: "var(--radius-card)",
+        boxShadow: "0 var(--s4) var(--s9) color-mix(in srgb, black 24%, transparent)",
         overflow: "hidden",
       },
       ".cm-tooltip.cm-tooltip-autocomplete > ul": {
@@ -219,7 +261,7 @@ export function muxy_cm_theme(is_dark) {
         backgroundColor: "transparent",
       },
       ".cm-tooltip.cm-tooltip-autocomplete > ul > li": {
-        padding: "3px 8px",
+        padding: "var(--s1) var(--s4)",
         color: "var(--muxy-foreground)",
         lineHeight: "1.4",
       },
@@ -244,7 +286,7 @@ export function muxy_cm_theme(is_dark) {
         background: "var(--muxy-background)",
         backgroundImage: "linear-gradient(var(--muxy-surface), var(--muxy-surface))",
         border: "1px solid var(--muxy-border)",
-        borderRadius: "8px",
+        borderRadius: "var(--radius-card)",
         color: "var(--muxy-foreground)",
         padding: "var(--s4) var(--s5)",
       },
@@ -252,7 +294,7 @@ export function muxy_cm_theme(is_dark) {
       // --- Lint / diagnostics ---
       ".cm-lintRange-error": {
         backgroundImage: "none",
-        textDecoration: "underline wavy var(--muxy-diff-remove, #e5534b)",
+        textDecoration: "underline wavy var(--muxy-diff-remove)",
         textDecorationSkipInk: "none",
       },
       ".cm-lintRange-warning": {
@@ -261,11 +303,11 @@ export function muxy_cm_theme(is_dark) {
         textDecorationSkipInk: "none",
       },
       ".cm-lint-marker": {
-        width: "12px",
-        height: "12px",
+        width: "var(--icon-sm)",
+        height: "var(--icon-sm)",
       },
       ".cm-lint-marker-error": {
-        color: "var(--muxy-diff-remove, #e5534b)",
+        color: "var(--muxy-diff-remove)",
       },
       ".cm-lint-marker-warning": {
         color: "color-mix(in srgb, var(--muxy-accent) 80%, var(--muxy-foreground))",
@@ -274,8 +316,8 @@ export function muxy_cm_theme(is_dark) {
         background: "var(--muxy-background)",
         backgroundImage: "linear-gradient(var(--muxy-surface), var(--muxy-surface))",
         border: "1px solid var(--muxy-border)",
-        borderRadius: "8px",
-        boxShadow: "0 8px 24px color-mix(in srgb, black 24%, transparent)",
+        borderRadius: "var(--radius-card)",
+        boxShadow: "0 var(--s4) var(--s9) color-mix(in srgb, black 24%, transparent)",
       },
       ".cm-diagnostic": {
         fontFamily: '-apple-system, "SF Pro", system-ui, sans-serif',
@@ -285,7 +327,7 @@ export function muxy_cm_theme(is_dark) {
         borderLeft: "3px solid transparent",
       },
       ".cm-diagnostic-error": {
-        borderLeftColor: "var(--muxy-diff-remove, #e5534b)",
+        borderLeftColor: "var(--muxy-diff-remove)",
       },
       ".cm-diagnostic-warning": {
         borderLeftColor: "color-mix(in srgb, var(--muxy-accent) 80%, var(--muxy-foreground))",
