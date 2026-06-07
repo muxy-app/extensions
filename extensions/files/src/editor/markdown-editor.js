@@ -47,6 +47,11 @@ export class MarkdownEditor {
     return this.child?.getValue?.() ?? this.source;
   }
 
+  focus() {
+    if (this.mode !== "edit") return;
+    this.child?.focus?.();
+  }
+
   openSearch() {
     this.child?.openSearch?.();
   }

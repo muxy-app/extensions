@@ -347,6 +347,10 @@ export class CodeEditor {
     return this.value;
   }
 
+  focus() {
+    this.view?.focus();
+  }
+
   openSearch() {
     this.openSearchPanel(false);
   }

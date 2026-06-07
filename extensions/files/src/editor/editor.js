@@ -48,6 +48,8 @@ export class EditorApp {
     this.bodyKey = null;
     this.child = null;
     this.settingsSheet = null;
+    this.tabFocused = document.hasFocus();
+    this.pendingFocusRaf = 0;
   }
 
   start() {
@@ -134,19 +136,28 @@ export class EditorApp {
     window.addEventListener("keydown", this.keyHandler, true);
     this.disposers.push(() => window.removeEventListener("keydown", this.keyHandler, true));
 
+    const onWindowFocus = () => {
+      this.tabFocused = true;
+      if (!is_text_entry(document.activeElement)) this.focusEditor();
+    };
+    const onWindowBlur = () => {
+      this.tabFocused = false;
+    };
+    window.addEventListener("focus", onWindowFocus);
+    window.addEventListener("blur", onWindowBlur);
+    this.disposers.push(() => {
+      window.removeEventListener("focus", onWindowFocus);
+      window.removeEventListener("blur", onWindowBlur);
+    });
+
     this.heartbeat = window.setInterval(() => this.publishEditorState(), 2000);
     const clearState = () => clear_editor_state(this.editorStateId);
-    const guardUnsavedClose = (event) => {
-      if (!this.dirty) return;
-      event.preventDefault();
-      event.returnValue = "";
-    };
     window.addEventListener("pagehide", clearState);
-    window.addEventListener("beforeunload", guardUnsavedClose);
+    const offBeforeClose = muxy.lifecycle?.onBeforeClose?.(() => this.confirmClose());
     this.disposers.push(() => {
       window.clearInterval(this.heartbeat);
       window.removeEventListener("pagehide", clearState);
-      window.removeEventListener("beforeunload", guardUnsavedClose);
+      offBeforeClose?.();
       clearState();
     });
 
@@ -154,6 +165,7 @@ export class EditorApp {
   }
 
   dispose() {
+    if (this.pendingFocusRaf) cancelAnimationFrame(this.pendingFocusRaf);
     this.destroyChild();
     this.destroySettings();
     for (const dispose of this.disposers) dispose?.();
@@ -245,7 +257,7 @@ export class EditorApp {
   }
 
   async save() {
-    if (!this.filePath || !this.child || this.saving) return;
+    if (!this.filePath || !this.child || this.saving) return false;
     const next = this.child.getValue();
     this.saving = true;
     this.updateTopbar();
@@ -256,6 +268,26 @@ export class EditorApp {
       this.setDirty(false);
     }
     this.updateTopbar();
+    return ok;
+  }
+
+  async confirmClose() {
+    if (!this.dirty) return false;
+    const name = this.filePath ? basename(this.filePath) : "This file";
+    const choice = await muxy.dialog.confirm({
+      title: "Unsaved changes",
+      message: `${name} has unsaved changes. Save before closing?`,
+      buttons: ["Save", "Don't Save", "Cancel"],
+      default: "Save",
+      cancel: "Cancel",
+      style: "warning",
+    });
+    if (choice === null || choice === "Cancel") return true;
+    if (choice === "Save") {
+      const ok = await this.save();
+      return !ok;
+    }
+    return false;
   }
 
   setMarkdownMode(mode) {
@@ -432,6 +464,7 @@ export class EditorApp {
         onDirty: () => this.markDirty(),
         onSave: () => this.save(),
       });
+      this.focusEditor();
       return;
     }
 
@@ -443,6 +476,16 @@ export class EditorApp {
       config: this.config,
       onDirty: () => this.markDirty(),
       onSave: () => this.save(),
+    });
+    this.focusEditor();
+  }
+
+  focusEditor() {
+    if (!this.tabFocused) return;
+    if (this.pendingFocusRaf) cancelAnimationFrame(this.pendingFocusRaf);
+    this.pendingFocusRaf = requestAnimationFrame(() => {
+      this.pendingFocusRaf = 0;
+      this.child?.focus?.();
     });
   }
 
