@@ -18,8 +18,33 @@ import {
   rename_fs,
 } from "@/lib/file-ops";
 import { cls, h, icon_svg } from "@/lib/dom";
+import { GitStatusStore } from "@/lib/git-status";
 
 const RECONCILE_DEBOUNCE_MS = 250;
+
+const GIT_STATUS_CLASS = {
+  M: "file-tree-git-modified",
+  R: "file-tree-git-modified",
+  A: "file-tree-git-added",
+  "?": "file-tree-git-added",
+  D: "file-tree-git-deleted",
+};
+
+const GIT_STATUS_LABEL = {
+  M: "Modified",
+  R: "Renamed",
+  A: "Added",
+  "?": "Untracked",
+  D: "Deleted",
+};
+
+const GIT_STATUS_GLYPH = {
+  M: "M",
+  R: "R",
+  A: "A",
+  "?": "U",
+  D: "D",
+};
 
 function is_dir(path) {
   return path === "" || path.endsWith("/");
@@ -127,6 +152,7 @@ export class FilesPanelApp {
     this.contextMenu = null;
     this.contextDisposers = [];
     this.disposers = [];
+    this.gitStatus = new GitStatusStore();
 
     this.ops = {
       createFile: (parentRel = "") => this.createFile(parentRel),
@@ -163,16 +189,22 @@ export class FilesPanelApp {
 
     document.addEventListener("contextmenu", this.preventNativeContextMenu);
     this.disposers.push(
+      this.gitStatus.subscribe(() => this.render()),
       muxy.events.subscribe("worktree.switched", () => void this.loadRoot()),
       muxy.events.subscribe("project.switched", () => void this.loadRoot()),
-      muxy.events.subscribe("file.changed", (payload) => this.scheduleReconcile(payload)),
+      muxy.events.subscribe("file.changed", (payload) => {
+        this.scheduleReconcile(payload);
+        this.gitStatus.scheduleRefresh(RECONCILE_DEBOUNCE_MS);
+      }),
       muxy.events.subscribe("command.files-new-file", () => void this.createFile("")),
       muxy.events.subscribe("command.files-new-folder", () => void this.createFolder("")),
       muxy.events.subscribe("command.files-refresh", () => void this.loadRoot()),
+      () => this.gitStatus.dispose(),
       () => document.removeEventListener("contextmenu", this.preventNativeContextMenu),
     );
 
     void this.loadRoot();
+    void this.gitStatus.refresh();
   }
 
   preventNativeContextMenu = (event) => {
@@ -239,6 +271,7 @@ export class FilesPanelApp {
       this.children.set("", []);
     }
     this.render();
+    void this.gitStatus.refresh();
   }
 
   async loadChildren(dirRel) {
@@ -283,6 +316,7 @@ export class FilesPanelApp {
     const directory = entry.kind === "directory";
     const expanded = this.expandedDirs.has(path);
     const renaming = this.renameState?.path === path;
+    const gitStatus = this.gitStatus.statusFor(path, directory);
     const row = h(
       "div",
       {
@@ -290,6 +324,8 @@ export class FilesPanelApp {
           "file-tree-row",
           this.selectedPath === path && "file-tree-row-selected",
           entry.isIgnored && "file-tree-row-ignored",
+          gitStatus && GIT_STATUS_CLASS[gitStatus],
+          gitStatus && directory && "file-tree-row-git-folder",
           this.dropTarget === path && "file-tree-row-drop",
         ),
         role: "treeitem",
@@ -339,6 +375,9 @@ export class FilesPanelApp {
         : h("span", { class: "file-tree-disclosure file-tree-disclosure-placeholder" }),
       h("span", { class: "file-tree-kind-icon" }, file_icon(entry.kind)),
       renaming ? this.renderRenameInput(path, directory) : h("span", { class: "file-tree-name", title: path }, basename(path)),
+      !renaming && !directory && gitStatus
+        ? h("span", { class: "file-tree-git-mark", title: GIT_STATUS_LABEL[gitStatus] }, GIT_STATUS_GLYPH[gitStatus])
+        : null,
     );
     this.list.appendChild(row);
 

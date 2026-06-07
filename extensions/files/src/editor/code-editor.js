@@ -31,6 +31,8 @@ import { h, icon_svg } from "@/lib/dom";
 import { muxy_cm_theme } from "@/lib/editor-theme";
 import { muxy_highlight_style } from "@/lib/syntax-theme";
 import { language_for } from "@/lib/languages";
+import { gitGutterExtension, setGitBaseline } from "@/editor/git-gutter";
+import { head_baseline } from "@/lib/git-baseline";
 
 const replacePanelMode = new WeakMap();
 
@@ -244,6 +246,7 @@ export class CodeEditor {
         extensions: [
           this.configCompartment.of(this.configExtensions(config, isDark)),
           this.languageCompartment.of([]),
+          gitGutterExtension(),
           EditorView.updateListener.of((update) => {
             if (!update.docChanged) return;
             this.value = update.state.doc.toString();
@@ -266,6 +269,14 @@ export class CodeEditor {
     };
     window.addEventListener("keydown", this.keyHandler, true);
     this.loadLanguage(filePath);
+    this.loadGitBaseline(filePath);
+    this.gitBaselineDisposer = muxy.events.subscribe("file.changed", () => this.loadGitBaseline(filePath));
+  }
+
+  async loadGitBaseline(filePath) {
+    const baseline = await head_baseline(filePath);
+    if (this.destroyed || !this.view) return;
+    this.view.dispatch({ effects: setGitBaseline.of(baseline) });
   }
 
   configExtensions(config, isDark) {
@@ -377,6 +388,8 @@ export class CodeEditor {
 
   destroy() {
     this.destroyed = true;
+    this.gitBaselineDisposer?.();
+    this.gitBaselineDisposer = null;
     window.removeEventListener("keydown", this.keyHandler, true);
     this.view?.destroy();
     this.view = null;

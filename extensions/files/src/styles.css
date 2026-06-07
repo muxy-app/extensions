@@ -170,6 +170,37 @@ textarea {
   color: var(--muxy-foreground-muted);
 }
 
+.file-tree-git-modified {
+  --file-tree-git-color: var(--muxy-accent);
+}
+
+.file-tree-git-added {
+  --file-tree-git-color: var(--muxy-diff-add);
+}
+
+.file-tree-git-deleted {
+  --file-tree-git-color: var(--muxy-diff-remove);
+}
+
+.file-tree-git-modified .file-tree-name,
+.file-tree-git-added .file-tree-name,
+.file-tree-git-deleted .file-tree-name {
+  color: var(--file-tree-git-color);
+}
+
+.file-tree-row-git-folder .file-tree-name {
+  color: var(--file-tree-git-color);
+}
+
+.file-tree-git-mark {
+  flex: 0 0 auto;
+  width: var(--s6);
+  margin-left: var(--s1);
+  color: var(--file-tree-git-color);
+  font: 600 var(--font-footnote) "SF Mono", Menlo, monospace;
+  text-align: center;
+}
+
 .file-tree-indent {
   flex: 0 0 auto;
   height: 1px;
