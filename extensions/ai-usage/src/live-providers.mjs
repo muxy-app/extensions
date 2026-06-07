@@ -75,13 +75,36 @@ async function fetchCopilotUsage(context) {
 }
 
 async function fetchKimiUsage(context) {
-  const token = await readJSONPath(context, `${context.home}/.kimi/credentials/kimi-code.json`, ["access_token"]);
+  const credentials = await readKimiCredentials(context);
+  const token = credentials?.accessToken;
+
+  // Skip API call and show "Token expired" if the token is stale.
+  // We intentionally do NOT refresh here: doing so would rotate the
+  // refresh_token on the server and invalidate the CLI's copy.
+  if (token && credentials?.expiresAt && Date.now() > credentials.expiresAt * 1000) {
+    return unavailable(providerByID.get("kimi"), "Token expired, run `kimi login`");
+  }
+
   return fetchProviderRows(context, providerByID.get("kimi"), token, {
     unauthenticated: "Sign in to Kimi",
     url: "https://api.kimi.com/coding/v1/usages",
     headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
     parse: (payload) => parseKimiRows(payload).rows,
   });
+}
+
+async function readKimiCredentials(context) {
+  for (const path of [`${context.home}/.kimi-code/credentials/kimi-code.json`, `${context.home}/.kimi/credentials/kimi-code.json`]) {
+    const payload = parseJSON(await context.readText(path));
+    const accessToken = jsonPath(payload, ["access_token"]);
+    if (accessToken) {
+      return {
+        accessToken,
+        expiresAt: Number(jsonPath(payload, ["expires_at"])) || null,
+      };
+    }
+  }
+  return null;
 }
 
 async function fetchFactoryUsage(context) {
