@@ -271,6 +271,38 @@ textarea {
   text-align: center;
 }
 
+.file-tree-filter-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s4);
+  padding: var(--s2) var(--s5);
+  border-bottom: 1px solid var(--muxy-border);
+  background: var(--muxy-surface);
+}
+
+.file-tree-filter-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s3);
+  color: var(--muxy-foreground-muted);
+  font-size: var(--font-footnote);
+}
+
+.file-tree-filter-clear {
+  padding: var(--s1) var(--s3);
+  border: 0;
+  border-radius: var(--s2);
+  background: transparent;
+  color: var(--muxy-accent);
+  font-size: var(--font-footnote);
+  cursor: pointer;
+}
+
+.file-tree-filter-clear:hover {
+  background: var(--muxy-hover);
+}
+
 .ctx-menu {
   display: flex;
   flex-direction: column;

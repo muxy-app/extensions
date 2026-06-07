@@ -153,6 +153,7 @@ export class FilesPanelApp {
     this.contextDisposers = [];
     this.disposers = [];
     this.gitStatus = new GitStatusStore();
+    this.dirtyFilter = false;
 
     this.ops = {
       createFile: (parentRel = "") => this.createFile(parentRel),
@@ -169,7 +170,8 @@ export class FilesPanelApp {
   }
 
   start() {
-    const panel = h("div", { class: "files-panel" }, h("div", { class: "file-tree-wrap" }));
+    this.filterBar = h("div", { class: "file-tree-filter-bar", hidden: true });
+    const panel = h("div", { class: "files-panel" }, this.filterBar, h("div", { class: "file-tree-wrap" }));
     this.root.replaceChildren(panel);
     this.wrap = panel.querySelector(".file-tree-wrap");
     this.list = h("div", {
@@ -189,7 +191,7 @@ export class FilesPanelApp {
 
     document.addEventListener("contextmenu", this.preventNativeContextMenu);
     this.disposers.push(
-      this.gitStatus.subscribe(() => this.render()),
+      this.gitStatus.subscribe(() => this.onGitStatusChange()),
       muxy.events.subscribe("worktree.switched", () => void this.loadRoot()),
       muxy.events.subscribe("project.switched", () => void this.loadRoot()),
       muxy.events.subscribe("file.changed", (payload) => {
@@ -199,6 +201,7 @@ export class FilesPanelApp {
       muxy.events.subscribe("command.files-new-file", () => void this.createFile("")),
       muxy.events.subscribe("command.files-new-folder", () => void this.createFolder("")),
       muxy.events.subscribe("command.files-refresh", () => void this.loadRoot()),
+      muxy.events.subscribe("command.files-toggle-dirty-filter", () => this.toggleDirtyFilter()),
       () => this.gitStatus.dispose(),
       () => document.removeEventListener("contextmenu", this.preventNativeContextMenu),
     );
@@ -298,12 +301,79 @@ export class FilesPanelApp {
     }
   }
 
+  async toggleDirtyFilter() {
+    this.dirtyFilter = !this.dirtyFilter;
+    if (this.dirtyFilter) {
+      await this.gitStatus.refresh();
+      await this.ensureDirtyLoaded();
+    }
+    this.render();
+  }
+
+  onGitStatusChange() {
+    if (this.dirtyFilter) {
+      void this.ensureDirtyLoaded().then(() => this.render());
+      return;
+    }
+    this.render();
+  }
+
+  async ensureDirtyLoaded() {
+    const dirs = new Set();
+    for (const filePath of this.gitStatus.files.keys()) {
+      let parent = parent_dir(filePath);
+      while (parent !== "") {
+        dirs.add(parent);
+        parent = parent_dir(parent);
+      }
+    }
+    const ordered = Array.from(dirs).sort((a, b) => a.length - b.length);
+    for (const dir of ordered) await this.ensureLoaded(dir);
+  }
+
+  isVisibleInFilter(path, directory) {
+    return Boolean(this.gitStatus.statusFor(path, directory));
+  }
+
+  renderFilterBar() {
+    if (!this.filterBar) return;
+    this.filterBar.hidden = !this.dirtyFilter;
+    if (!this.dirtyFilter) {
+      this.filterBar.replaceChildren();
+      return;
+    }
+    this.filterBar.replaceChildren(
+      h("span", { class: "file-tree-filter-label" }, "Changed files only"),
+      h(
+        "button",
+        {
+          type: "button",
+          class: "file-tree-filter-clear",
+          onClick: () => void this.toggleDirtyFilter(),
+        },
+        "Clear",
+      ),
+    );
+  }
+
   render() {
     if (!this.list) return;
+    this.renderFilterBar();
     this.list.replaceChildren();
     const rootChildren = this.children.get("") ?? [];
     if (rootChildren.length === 0) {
       this.list.appendChild(h("div", { class: "files-status" }, "No files"));
+      return;
+    }
+    if (this.dirtyFilter) {
+      const visible = rootChildren.filter((path) => this.isVisibleInFilter(path, is_dir(path)));
+      if (visible.length === 0) {
+        const message = this.gitStatus.available ? "No changed files" : "No git changes";
+        this.list.appendChild(h("div", { class: "files-status" }, message));
+        return;
+      }
+      for (const path of visible) this.renderRow(path, 0);
+      this.focusRenameInput();
       return;
     }
     for (const path of rootChildren) this.renderRow(path, 0);
@@ -314,7 +384,7 @@ export class FilesPanelApp {
     const entry = this.entries.get(path);
     if (!entry) return;
     const directory = entry.kind === "directory";
-    const expanded = this.expandedDirs.has(path);
+    const expanded = directory && (this.dirtyFilter || this.expandedDirs.has(path));
     const renaming = this.renameState?.path === path;
     const gitStatus = this.gitStatus.statusFor(path, directory);
     const row = h(
@@ -382,7 +452,10 @@ export class FilesPanelApp {
     this.list.appendChild(row);
 
     if (directory && expanded) {
-      for (const child of this.children.get(path) ?? []) this.renderRow(child, depth + 1);
+      for (const child of this.children.get(path) ?? []) {
+        if (this.dirtyFilter && !this.isVisibleInFilter(child, is_dir(child))) continue;
+        this.renderRow(child, depth + 1);
+      }
     }
   }
 

@@ -1,6 +1,6 @@
 {
   "name": "files",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "scripts": {
     "dev": "vite",
     "build": "vite build && node -e \"const fs=require('fs');fs.copyFileSync('package.json','dist/package.json');fs.mkdirSync('dist/scripts',{recursive:true});fs.copyFileSync('scripts/quick-open.js','dist/scripts/quick-open.js')\"",
@@ -54,7 +54,17 @@
         ],
         "icon": {
           "symbol": "folder"
-        }
+        },
+        "headerButtons": [
+          {
+            "id": "files-toggle-dirty-filter",
+            "icon": {
+              "symbol": "line.3.horizontal.decrease"
+            },
+            "tooltip": "Show only changed files",
+            "command": "files-toggle-dirty-filter"
+          }
+        ]
       }
     ],
     "tabTypes": [
@@ -83,6 +93,11 @@
           "kind": "runScript",
           "script": "scripts/quick-open.js"
         }
+      },
+      {
+        "id": "files-toggle-dirty-filter",
+        "title": "Files: Show Only Changed Files",
+        "subtitle": "Toggle filtering the file tree to git changes"
       }
     ],
     "topbarItems": [
