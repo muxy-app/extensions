@@ -75,13 +75,35 @@ async function fetchCopilotUsage(context) {
 }
 
 async function fetchKimiUsage(context) {
-  const token = await readJSONPath(context, `${context.home}/.kimi/credentials/kimi-code.json`, ["access_token"]);
+  const credentials = await readKimiCredentials(context);
+  const token = credentials?.accessToken;
+
+  // 토큰이 만료되었으면 API 호출하지 않고 "Token expired" 표시
+  // (확장에서 refresh하면 CLI의 refresh_token이 무효화될 수 있음)
+  if (token && credentials?.expiresAt && Date.now() > credentials.expiresAt * 1000) {
+    return unavailable(providerByID.get("kimi"), "Token expired, run `kimi login`");
+  }
+
   return fetchProviderRows(context, providerByID.get("kimi"), token, {
     unauthenticated: "Sign in to Kimi",
     url: "https://api.kimi.com/coding/v1/usages",
     headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
     parse: (payload) => parseKimiRows(payload).rows,
   });
+}
+
+async function readKimiCredentials(context) {
+  for (const path of [`${context.home}/.kimi-code/credentials/kimi-code.json`, `${context.home}/.kimi/credentials/kimi-code.json`]) {
+    const payload = parseJSON(await context.readText(path));
+    const accessToken = jsonPath(payload, ["access_token"]);
+    if (accessToken) {
+      return {
+        accessToken,
+        expiresAt: Number(jsonPath(payload, ["expires_at"])) || null,
+      };
+    }
+  }
+  return null;
 }
 
 async function fetchFactoryUsage(context) {
