@@ -7,6 +7,7 @@ import {
   open_in_editor,
   parent_dir,
   reveal_in_finder,
+  strip_slash,
 } from "@/lib/files";
 import {
   create_file,
@@ -22,6 +23,21 @@ const RECONCILE_DEBOUNCE_MS = 250;
 
 function is_dir(path) {
   return path === "" || path.endsWith("/");
+}
+
+function block_ends_within(dirSegs, pathSegs, maxEnd) {
+  if (dirSegs.length === 0) return true;
+  for (let start = 0; start + dirSegs.length <= maxEnd; start++) {
+    let matched = true;
+    for (let i = 0; i < dirSegs.length; i++) {
+      if (pathSegs[start + i] !== dirSegs[i]) {
+        matched = false;
+        break;
+      }
+    }
+    if (matched) return true;
+  }
+  return false;
 }
 
 function sorted_rels(entries) {
@@ -486,11 +502,26 @@ export class FilesPanelApp {
     this.render();
   }
 
+  resolveLoadedDir(rawPath) {
+    const segs = strip_slash(rawPath).split("/").filter(Boolean);
+    const parentEnd = Math.max(0, segs.length - 1);
+    let best = "";
+    let bestDepth = -1;
+    for (const dir of this.loadedDirs) {
+      const dirSegs = strip_slash(dir).split("/").filter(Boolean);
+      if (dirSegs.length <= bestDepth) continue;
+      if (block_ends_within(dirSegs, segs, parentEnd)) {
+        best = dir;
+        bestDepth = dirSegs.length;
+      }
+    }
+    return best;
+  }
+
   scheduleReconcile(payload) {
     const raw = payload && typeof payload === "object" && "path" in payload ? payload.path : undefined;
-    if (typeof raw !== "string") return;
-    const dir = parent_dir(raw.replace(/^\/+/, ""));
-    this.pendingDirs.add(dir);
+    if (typeof raw !== "string" || raw.trim() === "") return;
+    this.pendingDirs.add(this.resolveLoadedDir(raw));
     if (this.reconcileTimer !== null) return;
     this.reconcileTimer = setTimeout(() => {
       this.reconcileTimer = null;
@@ -504,9 +535,6 @@ export class FilesPanelApp {
     this.closeContextMenu();
     const menu = create_context_menu(item, this.ops, () => this.closeContextMenu());
     document.body.appendChild(menu);
-    // Clamp to the viewport so a right-click near the bottom/right edge doesn't
-    // push the menu (or its lower items, e.g. Delete) out of reach. Measured
-    // after appending; coords and the fixed-position menu are viewport-relative.
     const MARGIN = 8;
     const rect = menu.getBoundingClientRect();
     const left = Math.max(MARGIN, Math.min(x, window.innerWidth - rect.width - MARGIN));

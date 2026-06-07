@@ -57,9 +57,6 @@ export class EditorApp {
         const prevPath = this.data.filePath;
         const nextPath = nextData.filePath;
 
-        // This preview pane is being reused for a different file. If it holds
-        // unsaved edits, switching would silently discard them — so keep
-        // editing here and open the requested file in its own tab instead.
         if (this.dirty && prevPath) {
           if (nextPath && nextPath !== prevPath) {
             void muxy.tabs.open({

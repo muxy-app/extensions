@@ -1,13 +1,3 @@
-// "Go to File" picker (⌘P).
-//
-// Runs as a runScript command so the shortcut works app-wide — whether or not
-// the Files panel is open. Muxy executes this on demand; the modal searches
-// natively while we stream rows in via items(emit), and onSelect opens the
-// chosen file in our editor tab.
-//
-// Self-contained: runScript files are loaded verbatim (not bundled), so no
-// imports — only the synchronous `muxy` globals.
-
 const SKIP_DIRS = new Set([".git", "node_modules", ".svn", ".hg"]);
 const MAX_FILES = 50000;
 const EMIT_BATCH = 5000;
@@ -25,8 +15,6 @@ function to_item(rel) {
   return { id: rel, title: basename(rel), subtitle: rel };
 }
 
-// Fast path: one `git ls-files` (tracked + untracked, minus .gitignored). `-z`
-// keeps odd paths intact. Returns false when not a git repo / nothing listed.
 function emit_git_files(emit) {
   let out = "";
   try {
@@ -50,7 +38,6 @@ function emit_git_files(emit) {
   return true;
 }
 
-// Fallback for non-git workspaces: a synchronous walk via muxy.files.
 function emit_walked_files(emit) {
   const stack = [""];
   let total = 0;
@@ -89,8 +76,6 @@ muxy.modal.open({
     if (!choice) return;
     const extId = (typeof muxy !== "undefined" && muxy.extensionID) || "files";
     try {
-      // Reuse the single preview pane like a tree click does. The editor guards
-      // against discarding unsaved edits when its preview pane is reused.
       muxy.tabs.open({
         kind: "extensionWebView",
         extension: {
@@ -101,8 +86,6 @@ muxy.modal.open({
         },
       });
     } catch (err) {
-      // Log the actual message (not the Error object, which renders as a stack)
-      // so the real reason is visible in the extension log.
       console.error(
         "[quick-open] tabs.open FAILED" +
           " extId=" + String(extId) +

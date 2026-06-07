@@ -1,6 +1,4 @@
 #!/usr/bin/env node
-// Updates the bundled muxy-extension skill (SKILL.md) for both .claude and
-// .agents from the canonical copy in the muxy repo.
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";

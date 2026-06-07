@@ -18,7 +18,12 @@ export class MarkdownEditor {
   render() {
     this.destroyChild();
     if (this.mode === "preview") {
-      this.child = new MarkdownView({ source: this.source, fontSize: this.config.fontSize });
+      this.child = new MarkdownView({
+        source: this.source,
+        fontSize: this.config.fontSize,
+        isDark: this.isDark,
+        filePath: this.filePath,
+      });
       this.parent.replaceChildren(this.child.element);
       return;
     }
@@ -54,7 +59,7 @@ export class MarkdownEditor {
     this.config = config;
     this.isDark = isDark;
     if (this.mode === "preview") {
-      this.child?.update?.(this.source, config.fontSize);
+      this.child?.update?.(this.source, config.fontSize, this.isDark);
       return;
     }
     this.child?.updateConfig?.(config, isDark);

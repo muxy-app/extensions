@@ -119,7 +119,6 @@ textarea {
   background: var(--muxy-hover);
 }
 
-/* --- files panel --- */
 .files-panel {
   display: flex;
   height: 100vh;
@@ -128,9 +127,6 @@ textarea {
   color: var(--muxy-foreground);
 }
 
-/* Full-height wrapper: the tree fills the panel so the empty area below the
-   last row still belongs to the webview's tree surface (right-click there opens
-   our root menu, not the native webview menu). */
 .file-tree-wrap {
   position: relative;
   flex: 1;
@@ -244,7 +240,6 @@ textarea {
   text-align: center;
 }
 
-/* --- context menu (rendered into the trees shadow slot) --- */
 .ctx-menu {
   display: flex;
   flex-direction: column;
@@ -252,14 +247,11 @@ textarea {
   padding: var(--s2);
   border: 1px solid var(--muxy-border);
   border-radius: var(--radius);
-  /* Opaque base (page background) so the menu never shows what's behind it,
-     then the surface tint on top. --muxy-surface can be translucent. */
   background-color: var(--muxy-background);
   background-image: linear-gradient(var(--muxy-surface), var(--muxy-surface));
   box-shadow: 0 6px 20px rgb(0 0 0 / 25%);
 }
 
-/* Root menu (empty-area right-click) is positioned at the cursor. */
 .ctx-menu-floating {
   position: fixed;
   z-index: 1000;
@@ -291,7 +283,6 @@ textarea {
   margin-top: var(--s2);
 }
 
-/* --- editor --- */
 .editor {
   display: flex;
   height: 100vh;
@@ -300,9 +291,6 @@ textarea {
   color: var(--muxy-foreground);
 }
 
-/* Topbar matches the native tab bar: content-box + --muxy-topbar-height so the
-   border-bottom lands on the same line as native tabs and split panes align.
-   Mirrors the git extension's diff-viewer .topbar. */
 .topbar {
   box-sizing: content-box;
   display: flex;
@@ -352,7 +340,6 @@ textarea {
   gap: var(--s2);
 }
 
-/* 24x24 transparent icon button — the native tool-button treatment. */
 .tool-button {
   display: inline-flex;
   width: var(--control, 24px);
@@ -378,7 +365,6 @@ textarea {
   cursor: default;
 }
 
-/* Save glows accent while there are unsaved changes. */
 .tool-button-accent:not(:disabled) {
   color: var(--muxy-accent);
 }
@@ -428,8 +414,6 @@ textarea {
   font-size: var(--font-body);
 }
 
-/* --- editor host: makes CodeMirror / preview fill the body --- */
-/* .editor-body is flex:1 + min-height:0, so height:100% here resolves. */
 .editor-host {
   display: flex;
   flex: 1;
@@ -443,15 +427,9 @@ textarea {
 }
 
 .editor-host .cm-scroller {
-  /* font-family only — font-size is owned by EditorView.theme (settings) so the
-     shorthand `font:` must NOT be used here; it would pin font-size and override
-     the configurable size. */
   font-family: "SF Mono", Menlo, monospace;
 }
 
-/* --- rendered markdown preview --- */
-/* Carries .editor-host to fill the body, but content must flow as a normal
-   scrolling block — not a flex column (which clips/shrinks children like <pre>). */
 .md-preview {
   display: block;
   overflow: auto;
@@ -479,8 +457,6 @@ textarea {
   line-height: 1.25;
 }
 
-/* A heading that follows another block gets a moderate top gap — enough to
-   set off a new section, without the full stacked margin looking airy. */
 .md-preview * + h1,
 .md-preview * + h2,
 .md-preview * + h3,
@@ -559,6 +535,27 @@ textarea {
   line-height: inherit;
 }
 
+.md-preview .md-mermaid {
+  display: flex;
+  justify-content: center;
+  margin: 0 0 0.85em;
+  padding: var(--s6);
+  border-radius: var(--radius);
+  background: var(--muxy-surface);
+  overflow-x: auto;
+}
+
+.md-preview .md-mermaid svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.md-preview .md-mermaid-error {
+  margin-top: var(--s3);
+  color: var(--muxy-foreground-muted);
+  font-size: 0.85em;
+}
+
 .md-preview blockquote {
   margin: 0 0 0.85em;
   padding: 0 var(--s6);
@@ -585,8 +582,6 @@ textarea {
   font-weight: 600;
 }
 
-/* Frontmatter properties (key | value), rendered above the body as a bordered
-   definition grid — avoids <table> layout pitfalls. */
 .md-frontmatter {
   margin: 0 0 1.2em;
   border: 1px solid var(--muxy-border);
@@ -642,7 +637,6 @@ textarea {
   margin-right: var(--s3);
 }
 
-/* --- settings sheet (slides in from the right edge) --- */
 .sheet-overlay {
   position: fixed;
   inset: 0;
@@ -712,7 +706,6 @@ textarea {
   font-size: var(--font-body);
 }
 
-/* stepper (font size) */
 .stepper {
   display: flex;
   align-items: center;
@@ -733,7 +726,6 @@ textarea {
   font: var(--font-body) "SF Mono", Menlo, monospace;
 }
 
-/* segmented control (tab size) */
 .segmented {
   display: flex;
   border: 1px solid var(--muxy-border);
@@ -765,7 +757,6 @@ textarea {
   color: var(--muxy-foreground);
 }
 
-/* checkbox accent */
 .sheet-row input[type="checkbox"] {
   width: 16px;
   height: 16px;

@@ -1,7 +1,16 @@
 import { escape_html, h } from "@/lib/dom";
 import { highlight_code } from "@/lib/preview-highlight";
+import { render_mermaid } from "@/lib/mermaid-render";
 import { ensure_preview_highlight_css } from "@/lib/syntax-theme";
 import { split_frontmatter } from "@/lib/frontmatter";
+import { is_markdown } from "@/lib/languages";
+import { open_in_new_tab, open_url, resolve_rel } from "@/lib/files";
+
+// A leading scheme (http:, https:, mailto:, tel:, …) means the link points
+// outside the workspace and should open in the user's browser.
+function has_scheme(href) {
+  return /^[a-z][a-z0-9+.-]*:/i.test(href);
+}
 
 function language_of(fence) {
   const match = /^```([\w-]+)?/.exec(fence.trim());
@@ -63,7 +72,13 @@ function is_block_start(lines, index) {
   );
 }
 
-function append_code_block(parent, code, lang) {
+function append_code_block(parent, code, lang, isDark) {
+  if (lang === "mermaid") {
+    const container = h("div", { class: "md-mermaid" });
+    parent.appendChild(container);
+    void render_mermaid(container, code, isDark);
+    return;
+  }
   const codeNode = h("code", {}, code);
   parent.appendChild(h("pre", {}, codeNode));
   void highlight_code(code, lang).then((parts) => {
@@ -77,7 +92,7 @@ function append_code_block(parent, code, lang) {
   });
 }
 
-function render_markdown(parent, source) {
+function render_markdown(parent, source, isDark) {
   const lines = source.replace(/\r\n/g, "\n").split("\n");
   let index = 0;
 
@@ -99,7 +114,7 @@ function render_markdown(parent, source) {
         index += 1;
       }
       if (index < lines.length) index += 1;
-      append_code_block(parent, code.join("\n"), language_of(fence));
+      append_code_block(parent, code.join("\n"), language_of(fence), isDark);
       continue;
     }
 
@@ -147,7 +162,7 @@ function render_markdown(parent, source) {
         index += 1;
       }
       const blockquote = h("blockquote");
-      render_markdown(blockquote, parts.join("\n"));
+      render_markdown(blockquote, parts.join("\n"), isDark);
       parent.appendChild(blockquote);
       continue;
     }
@@ -185,15 +200,52 @@ function render_markdown(parent, source) {
 }
 
 export class MarkdownView {
-  constructor({ source, fontSize }) {
+  constructor({ source, fontSize, isDark, filePath }) {
     ensure_preview_highlight_css();
+    this.filePath = filePath;
     this.element = h("div", { class: "editor-host md-preview", style: { "font-size": `${fontSize}px` } });
-    this.update(source, fontSize);
+    this.onClick = (event) => this.handleClick(event);
+    this.element.addEventListener("click", this.onClick);
+    this.update(source, fontSize, isDark);
   }
 
-  update(source, fontSize) {
+  handleClick(event) {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.altKey) return;
+    const anchor = event.target instanceof Element ? event.target.closest("a[href]") : null;
+    if (!anchor || !this.element.contains(anchor)) return;
+    const href = anchor.getAttribute("href") ?? "";
+
+    // In-page fragments scroll within the preview; let the browser handle them.
+    if (href.startsWith("#") || href === "") return;
+
+    event.preventDefault();
+
+    // External links (and any URL with a scheme) open in the browser.
+    if (has_scheme(href)) {
+      void open_url(href);
+      return;
+    }
+
+    // Internal relative links: resolve against this file's directory. Markdown
+    // files open in a new editor tab; everything else opens with the system handler.
+    if (!this.filePath) {
+      void open_url(href);
+      return;
+    }
+    const [path, hash] = href.split("#");
+    const target = resolve_rel(this.filePath, path);
+    if (target === null) {
+      void open_url(href);
+      return;
+    }
+    if (is_markdown(target)) void open_in_new_tab(target);
+    else void open_url(hash ? `${target}#${hash}` : target);
+  }
+
+  update(source, fontSize, isDark) {
     this.source = source;
     this.fontSize = fontSize;
+    this.isDark = isDark;
     this.element.style.fontSize = `${fontSize}px`;
     this.element.replaceChildren();
     const documentElement = h("div", { class: "md-preview-document" });
@@ -209,11 +261,12 @@ export class MarkdownView {
         ),
       );
     }
-    render_markdown(documentElement, body);
+    render_markdown(documentElement, body, isDark);
     this.element.appendChild(documentElement);
   }
 
   destroy() {
+    this.element.removeEventListener("click", this.onClick);
     this.element.remove();
   }
 }

@@ -21,6 +21,24 @@ export function basename(path) {
   return idx === -1 ? clean : clean.slice(idx + 1);
 }
 
+// Resolve a relative link target against the directory of `fromRel`, collapsing
+// "." and ".." segments. Returns a workspace-relative path, or null if the link
+// escapes the workspace root (leading "..") or is absolute.
+export function resolve_rel(fromRel, target) {
+  if (target.startsWith("/")) return null;
+  const base = parent_dir(fromRel).split("/").filter(Boolean);
+  for (const segment of strip_slash(target).split("/")) {
+    if (segment === "" || segment === ".") continue;
+    if (segment === "..") {
+      if (base.length === 0) return null;
+      base.pop();
+      continue;
+    }
+    base.push(segment);
+  }
+  return base.join("/");
+}
+
 export function entry_to_rel(entry) {
   const rel = strip_slash(entry.path);
   return entry.isDirectory ? canonical_dir(rel) : rel;
@@ -85,12 +103,33 @@ export async function open_in_editor(rel) {
   }
 }
 
+export async function open_in_new_tab(rel) {
+  try {
+    await muxy.tabs.open({
+      kind: "extensionWebView",
+      extension: {
+        id: muxy.extensionID,
+        tabType: "code-editor",
+        data: { filePath: rel, replaceable: false },
+      },
+    });
+  } catch (err) {
+    await muxy
+      .toast({ title: "Open file", body: error_message(err), variant: "error" })
+      .catch(() => undefined);
+  }
+}
+
 export async function reveal_in_finder(rel) {
   await muxy.exec(["open", "-R", strip_slash(rel)]).catch(() => undefined);
 }
 
 export async function open_externally(rel) {
   await muxy.exec(["open", strip_slash(rel)]).catch(() => undefined);
+}
+
+export async function open_url(url) {
+  await muxy.exec(["open", url]).catch(() => undefined);
 }
 
 export async function copy_path(rel) {
