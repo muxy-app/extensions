@@ -166,6 +166,8 @@ export class GitPanelApp {
     refreshAll() {
         void this.loadLocal(true);
         void this.resetGraph(true);
+        if (this.prStarted)
+            void this.loadPrList(true);
     }
     runRefresh() {
         this.refreshing = true;
