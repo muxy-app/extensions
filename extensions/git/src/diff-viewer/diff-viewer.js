@@ -1,5 +1,6 @@
 import { h, readPref, writePref } from "@/lib/dom";
 import * as cmd from "@/lib/cmd";
+import { highlight, language_for } from "@/lib/highlight";
 import { DiffFileListView } from "./diff-file-list";
 import "@/styles/global.css";
 import "./diff-viewer.css";
@@ -20,6 +21,7 @@ const zoomOutButton = document.querySelector("#zoom-out");
 const zoomResetButton = document.querySelector("#zoom-reset");
 const zoomLevelNode = document.querySelector("#zoom-reset");
 const toggleStyleButton = document.querySelector("#toggle-style");
+const toggleWrapButton = document.querySelector("#toggle-wrap");
 const collapseAllButton = document.querySelector("#collapse-all");
 const expandAllButton = document.querySelector("#expand-all");
 const railResize = document.querySelector("#rail-resize");
@@ -32,6 +34,7 @@ const RAIL_MAX = 520;
 let files = [];
 let activeItemId = "";
 let diffStyle = readPref("muxy.git.diff.style", "split");
+let wrapLines = readPref("muxy.git.diff.wrap", "true") !== "false";
 let zoom = Number(readPref("muxy.git.diff.zoom", "1")) || 1;
 let collapsed = new Set();
 let suppressScrollSync = false;
@@ -231,26 +234,30 @@ function renderFile(file) {
     }, h("span", { class: "file-chevron" }, chevronSvg()), h("span", { class: "diff-file-title", title: file.path }, file.path), file.oldPath ? h("span", { class: "diff-file-previous", title: file.oldPath }, file.oldPath) : null, h("span", { class: "diff-file-stat added" }, `+${file.additions}`), h("span", { class: "diff-file-stat deleted" }, `-${file.deletions}`)), isCollapsed ? null : h("div", { class: "diff-file-body" }, renderRows(file)));
 }
 function renderRows(file) {
-    const rows = file.rows.map((row) => (diffStyle === "split" ? renderSplitRow(row) : renderUnifiedRow(row)));
+    const lang = language_for(file.path);
+    const rows = file.rows.map((row) => (diffStyle === "split" ? renderSplitRow(row, lang) : renderUnifiedRow(row, lang)));
     if (file.truncated) {
         rows.push(h("div", { class: "diff-row meta unified-row" }, h("span", { class: "line-no" }), h("span", { class: "line-no" }), h("span", { class: "code-cell" }, "Diff truncated for faster rendering.")));
     }
     return rows;
 }
-function renderUnifiedRow(row) {
+function codeCell(extraClass, mark, text, lang) {
+    return h("span", { class: extraClass ? `code-cell ${extraClass}` : "code-cell", html: mark + highlight(text, lang) });
+}
+function renderUnifiedRow(row, lang) {
     if (row.kind === "hunk" || row.kind === "meta") {
         return h("div", { class: `diff-row ${row.kind} unified-row` }, h("span", { class: "line-no" }), h("span", { class: "line-no" }), h("span", { class: "code-cell" }, row.text));
     }
     const mark = row.kind === "addition" ? "+" : row.kind === "deletion" ? "-" : " ";
-    return h("div", { class: `diff-row ${row.kind} unified-row` }, h("span", { class: "line-no" }, row.oldLineNumber === null ? "" : String(row.oldLineNumber)), h("span", { class: "line-no" }, row.newLineNumber === null ? "" : String(row.newLineNumber)), h("span", { class: "code-cell" }, `${mark}${row.text}`));
+    return h("div", { class: `diff-row ${row.kind} unified-row` }, h("span", { class: "line-no" }, row.oldLineNumber === null ? "" : String(row.oldLineNumber)), h("span", { class: "line-no" }, row.newLineNumber === null ? "" : String(row.newLineNumber)), codeCell("", mark, row.text, lang));
 }
-function renderSplitRow(row) {
+function renderSplitRow(row, lang) {
     if (row.kind === "hunk" || row.kind === "meta") {
         return h("div", { class: `diff-row ${row.kind} split-row span-row` }, row.text);
     }
     const oldText = row.kind === "addition" ? "" : row.text;
     const newText = row.kind === "deletion" ? "" : row.text;
-    return h("div", { class: `diff-row ${row.kind} split-row` }, h("span", { class: "line-no" }, row.oldLineNumber === null ? "" : String(row.oldLineNumber)), h("span", { class: "code-cell old-cell" }, oldText), h("span", { class: "line-no" }, row.newLineNumber === null ? "" : String(row.newLineNumber)), h("span", { class: "code-cell new-cell" }, newText));
+    return h("div", { class: `diff-row ${row.kind} split-row` }, h("span", { class: "line-no" }, row.oldLineNumber === null ? "" : String(row.oldLineNumber)), codeCell("old-cell", "", oldText, lang), h("span", { class: "line-no" }, row.newLineNumber === null ? "" : String(row.newLineNumber)), codeCell("new-cell", "", newText, lang));
 }
 function chevronSvg() {
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -434,6 +441,16 @@ function toggleStyle() {
     syncStyleButton();
     void renderViewer().then(() => setActiveItem(activeItemId, false));
 }
+function applyWrap() {
+    document.documentElement.classList.toggle("no-wrap", !wrapLines);
+    toggleWrapButton.classList.toggle("active", wrapLines);
+    toggleWrapButton.title = wrapLines ? "Disable line wrap" : "Enable line wrap";
+}
+function toggleWrap() {
+    wrapLines = !wrapLines;
+    writePref("muxy.git.diff.wrap", String(wrapLines));
+    applyWrap();
+}
 applyRailWidth(Number(readPref("muxy.git.diff.rail", "260")) || 260);
 railResize.addEventListener("pointerdown", (event) => {
     event.preventDefault();
@@ -462,6 +479,7 @@ zoomInButton.addEventListener("click", () => setZoom(zoom + ZOOM_STEP));
 zoomOutButton.addEventListener("click", () => setZoom(zoom - ZOOM_STEP));
 zoomResetButton.addEventListener("click", () => setZoom(1));
 toggleStyleButton.addEventListener("click", toggleStyle);
+toggleWrapButton.addEventListener("click", toggleWrap);
 collapseAllButton.addEventListener("click", () => setAllCollapsed(true));
 expandAllButton.addEventListener("click", () => setAllCollapsed(false));
 reloadButton.addEventListener("click", () => void loadGitDiff());
@@ -484,4 +502,5 @@ window.addEventListener("keydown", (event) => {
 window.muxy?.onDataChange?.(() => void loadGitDiff());
 applyZoom();
 syncStyleButton();
+applyWrap();
 void loadGitDiff();
