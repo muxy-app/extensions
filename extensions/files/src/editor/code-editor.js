@@ -396,6 +396,23 @@ export class CodeEditor {
       ),
       history(),
       drawSelection(),
+      // Triple-click selects the line content only, excluding the trailing
+      // newline. CodeMirror's default extends the selection to the start of
+      // the next line, which makes drawSelection paint a sliver on the row
+      // below so the next line appears (but isn't) selected.
+      EditorView.domEventHandlers({
+        mousedown(event, view) {
+          if (event.detail < 3 || event.button !== 0) return false;
+          const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+          if (pos == null) return false;
+          const line = view.state.doc.lineAt(pos);
+          view.dispatch({
+            selection: EditorSelection.range(line.from, line.to),
+          });
+          event.preventDefault();
+          return true;
+        },
+      }),
       dropCursor(),
       highlightSpecialChars(),
       highlightActiveLine(),
