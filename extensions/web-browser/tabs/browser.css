@@ -1,0 +1,211 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  font: 13px -apple-system, "SF Pro", system-ui, sans-serif;
+  background: var(--muxy-background);
+  color: var(--muxy-foreground);
+  overflow: hidden;
+}
+
+.browser-app {
+  height: 100vh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 3px;
+  padding: 4px 6px;
+}
+
+.toolbar {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto auto;
+  align-items: start;
+  gap: 2px;
+}
+
+.nav-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.nav-btn {
+  appearance: none;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 5px;
+  margin: 0;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--muxy-foreground-muted);
+  cursor: pointer;
+}
+
+.nav-icon {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.nav-btn:hover:not(:disabled) {
+  background: var(--muxy-hover);
+  color: var(--muxy-foreground);
+}
+
+.nav-btn:focus-visible {
+  outline: none;
+  background: var(--muxy-hover);
+  box-shadow: 0 0 0 2px var(--muxy-accent-soft);
+}
+
+.nav-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.url-form {
+  width: 100%;
+}
+
+#url-input {
+  width: 100%;
+  height: 27px;
+  border: 1px solid var(--muxy-border);
+  border-radius: 8px;
+  background: var(--muxy-surface);
+  color: var(--muxy-foreground);
+  padding: 0 8px;
+  font: 500 10px -apple-system, "SF Pro", system-ui, sans-serif;
+}
+
+#url-input::placeholder {
+  color: var(--muxy-foreground-muted);
+  opacity: 0.9;
+}
+
+#url-input:focus-visible {
+  outline: none;
+  border-color: var(--muxy-accent);
+  box-shadow: 0 0 0 2px var(--muxy-accent);
+}
+
+.viewport {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--muxy-background);
+}
+
+#browser-frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--muxy-background);
+  display: block;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+#browser-frame.is-visible {
+  opacity: 1;
+}
+
+.frame-loader {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: var(--muxy-background);
+}
+
+.frame-loader.is-active {
+  display: flex;
+}
+
+.frame-loader-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: none;
+}
+
+.frame-loader-icon.is-shown {
+  display: block;
+}
+
+.frame-loader-host {
+  max-width: 80%;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muxy-foreground-muted);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.frame-loader-bar {
+  width: 120px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--muxy-surface);
+  overflow: hidden;
+}
+
+.frame-loader-bar span {
+  display: block;
+  width: 40%;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--muxy-accent);
+  animation: frame-loader-slide 1s ease-in-out infinite;
+}
+
+@keyframes frame-loader-slide {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(320%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #browser-frame {
+    transition: none;
+  }
+
+  .frame-loader-bar span {
+    width: 100%;
+    opacity: 0.6;
+    animation: none;
+  }
+}
+
+@media (max-width: 620px) {
+  .browser-app {
+    padding: 4px;
+  }
+
+  .nav-btn {
+    width: 28px;
+    height: 28px;
+  }
+}

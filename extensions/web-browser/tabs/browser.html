@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Web Browser</title>
+  <link rel="stylesheet" href="browser.css">
+</head>
+<body>
+  <main class="browser-app">
+    <header class="toolbar">
+      <form id="url-form" class="url-form" autocomplete="off">
+        <input id="url-input" type="text" aria-label="URL" placeholder="Search or enter URL">
+      </form>
+      <div class="nav-group">
+        <button id="back-btn" type="button" class="nav-btn" title="Back" aria-label="Back">
+          <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M15 18l-6-6 6-6"></path>
+          </svg>
+        </button>
+        <button id="forward-btn" type="button" class="nav-btn" title="Forward" aria-label="Forward">
+          <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M9 6l6 6-6 6"></path>
+          </svg>
+        </button>
+        <button id="reload-btn" type="button" class="nav-btn" title="Reload" aria-label="Reload">
+          <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20 11a8.1 8.1 0 0 0-15.5-2"></path>
+            <path d="M4 5v4h4"></path>
+            <path d="M4 13a8.1 8.1 0 0 0 15.5 2"></path>
+            <path d="M20 19v-4h-4"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <section class="viewport">
+      <div id="frame-loader" class="frame-loader" aria-hidden="true">
+        <img id="frame-loader-icon" class="frame-loader-icon" alt="">
+        <div id="frame-loader-host" class="frame-loader-host"></div>
+        <div class="frame-loader-bar"><span></span></div>
+      </div>
+      <iframe
+        id="browser-frame"
+        title="Web Browser View"
+        referrerpolicy="no-referrer-when-downgrade"
+        sandbox="allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts"
+      ></iframe>
+    </section>
+  </main>
+
+  <script type="module" src="./browser.js"></script>
+</body>
+</html>
