@@ -124,9 +124,9 @@ const colorSwatchTheme = EditorView.baseTheme({
     height: "0.85em",
     marginRight: "0.3em",
     verticalAlign: "middle",
-    borderRadius: "3px",
+    borderRadius: "4px",
     background: "var(--swatch-color)",
-    boxShadow: "inset 0 0 0 1px rgba(128, 128, 128, 0.45)",
+    boxShadow: "inset 0 0 0 1px var(--muxy-border)",
     cursor: "pointer",
   },
 });

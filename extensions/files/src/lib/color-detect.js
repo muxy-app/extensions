@@ -1,3 +1,5 @@
+import { clamp, to_hex2 } from "@/lib/color-convert";
+
 const COLOR_RE = new RegExp(
   [
     "#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\\b",
@@ -66,14 +68,6 @@ function named_regex() {
   return NAMED_RE;
 }
 
-function clamp(value, max) {
-  return Math.max(0, Math.min(max, value));
-}
-
-function to_hex2(value) {
-  return clamp(Math.round(value), 255).toString(16).padStart(2, "0");
-}
-
 function normalize_hex(text) {
   let hex = text.slice(1);
   if (hex.length === 3 || hex.length === 4) {
@@ -97,10 +91,10 @@ function parse_alpha(token) {
   token = token.trim();
   if (token.endsWith("%")) {
     const pct = parseFloat(token);
-    return Number.isNaN(pct) ? null : clamp(pct / 100, 1);
+    return Number.isNaN(pct) ? null : clamp(pct / 100, 0, 1);
   }
   const num = parseFloat(token);
-  return Number.isNaN(num) ? null : clamp(num, 1);
+  return Number.isNaN(num) ? null : clamp(num, 0, 1);
 }
 
 function split_components(inner) {
@@ -130,8 +124,8 @@ function normalize_rgb(text) {
 
 function hsl_to_rgb(h, s, l) {
   h = ((h % 360) + 360) % 360;
-  s = clamp(s, 1);
-  l = clamp(l, 1);
+  s = clamp(s, 0, 1);
+  l = clamp(l, 0, 1);
   const c = (1 - Math.abs(2 * l - 1)) * s;
   const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
   const m = l - c / 2;

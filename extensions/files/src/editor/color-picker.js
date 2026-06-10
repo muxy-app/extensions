@@ -50,8 +50,8 @@ function ensureStyles() {
   height: 12px;
   margin: -6px 0 0 -6px;
   border-radius: 50%;
-  border: 2px solid #fff;
-  box-shadow: 0 0 0 1px rgba(0,0,0,0.5);
+  border: 2px solid var(--muxy-background);
+  box-shadow: 0 0 0 1px var(--muxy-border);
   pointer-events: none;
 }
 .muxy-color-picker__hue {
@@ -66,7 +66,7 @@ function ensureStyles() {
 .muxy-color-picker__hue-thumb {
   top: 50%;
   margin-top: -6px;
-  border-radius: 3px;
+  border-radius: 4px;
   width: 6px;
   height: 18px;
 }
@@ -79,8 +79,8 @@ function ensureStyles() {
 .muxy-color-picker__preview {
   width: 22px;
   height: 22px;
-  border-radius: 5px;
-  box-shadow: inset 0 0 0 1px rgba(128,128,128,0.45);
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px var(--muxy-border);
   flex: none;
 }
 .muxy-color-picker__hex {
@@ -88,7 +88,7 @@ function ensureStyles() {
   min-width: 0;
   box-sizing: border-box;
   padding: 4px 6px;
-  border-radius: 5px;
+  border-radius: 6px;
   border: 1px solid var(--muxy-border, rgba(128,128,128,0.35));
   background: var(--muxy-background, #141417);
   color: inherit;

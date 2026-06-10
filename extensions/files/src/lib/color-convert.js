@@ -1,4 +1,4 @@
-function clamp(value, min, max) {
+export function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
@@ -15,7 +15,7 @@ export function hex_to_rgb(hex) {
   return { r, g, b, a };
 }
 
-function to_hex2(value) {
+export function to_hex2(value) {
   return clamp(Math.round(value), 0, 255).toString(16).padStart(2, "0");
 }
 

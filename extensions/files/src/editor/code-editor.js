@@ -80,6 +80,31 @@ function foldMarker(open) {
   return wrap;
 }
 
+function lineSelectionStyle() {
+  return EditorView.mouseSelectionStyle.of((view, startEvent) => {
+    if (startEvent.detail < 3 || startEvent.button !== 0) return null;
+    const startPos = view.posAtCoords({ x: startEvent.clientX, y: startEvent.clientY });
+    if (startPos == null) return null;
+    const anchorLine = view.state.doc.lineAt(startPos);
+
+    const selectionFor = (event) => {
+      const doc = view.state.doc;
+      const pos = view.posAtCoords({ x: event.clientX, y: event.clientY }, false);
+      const headLine = doc.lineAt(pos);
+      const from = Math.min(anchorLine.from, headLine.from);
+      const to = Math.max(anchorLine.to, headLine.to);
+      return headLine.number < anchorLine.number
+        ? EditorSelection.range(to, from, undefined, undefined, 1)
+        : EditorSelection.range(from, to, undefined, undefined, -1);
+    };
+
+    return {
+      get: (curEvent) => selectionFor(curEvent),
+      update: () => {},
+    };
+  });
+}
+
 class FindPanel {
   constructor(view) {
     this.view = view;
@@ -387,19 +412,7 @@ export class CodeEditor {
       ),
       history(),
       drawSelection(),
-      EditorView.domEventHandlers({
-        mousedown(event, view) {
-          if (event.detail < 3 || event.button !== 0) return false;
-          const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
-          if (pos == null) return false;
-          const line = view.state.doc.lineAt(pos);
-          view.dispatch({
-            selection: EditorSelection.range(line.from, line.to),
-          });
-          event.preventDefault();
-          return true;
-        },
-      }),
+      lineSelectionStyle(),
       dropCursor(),
       highlightSpecialChars(),
       highlightActiveLine(),
