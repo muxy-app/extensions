@@ -6,6 +6,7 @@ export const DEFAULT_CONFIG = {
   autocomplete: true,
   codeFolding: true,
   linting: true,
+  colorPreview: true,
 };
 
 export const FONT_SIZE_MIN = 10;

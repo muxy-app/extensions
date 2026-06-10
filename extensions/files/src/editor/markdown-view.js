@@ -6,8 +6,6 @@ import { split_frontmatter } from "@/lib/frontmatter";
 import { is_markdown } from "@/lib/languages";
 import { open_in_new_tab, open_url, resolve_rel } from "@/lib/files";
 
-// A leading scheme (http:, https:, mailto:, tel:, …) means the link points
-// outside the workspace and should open in the user's browser.
 function has_scheme(href) {
   return /^[a-z][a-z0-9+.-]*:/i.test(href);
 }
@@ -215,19 +213,15 @@ export class MarkdownView {
     if (!anchor || !this.element.contains(anchor)) return;
     const href = anchor.getAttribute("href") ?? "";
 
-    // In-page fragments scroll within the preview; let the browser handle them.
     if (href.startsWith("#") || href === "") return;
 
     event.preventDefault();
 
-    // External links (and any URL with a scheme) open in the browser.
     if (has_scheme(href)) {
       void open_url(href);
       return;
     }
 
-    // Internal relative links: resolve against this file's directory. Markdown
-    // files open in a new editor tab; everything else opens with the system handler.
     if (!this.filePath) {
       void open_url(href);
       return;

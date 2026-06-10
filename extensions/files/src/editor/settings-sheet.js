@@ -54,6 +54,11 @@ export class SettingsSheet {
       type: "checkbox",
       onChange: (event) => this.update({ linting: event.target.checked }),
     });
+    this.colorPreview = h("input", {
+      id: "cfg-color-preview",
+      type: "checkbox",
+      onChange: (event) => this.update({ colorPreview: event.target.checked }),
+    });
 
     this.overlay = h(
       "div",
@@ -106,6 +111,12 @@ export class SettingsSheet {
         h(
           "div",
           { class: "sheet-row" },
+          h("label", { class: "sheet-label", for: "cfg-color-preview" }, "Color preview"),
+          this.colorPreview,
+        ),
+        h(
+          "div",
+          { class: "sheet-row" },
           h("label", { class: "sheet-label" }, "Tab size"),
           h(
             "div",
@@ -146,6 +157,7 @@ export class SettingsSheet {
     this.autocomplete.checked = config.autocomplete !== false;
     this.codeFolding.checked = config.codeFolding !== false;
     this.linting.checked = config.linting !== false;
+    this.colorPreview.checked = config.colorPreview !== false;
 
     for (const [size, button] of this.tabButtons) {
       button.className = cls("segment", config.tabSize === size && "segment-active");

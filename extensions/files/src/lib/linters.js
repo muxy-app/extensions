@@ -3,14 +3,10 @@ import { parse as parseJsonc } from "jsonc-parser";
 import { parseDocument } from "yaml";
 import { extname } from "@/lib/files";
 
-// Strict JSON (.json, manifests) flags comments and trailing commas; JSONC/JSON5
-// permit them. jsonc-parser reports precise offsets either way — unlike V8's
-// JSON.parse, whose error messages omit the position about half the time.
 const STRICT_JSON_EXT = new Set([".json", ".webmanifest"]);
 const LOOSE_JSON_EXT = new Set([".jsonc", ".json5"]);
 const YAML_EXT = new Set([".yaml", ".yml"]);
 
-// jsonc-parser ParseErrorCode → human message (codes are a stable enum).
 const JSONC_ERROR_MESSAGE = {
   1: "Invalid symbol",
   2: "Invalid number format",
@@ -30,8 +26,6 @@ const JSONC_ERROR_MESSAGE = {
   16: "Invalid character",
 };
 
-// Clamp an offset into the document so a stale/odd position from a parser can
-// never throw when CodeMirror builds the diagnostic range.
 function clamp(pos, length) {
   if (!Number.isFinite(pos)) return 0;
   return Math.max(0, Math.min(pos, length));

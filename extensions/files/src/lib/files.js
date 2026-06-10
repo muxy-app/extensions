@@ -21,18 +21,12 @@ export function basename(path) {
   return idx === -1 ? clean : clean.slice(idx + 1);
 }
 
-// Lowercased file extension including the leading dot (".js"), matching Node's
-// path.extname convention. Returns "" for no extension and for dotfiles like
-// ".gitignore" (where the dot is the first character of the name).
 export function extname(path) {
   const name = basename(path).toLowerCase();
   const dot = name.lastIndexOf(".");
   return dot <= 0 ? "" : name.slice(dot);
 }
 
-// Resolve a relative link target against the directory of `fromRel`, collapsing
-// "." and ".." segments. Returns a workspace-relative path, or null if the link
-// escapes the workspace root (leading "..") or is absolute.
 export function resolve_rel(fromRel, target) {
   if (target.startsWith("/")) return null;
   const base = parent_dir(fromRel).split("/").filter(Boolean);

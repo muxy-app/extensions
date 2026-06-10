@@ -20,8 +20,6 @@ async function get_mermaid(isDark) {
   return mermaid;
 }
 
-// Mermaid appends working/error nodes to document.body during render. Remove any
-// that survive so repeated renders don't leak hidden SVGs into the page.
 function cleanup_orphan(id) {
   document.getElementById(id)?.remove();
   document.getElementById(`d${id}`)?.remove();
@@ -35,9 +33,6 @@ function render_fallback(container, code, err) {
   );
 }
 
-// Renders `code` as a diagram into `container` (already in the DOM). On failure
-// falls back to a raw code block plus a subtle note. Guards every async step
-// with isConnected so stale renders from rapid re-renders are dropped.
 export async function render_mermaid(container, code, isDark) {
   const id = `mermaid-${(renderSeq += 1)}`;
   try {

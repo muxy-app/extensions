@@ -8,13 +8,6 @@ export function is_markdown(path) {
   return MARKDOWN_EXT.has(extname(path));
 }
 
-// Rich language packages. Unlike the highlight-only grammars from
-// @codemirror/language-data, each factory below returns a LanguageSupport that
-// also registers a completion source (scope identifiers, snippets, keywords,
-// CSS properties, HTML tags, etc.). Loaders are dynamic imports so each grammar
-// is code-split and only fetched when a matching file is opened.
-//
-// Keyed by canonical name; `RICH_BY_EXT` maps file extensions onto these.
 const RICH_LANGUAGES = {
   javascript: () => import("@codemirror/lang-javascript").then((m) => m.javascript()),
   jsx: () => import("@codemirror/lang-javascript").then((m) => m.javascript({ jsx: true })),
@@ -36,7 +29,6 @@ const RICH_LANGUAGES = {
   yaml: () => import("@codemirror/lang-yaml").then((m) => m.yaml()),
 };
 
-// Keyed by extname() output (leading dot, lowercased).
 const RICH_BY_EXT = {
   ".js": "javascript",
   ".cjs": "javascript",
@@ -90,9 +82,6 @@ export async function language_for(path) {
 
 export async function language_for_name(name) {
   const key = name.toLowerCase();
-  // `name` is a fence token like "javascript" (language name) or "js" (bare
-  // extension). Try the rich registry by name, then by extension (dot-prefixed
-  // to match RICH_BY_EXT), before falling back to language-data.
   const rich = RICH_LANGUAGES[key] ?? RICH_LANGUAGES[RICH_BY_EXT[`.${key}`]];
   if (rich) return rich();
   const desc =

@@ -1,7 +1,3 @@
-// Per-file cursor + scroll memory so reopening a file (or switching markdown
-// edit/preview) returns you to where you were, instead of line 1 / top. Keyed by
-// file path in localStorage; capped to MAX_ENTRIES on an LRU basis so it can't
-// grow without bound.
 const STORAGE_KEY = "muxy.files.cursor-state";
 const MAX_ENTRIES = 200;
 
@@ -20,11 +16,9 @@ function write_registry(registry) {
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(registry));
   } catch {
-    // Quota or disabled storage — cursor memory is best-effort, so ignore.
   }
 }
 
-// Drop the oldest entries (by updatedAt) once the registry exceeds the cap.
 function prune(registry) {
   const keys = Object.keys(registry);
   if (keys.length <= MAX_ENTRIES) return registry;

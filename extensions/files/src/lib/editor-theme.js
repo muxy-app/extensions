@@ -160,7 +160,6 @@ export function muxy_cm_theme(is_dark) {
         height: "14px",
       },
 
-      // --- Go to line dialog (built-in gotoLine command) ---
       ".cm-panel.cm-dialog": {
         display: "flex",
         alignItems: "center",
@@ -202,7 +201,6 @@ export function muxy_cm_theme(is_dark) {
         color: "var(--muxy-foreground)",
       },
 
-      // --- Code folding gutter ---
       ".cm-foldGutter": {
         color: "color-mix(in srgb, var(--muxy-foreground-muted) 55%, transparent)",
       },
@@ -240,10 +238,6 @@ export function muxy_cm_theme(is_dark) {
         padding: "0 var(--s3)",
       },
 
-      // --- Autocomplete ---
-      // The popup must be fully opaque — --muxy-surface can carry alpha, so
-      // stack it over an opaque --muxy-background fill (and override the base
-      // .cm-tooltip color, which CodeMirror otherwise paints semi-transparent).
       ".cm-tooltip": {
         backgroundColor: "var(--muxy-background)",
       },
@@ -291,7 +285,6 @@ export function muxy_cm_theme(is_dark) {
         padding: "var(--s4) var(--s5)",
       },
 
-      // --- Lint / diagnostics ---
       ".cm-lintRange-error": {
         backgroundImage: "none",
         textDecoration: "underline wavy var(--muxy-diff-remove)",
