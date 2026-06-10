@@ -1,3 +1,27 @@
+:root {
+  --s1: 2px;
+  --s2: 4px;
+  --s3: 6px;
+  --s4: 8px;
+  --s5: 10px;
+  --s6: 12px;
+  --s7: 16px;
+  --s8: 20px;
+  --s9: 24px;
+  --s10: 32px;
+
+  --font-caption: 10px;
+  --font-body: 12px;
+  --font-emphasis: 13px;
+
+  --icon: 14px;
+  --control: 24px;
+
+  --radius-chip: 4px;
+  --radius: 6px;
+  --radius-card: 8px;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -10,7 +34,7 @@ body {
 }
 
 body {
-  font: 13px -apple-system, "SF Pro", system-ui, sans-serif;
+  font: var(--font-emphasis) -apple-system, "SF Pro", system-ui, sans-serif;
   background: var(--muxy-background);
   color: var(--muxy-foreground);
   overflow: hidden;
@@ -20,8 +44,8 @@ body {
   height: 100vh;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  gap: 3px;
-  padding: 4px 6px;
+  gap: var(--s2);
+  padding: var(--s2) var(--s3);
 }
 
 .toolbar {
@@ -29,21 +53,21 @@ body {
   grid-template-columns: 1fr;
   grid-template-rows: auto auto;
   align-items: start;
-  gap: 2px;
+  gap: var(--s1);
 }
 
 .nav-group {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--s2);
 }
 
 .nav-btn {
   appearance: none;
-  width: 28px;
-  height: 28px;
+  width: var(--control);
+  height: var(--control);
   border: 0;
-  border-radius: 5px;
+  border-radius: var(--radius);
   margin: 0;
   padding: 0;
   display: inline-flex;
@@ -55,11 +79,11 @@ body {
 }
 
 .nav-icon {
-  width: 16px;
-  height: 16px;
+  width: var(--icon);
+  height: var(--icon);
   fill: none;
   stroke: currentColor;
-  stroke-width: 2;
+  stroke-width: 2.5;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -88,11 +112,11 @@ body {
   width: 100%;
   height: 27px;
   border: 1px solid var(--muxy-border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--muxy-surface);
   color: var(--muxy-foreground);
-  padding: 0 8px;
-  font: 500 10px -apple-system, "SF Pro", system-ui, sans-serif;
+  padding: 0 var(--s4);
+  font: 500 var(--font-caption) -apple-system, "SF Pro", system-ui, sans-serif;
 }
 
 #url-input::placeholder {
@@ -135,7 +159,7 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: var(--s5);
   background: var(--muxy-background);
 }
 
@@ -146,7 +170,7 @@ body {
 .frame-loader-icon {
   width: 40px;
   height: 40px;
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   display: none;
 }
 
@@ -156,7 +180,7 @@ body {
 
 .frame-loader-host {
   max-width: 80%;
-  font-size: 12px;
+  font-size: var(--font-body);
   font-weight: 500;
   color: var(--muxy-foreground-muted);
   text-align: center;
@@ -201,11 +225,11 @@ body {
 
 @media (max-width: 620px) {
   .browser-app {
-    padding: 4px;
+    padding: var(--s2);
   }
 
   .nav-btn {
-    width: 28px;
-    height: 28px;
+    width: var(--control);
+    height: var(--control);
   }
 }
