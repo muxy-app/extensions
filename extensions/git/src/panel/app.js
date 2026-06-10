@@ -55,6 +55,7 @@ export class GitPanelApp {
     changesFilterOpen = false;
     commitBusy = null;
     prPending = null;
+    opPending = false;
     prFilter = readPref(FILTER_KEY, "open");
     prList = { kind: "idle" };
     prListCache = readPrListCache();
@@ -283,6 +284,19 @@ export class GitPanelApp {
         return ok;
     }
     async switchBranch(name, create) {
+        if (!create && this.repo.kind === "ready" && this.repo.status.pendingOp) {
+            const op = this.repo.status.pendingOp;
+            const proceed = await confirmAction({
+                title: `Abort ${op} and switch?`,
+                message: `A ${op} is in progress. Abort it and switch to "${name}"?`,
+                confirmLabel: "Abort & switch",
+                critical: true,
+            });
+            if (!proceed)
+                return;
+            if (!(await this.abortPendingOp(op)))
+                return;
+        }
         const ok = await tryAction(() => runPinned((cwd) => create
             ? cmd.branchCreate(cwd, name)
             : cmd.branchSwitch(cwd, name)), create ? "Could not create branch" : "Could not switch branch");
@@ -290,6 +304,22 @@ export class GitPanelApp {
             await this.loadLocal(true);
             void this.resetGraph(true);
         }
+    }
+    async abortPendingOp(op) {
+        if (this.opPending)
+            return false;
+        this.opPending = true;
+        this.render();
+        const ok = await tryAction(() => runPinned((cwd) => cmd.abortOperation(cwd, op)), `Could not abort ${op}`);
+        this.opPending = false;
+        if (ok) {
+            await this.loadLocal(true);
+            void this.resetGraph(true);
+        }
+        else {
+            this.render();
+        }
+        return ok;
     }
     async deleteBranch(name) {
         const confirmed = await confirmAction({

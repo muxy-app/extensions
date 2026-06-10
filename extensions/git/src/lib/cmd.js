@@ -111,12 +111,28 @@ function parsePorcelain(text) {
     return result;
 }
 
+async function pendingOp(cwd) {
+    const refs = ["REVERT_HEAD", "CHERRY_PICK_HEAD", "MERGE_HEAD", "REBASE_HEAD"];
+    const ops = ["revert", "cherry-pick", "merge", "rebase"];
+    const present = await Promise.all(refs.map((ref) => muxy
+        .exec(["git", "rev-parse", "--verify", "--quiet", ref], { cwd })
+        .then((r) => r.exitCode === 0)
+        .catch(() => false)));
+    const idx = present.findIndex(Boolean);
+    return idx >= 0 ? ops[idx] : null;
+}
+
+export function abortOperation(cwd, op) {
+    return run(["git", op, "--abort"], cwd);
+}
+
 export async function status(cwd) {
-    const [porcelainText, unstagedStat, stagedStat, def] = await Promise.all([
+    const [porcelainText, unstagedStat, stagedStat, def, op] = await Promise.all([
         tryRun(["git", "status", "--porcelain=v2", "--branch", "--untracked-files=all", "-z"], cwd).then((z) => z.replace(/\0/g, "\n")),
         tryRun(["git", "diff", "--numstat"], cwd),
         tryRun(["git", "diff", "--cached", "--numstat"], cwd),
         defaultBranch(cwd),
+        pendingOp(cwd),
     ]);
     const parsed = parsePorcelain(porcelainText);
     const unstagedMap = parseNumstat(unstagedStat);
@@ -138,6 +154,7 @@ export async function status(cwd) {
         stagedFiles,
         unstagedFiles,
         pullRequest: null,
+        pendingOp: op,
     };
 }
 
@@ -271,11 +288,18 @@ async function pushPrBranch(cwd) {
     return true;
 }
 
+async function hasUpstream(cwd) {
+    const res = await muxy.exec(["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], { cwd });
+    return res.exitCode === 0;
+}
+
 export async function push(cwd, { setUpstream } = {}) {
     if (setUpstream)
         return run(["git", "push", "-u", "origin", "HEAD"], cwd);
     if (await pushPrBranch(cwd))
         return "";
+    if (!(await hasUpstream(cwd)))
+        return run(["git", "push", "-u", "origin", "HEAD"], cwd);
     return run(["git", "push"], cwd);
 }
 

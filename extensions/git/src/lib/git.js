@@ -215,6 +215,7 @@ export function toViewStatus(s) {
         staged: s.stagedFiles.map(toEntry),
         unstaged: s.unstagedFiles.map(toEntry),
         pullRequest: s.pullRequest,
+        pendingOp: s.pendingOp ?? null,
     };
 }
 
