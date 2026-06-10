@@ -1,7 +1,7 @@
 import { clear, h, readPref, writePref } from "@/lib/dom";
 import { computeLanes, toCommitNode } from "@/lib/graph";
 import { alertError, activeWorktreePath, commitAll, confirmAction, hasPendingChanges, isBusy, onBusyChange, runPinned, toViewStatus, tryAction, } from "@/lib/git";
-import { checkoutPr, checkoutPrWorktree, cleanupBranch, closePr, confirmOpenExistingPr, createPr, mergePr, parentDir, removeWorktreeOrBranch, worktreePathIn, } from "@/lib/pr";
+import { checkoutPr, checkoutPrWorktree, cleanupBranch, closePr, confirmOpenExistingPr, createPr, mergePr, parentDir, readyPr, removeWorktreeOrBranch, worktreePathIn, } from "@/lib/pr";
 import * as cmd from "@/lib/cmd";
 import { icon } from "@/lib/icons";
 import { button, emptyState, iconButton, loadingOverlay } from "@/ui/shared";
@@ -362,6 +362,25 @@ export class GitPanelApp {
         }
         catch (err) {
             await alertError(`Could not close PR #${number}`, err);
+            return false;
+        }
+        finally {
+            this.prPending = null;
+            this.render();
+        }
+    }
+    async markReadyCurrentPr(number, title) {
+        this.prPending = "ready";
+        this.render();
+        try {
+            await runPinned((cwd) => readyPr(number, title, cwd));
+            if (this.repo.kind === "ready" && this.repo.status.pullRequest?.number === number) {
+                this.repo = { kind: "ready", status: { ...this.repo.status, pullRequest: { ...this.repo.status.pullRequest, isDraft: false } } };
+            }
+            return true;
+        }
+        catch (err) {
+            await alertError(`Could not mark PR #${number} ready`, err);
             return false;
         }
         finally {

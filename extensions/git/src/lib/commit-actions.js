@@ -36,7 +36,7 @@ export async function openCommitOnGithub(commit) {
         openUrl(url);
     }
     catch (err) {
-        await alertError("Open on GitHub failed", err);
+        await alertError("Open in browser failed", err);
     }
 }
 export async function cherryPickCommit(commit, onDone) {

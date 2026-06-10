@@ -16,6 +16,9 @@ export function mergePr(number, method, deleteBranch, cwd) {
 export function closePr(number, cwd) {
     return cmd.prClose(cwd, number);
 }
+export function readyPr(number, title, cwd) {
+    return cmd.prReady(cwd, { number, title });
+}
 export function createPr(title, body, baseBranch, draft, cwd) {
     return cmd.prCreate(cwd, { title, body, baseBranch, draft });
 }

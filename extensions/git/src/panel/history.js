@@ -29,7 +29,7 @@ function renderCommitRow(app, commit, lane) {
     }, "flex opacity-0 group-hover:opacity-100"));
 }
 function openCommitMenu(app, commit, anchor) {
-    const content = h("div", { class: "p-1" }, menuItem("View diff", null, () => void openCommitDiff(commit.hash, commit.shortHash)), menuItem("Copy hash", null, () => void copyHash(commit)), menuItem("Open on GitHub", null, () => void openCommitOnGithub(commit)), menuItem("Cherry-pick", null, () => void cherryPickCommit(commit, () => app.refreshAll())), menuItem("Revert", null, () => void revertCommit(commit, (message) => {
+    const content = h("div", { class: "p-1" }, menuItem("View diff", null, () => void openCommitDiff(commit.hash, commit.shortHash)), menuItem("Copy hash", null, () => void copyHash(commit)), menuItem("Open in browser", null, () => void openCommitOnGithub(commit)), menuItem("Cherry-pick", null, () => void cherryPickCommit(commit, () => app.refreshAll())), menuItem("Revert", null, () => void revertCommit(commit, (message) => {
         app.message = message;
         app.setTab("branch");
     }, () => app.refreshAll())));

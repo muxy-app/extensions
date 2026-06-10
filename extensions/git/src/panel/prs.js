@@ -131,12 +131,22 @@ function renderCurrentPr(app, pr, status, dirty) {
     const target = { branch: status.branch, defaultBranch: status.defaultBranch, dirty };
     const state = prState(pr);
     const busy = app.prPending !== null;
-    return h("div", { class: "flex flex-col gap-2" }, h("div", { class: "flex items-center gap-1.5" }, prStateIcon(pr, 13), h("span", { class: "font-mono text-[12px] font-semibold text-foreground" }, `#${pr.number}`), h("span", { class: "text-[11px] text-muted-foreground" }, stateLabel(pr)), h("div", { class: "ml-auto flex items-center gap-0.5" }, iconButton("Refresh PR", "refresh", () => void app.refreshCurrentPr(), "", busy || app.prRefreshing), iconButton("Close PR", "xCircle", () => void confirmCloseCurrent(app, pr.number), "", busy || state !== "open", "danger"), iconButton("Clean up branch", "trash", () => void confirmCleanupCurrent(app, target), "", busy || !status.branch), iconButton("View on GitHub", "external", () => openUrl(pr.url)))), infoRow("Base", pr.baseBranch), infoRow("Mergeable", mergeableLabel(pr), mergeableTone(pr)), checksRow(pr.checks), renderMergeActions(app, pr, target));
+    return h("div", { class: "flex flex-col gap-2" }, h("div", { class: "flex items-center gap-1.5" }, prStateIcon(pr, 13), h("span", { class: "font-mono text-[12px] font-semibold text-foreground" }, `#${pr.number}`), h("span", { class: "text-[11px] text-muted-foreground" }, stateLabel(pr)), h("div", { class: "ml-auto flex items-center gap-0.5" }, iconButton("Refresh PR", "refresh", () => void app.refreshCurrentPr(), "", busy || app.prRefreshing), iconButton("Close PR", "xCircle", () => void confirmCloseCurrent(app, pr.number), "", busy || state !== "open", "danger"), iconButton("Clean up branch", "trash", () => void confirmCleanupCurrent(app, target), "", busy || !status.branch), iconButton("Open in browser", "external", () => openUrl(pr.url)))), infoRow("Base", pr.baseBranch), infoRow("Mergeable", mergeableLabel(pr), mergeableTone(pr)), checksRow(pr.checks), renderMergeActions(app, pr, target));
 }
 function renderMergeActions(app, pr, target) {
     const state = prState(pr);
     if (state !== "open") {
         return h("span", { class: "mt-1 flex h-7 items-center justify-center rounded-md border border-border text-[11px] text-muted-foreground" }, `This PR is ${state}.`);
+    }
+    if (pr.isDraft) {
+        return h("div", { class: "mt-1 flex flex-col gap-1.5" }, button("Mark ready for review", {
+            iconName: "check",
+            loading: app.prPending === "ready",
+            variant: "outline",
+            disabled: app.prPending !== null,
+            className: "w-full",
+            onClick: () => void app.markReadyCurrentPr(pr.number, pr.title).then((ok) => ok && app.refreshAll()),
+        }), h("span", { class: "text-center text-[10px] text-muted-foreground" }, "Draft — mark ready to enable merging."));
     }
     const blocked = mergeBlockedReason(pr);
     const merge = (method, label) => button(label, {
@@ -186,7 +196,7 @@ function renderPrRow(app, pr) {
     const pending = app.prRowPending.get(pr.number) ?? null;
     const busy = pending !== null;
     const open = prState(pr) === "open";
-    return h("li", { class: "group flex items-center gap-2 border-b border-border px-3 py-1.5" }, prStateIcon(pr, 13), h("div", { class: "flex min-w-0 flex-1 flex-col" }, h("div", { class: "flex items-center gap-1.5" }, h("span", { class: "font-mono text-[11px] font-semibold text-muted-foreground" }, `#${pr.number}`), h("span", { class: "truncate text-[12px] font-medium text-foreground" }, pr.title)), h("span", { class: "truncate font-mono text-[10px] text-muted-foreground" }, `${pr.author} · ${pr.headBranch} -> ${pr.baseBranch}`)), h("div", { class: "shrink-0 group-hover:hidden" }, checksBadge(pr.checks)), h("div", { class: "hidden shrink-0 items-center gap-0.5 group-hover:flex" }, iconButton("Checkout this branch", "branchPlus", () => void app.checkoutPrRow(pr.number), "", busy), iconButton("Checkout to worktree", "folderGit", () => void app.checkoutPrWorktreeRow(pr.number), "", busy), iconButton("View diff", "fileDiff", () => void openPrDiff(pr.number), "", busy), iconButton("Open on GitHub", "external", () => openUrl(pr.url), "", busy), iconButton("Close PR", "xCircle", () => void app.closePrRow(pr.number), "", busy || !open, "danger")));
+    return h("li", { class: "group flex items-center gap-2 border-b border-border px-3 py-1.5" }, prStateIcon(pr, 13), h("div", { class: "flex min-w-0 flex-1 flex-col" }, h("div", { class: "flex items-center gap-1.5" }, h("span", { class: "font-mono text-[11px] font-semibold text-muted-foreground" }, `#${pr.number}`), h("span", { class: "truncate text-[12px] font-medium text-foreground" }, pr.title)), h("span", { class: "truncate font-mono text-[10px] text-muted-foreground" }, `${pr.author} · ${pr.headBranch} -> ${pr.baseBranch}`)), h("div", { class: "shrink-0 group-hover:hidden" }, checksBadge(pr.checks)), h("div", { class: "hidden shrink-0 items-center gap-0.5 group-hover:flex" }, iconButton("Checkout this branch", "branchPlus", () => void app.checkoutPrRow(pr.number), "", busy), iconButton("Checkout to worktree", "folderGit", () => void app.checkoutPrWorktreeRow(pr.number), "", busy), iconButton("View diff", "fileDiff", () => void openPrDiff(pr.number), "", busy), iconButton("Open in browser", "external", () => openUrl(pr.url), "", busy), iconButton("Close PR", "xCircle", () => void app.closePrRow(pr.number), "", busy || !open, "danger")));
 }
 function prStateIcon(pr, size) {
     if (pr.isDraft)
