@@ -1,20 +1,6 @@
+import { run, tryRun } from "@/lib/forge/exec";
+
 const PR_FIELDS = "index,state,title,author,url,mergeable,base,head,ci";
-
-async function run(argv, cwd) {
-    const res = await muxy.exec(argv, { cwd });
-    if (res.exitCode !== 0)
-        throw new Error(res.stderr || res.stdout || `Command failed: ${argv.join(" ")}`);
-    return res.stdout;
-}
-
-async function tryRun(argv, cwd) {
-    try {
-        return await run(argv, cwd);
-    }
-    catch {
-        return "";
-    }
-}
 
 async function currentBranch(cwd) {
     return (await tryRun(["git", "branch", "--show-current"], cwd)).trim();

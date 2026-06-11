@@ -20,7 +20,7 @@ export function renderBranchSwitcher(app, status) {
 const OP_LABELS = { revert: "Reverting", "cherry-pick": "Cherry-picking", merge: "Merging", rebase: "Rebasing" };
 function renderPendingOpBanner(app, status) {
     const op = status.pendingOp;
-    return h("div", { class: "flex items-center gap-2 border-b border-border bg-secondary px-2.5 py-2" }, icon("history", 14, "text-muted-foreground", 2), h("div", { class: "flex min-w-0 flex-1 flex-col" }, h("span", { class: "text-[12px] font-semibold text-foreground" }, `${OP_LABELS[op] ?? "Operation"} in progress`), h("span", { class: "text-[10px] text-muted-foreground" }, "Commit to finish, or abort.")), button("Abort", {
+    return h("div", { class: "flex items-center gap-2 border-b border-border bg-secondary px-2.5 py-2" }, icon("history", 14, "text-muted-foreground", 2.5), h("div", { class: "flex min-w-0 flex-1 flex-col" }, h("span", { class: "text-[12px] font-semibold text-foreground" }, `${OP_LABELS[op] ?? "Operation"} in progress`), h("span", { class: "text-[10px] text-muted-foreground" }, "Commit to finish, or abort.")), button("Abort", {
         iconName: "undo",
         variant: "outline",
         size: "md",
