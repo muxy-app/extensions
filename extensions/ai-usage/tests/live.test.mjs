@@ -153,15 +153,19 @@ test("regression: live provider fetch parses Copilot quota snapshots", async () 
   assert.equal(copilot.rows[0].percent, 60);
 });
 
-test("regression: live provider fetch parses Kimi usage limits", async () => {
+test("regression: live provider fetch prefers new kimi-code credential path", async () => {
   const exec = async (argv, options = {}) => {
     if (argv[0] === "/usr/bin/env") return ok("HOME=/tmp/home\n");
+    if (argv[0] === "/bin/cat" && argv[1] === "/tmp/home/.kimi-code/credentials/kimi-code.json") {
+      return ok(JSON.stringify({ access_token: "kimi-new-token", expires_at: 9999999999 }));
+    }
     if (argv[0] === "/bin/cat" && argv[1] === "/tmp/home/.kimi/credentials/kimi-code.json") {
-      return ok(JSON.stringify({ access_token: "kimi-token" }));
+      return fail(); // Should not be read
     }
     if (argv[0] === "/usr/bin/curl" && options.stdin.includes("api.kimi.com/coding/v1/usages")) {
-      assert.match(options.stdin, /Authorization: Bearer kimi-token/);
-      return ok(`${JSON.stringify({ data: { limits: [{ window: { duration: 5, timeUnit: "HOUR" }, detail: { limit: 100, used: 50 } }] } })}\n200`);
+      assert.match(options.stdin, /Authorization: Bearer kimi-new-token/);
+      return ok(`${JSON.stringify({ data: { limits: [{ window: { duration: 5, timeUnit: "HOUR" }, detail: { limit: 100, used: 50 } }] } })}
+200`);
     }
     return fail();
   };
@@ -172,6 +176,75 @@ test("regression: live provider fetch parses Kimi usage limits", async () => {
   assert.equal(kimi.state.kind, "available");
   assert.equal(kimi.rows[0].label, "Session");
   assert.equal(kimi.rows[0].percent, 50);
+});
+
+test("regression: live provider fetch falls back to legacy kimi credential path", async () => {
+  const exec = async (argv, options = {}) => {
+    if (argv[0] === "/usr/bin/env") return ok("HOME=/tmp/home\n");
+    if (argv[0] === "/bin/cat" && argv[1] === "/tmp/home/.kimi-code/credentials/kimi-code.json") {
+      return fail(); // New path doesn't exist
+    }
+    if (argv[0] === "/bin/cat" && argv[1] === "/tmp/home/.kimi/credentials/kimi-code.json") {
+      return ok(JSON.stringify({ access_token: "kimi-legacy-token", expires_at: 9999999999 }));
+    }
+    if (argv[0] === "/usr/bin/curl" && options.stdin.includes("api.kimi.com/coding/v1/usages")) {
+      assert.match(options.stdin, /Authorization: Bearer kimi-legacy-token/);
+      return ok(`${JSON.stringify({ data: { limits: [{ window: { duration: 5, timeUnit: "HOUR" }, detail: { limit: 100, used: 50 } }] } })}
+200`);
+    }
+    return fail();
+  };
+
+  const snapshots = await fetchLiveSnapshots({ exec, providerIDs: ["kimi"] });
+  const kimi = snapshots.find((snapshot) => snapshot.id === "kimi");
+
+  assert.equal(kimi.state.kind, "available");
+  assert.equal(kimi.rows[0].label, "Session");
+  assert.equal(kimi.rows[0].percent, 50);
+});
+
+test("regression: live provider fetch refreshes expired Kimi access token", async () => {
+  let writtenToken = null;
+  const exec = async (argv, options = {}) => {
+    if (argv[0] === "/usr/bin/env") return ok("HOME=/tmp/home\n");
+    if (argv[0] === "/bin/cat" && argv[1] === "/tmp/home/.kimi-code/credentials/kimi-code.json") {
+      // Return expired token on first read, refreshed token after write
+      if (writtenToken) {
+        return ok(JSON.stringify(writtenToken));
+      }
+      return ok(JSON.stringify({ access_token: "kimi-expired-token", refresh_token: "kimi-refresh-token", expires_at: Math.floor(Date.now() / 1000) - 3600 }));
+    }
+    if (argv[0] === "/bin/sh" && options.stdin) {
+      // Capture the written token
+      writtenToken = JSON.parse(options.stdin);
+      return ok("");
+    }
+    if (argv[0] === "/bin/mv") {
+      return ok("");
+    }
+    if (argv[0] === "/usr/bin/curl" && options.stdin.includes("auth.kimi.com/api/oauth/token")) {
+      // Refresh token endpoint
+      assert.match(options.stdin, /refresh_token=kimi-refresh-token/);
+      return ok(`${JSON.stringify({ access_token: "kimi-refreshed-token", expires_in: 900, scope: "kimi-code", token_type: "Bearer" })}
+200`);
+    }
+    if (argv[0] === "/usr/bin/curl" && options.stdin.includes("api.kimi.com/coding/v1/usages")) {
+      assert.match(options.stdin, /Authorization: Bearer kimi-refreshed-token/);
+      return ok(`${JSON.stringify({ data: { limits: [{ window: { duration: 5, timeUnit: "HOUR" }, detail: { limit: 100, used: 50 } }] } })}
+200`);
+    }
+    return fail();
+  };
+
+  const snapshots = await fetchLiveSnapshots({ exec, providerIDs: ["kimi"] });
+  const kimi = snapshots.find((snapshot) => snapshot.id === "kimi");
+
+  assert.equal(kimi.state.kind, "available");
+  assert.equal(kimi.rows[0].label, "Session");
+  assert.equal(kimi.rows[0].percent, 50);
+  // Verify the token was written back to disk
+  assert.equal(writtenToken?.access_token, "kimi-refreshed-token");
+  assert.equal(writtenToken?.refresh_token, "kimi-refresh-token");
 });
 
 test("regression: live provider fetch parses MiniMax remains", async () => {

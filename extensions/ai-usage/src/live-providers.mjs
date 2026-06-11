@@ -75,13 +75,88 @@ async function fetchCopilotUsage(context) {
 }
 
 async function fetchKimiUsage(context) {
-  const token = await readJSONPath(context, `${context.home}/.kimi/credentials/kimi-code.json`, ["access_token"]);
+  let credentials = await readKimiCredentials(context);
+  let token = credentials?.accessToken;
+
+  // If the access token is stale, try to refresh it using the refresh_token.
+  // We only update the access_token in the file; the refresh_token is left
+  // untouched so the CLI continues to work.
+  if (token && credentials?.refreshToken && credentials?.expiresAt && Date.now() > credentials.expiresAt * 1000) {
+    try {
+      const refreshed = await refreshKimiAccessToken(context, credentials);
+      if (refreshed?.accessToken) {
+        token = refreshed.accessToken;
+        credentials = refreshed;
+      }
+    } catch {
+      // Refresh failed; fall through to the API call with the expired token
+      // so the user sees the provider's error (e.g. 401 → "Sign in to Kimi").
+    }
+  }
+
   return fetchProviderRows(context, providerByID.get("kimi"), token, {
     unauthenticated: "Sign in to Kimi",
     url: "https://api.kimi.com/coding/v1/usages",
     headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
     parse: (payload) => parseKimiRows(payload).rows,
   });
+}
+
+async function readKimiCredentials(context) {
+  for (const path of [`${context.home}/.kimi-code/credentials/kimi-code.json`, `${context.home}/.kimi/credentials/kimi-code.json`]) {
+    const payload = parseJSON(await context.readText(path));
+    const accessToken = jsonPath(payload, ["access_token"]);
+    if (accessToken) {
+      return {
+        accessToken,
+        refreshToken: jsonPath(payload, ["refresh_token"]),
+        expiresAt: Number(jsonPath(payload, ["expires_at"])) || null,
+        credentialPath: path,
+      };
+    }
+  }
+  return null;
+}
+
+async function refreshKimiAccessToken(context, credentials) {
+  const response = await context.http({
+    url: "https://auth.kimi.com/api/oauth/token",
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Accept: "application/json",
+    },
+    body: `client_id=17e5f671-d194-4dfb-9706-5516cb48c098&grant_type=refresh_token&refresh_token=${encodeURIComponent(credentials.refreshToken)}`,
+  });
+
+  if (!response?.access_token) return null;
+
+  const newAccessToken = response.access_token;
+  const newExpiresIn = response.expires_in || 900;
+  const newExpiresAt = Math.floor(Date.now() / 1000) + newExpiresIn;
+
+  // Update only the access_token (and derived fields) in the credentials file.
+  // The refresh_token is intentionally left untouched.
+  const updatedPayload = JSON.stringify({
+    access_token: newAccessToken,
+    refresh_token: credentials.refreshToken,
+    expires_at: newExpiresAt,
+    expires_in: newExpiresIn,
+    scope: response.scope || "kimi-code",
+    token_type: response.token_type || "Bearer",
+  });
+
+  // Atomic write: write to a temp file, then rename.
+  const tmpPath = `${credentials.credentialPath}.tmp`;
+  await context.writeText(tmpPath, updatedPayload);
+  await context.rename(tmpPath, credentials.credentialPath);
+
+  return {
+    accessToken: newAccessToken,
+    refreshToken: credentials.refreshToken,
+    expiresAt: newExpiresAt,
+    credentialPath: credentials.credentialPath,
+  };
 }
 
 async function fetchFactoryUsage(context) {
