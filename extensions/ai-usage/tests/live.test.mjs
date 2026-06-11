@@ -203,15 +203,35 @@ test("regression: live provider fetch falls back to legacy kimi credential path"
   assert.equal(kimi.rows[0].percent, 50);
 });
 
-test("regression: live provider fetch shows expired token for Kimi when token is stale", async () => {
+test("regression: live provider fetch refreshes expired Kimi access token", async () => {
+  let writtenToken = null;
   const exec = async (argv, options = {}) => {
     if (argv[0] === "/usr/bin/env") return ok("HOME=/tmp/home\n");
     if (argv[0] === "/bin/cat" && argv[1] === "/tmp/home/.kimi-code/credentials/kimi-code.json") {
-      // Token expired 1 hour ago
-      return ok(JSON.stringify({ access_token: "kimi-expired-token", expires_at: Math.floor(Date.now() / 1000) - 3600 }));
+      // Return expired token on first read, refreshed token after write
+      if (writtenToken) {
+        return ok(JSON.stringify(writtenToken));
+      }
+      return ok(JSON.stringify({ access_token: "kimi-expired-token", refresh_token: "kimi-refresh-token", expires_at: Math.floor(Date.now() / 1000) - 3600 }));
     }
-    if (argv[0] === "/bin/cat" && argv[1] === "/tmp/home/.kimi/credentials/kimi-code.json") {
-      return fail();
+    if (argv[0] === "/bin/sh" && options.stdin) {
+      // Capture the written token
+      writtenToken = JSON.parse(options.stdin);
+      return ok("");
+    }
+    if (argv[0] === "/bin/mv") {
+      return ok("");
+    }
+    if (argv[0] === "/usr/bin/curl" && options.stdin.includes("auth.kimi.com/api/oauth/token")) {
+      // Refresh token endpoint
+      assert.match(options.stdin, /refresh_token=kimi-refresh-token/);
+      return ok(`${JSON.stringify({ access_token: "kimi-refreshed-token", expires_in: 900, scope: "kimi-code", token_type: "Bearer" })}
+200`);
+    }
+    if (argv[0] === "/usr/bin/curl" && options.stdin.includes("api.kimi.com/coding/v1/usages")) {
+      assert.match(options.stdin, /Authorization: Bearer kimi-refreshed-token/);
+      return ok(`${JSON.stringify({ data: { limits: [{ window: { duration: 5, timeUnit: "HOUR" }, detail: { limit: 100, used: 50 } }] } })}
+200`);
     }
     return fail();
   };
@@ -219,8 +239,12 @@ test("regression: live provider fetch shows expired token for Kimi when token is
   const snapshots = await fetchLiveSnapshots({ exec, providerIDs: ["kimi"] });
   const kimi = snapshots.find((snapshot) => snapshot.id === "kimi");
 
-  assert.equal(kimi.state.kind, "unavailable");
-  assert.match(kimi.state.message, /Token expired/);
+  assert.equal(kimi.state.kind, "available");
+  assert.equal(kimi.rows[0].label, "Session");
+  assert.equal(kimi.rows[0].percent, 50);
+  // Verify the token was written back to disk
+  assert.equal(writtenToken?.access_token, "kimi-refreshed-token");
+  assert.equal(writtenToken?.refresh_token, "kimi-refresh-token");
 });
 
 test("regression: live provider fetch parses MiniMax remains", async () => {

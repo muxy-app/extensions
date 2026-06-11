@@ -14,6 +14,8 @@ export async function makeRuntimeContext(exec) {
     home: env.HOME || "~",
     exec,
     readText: (path) => readText(exec, expandHome(path, env.HOME), readTimeoutMs),
+    writeText: (path, text) => writeText(exec, expandHome(path, env.HOME), text, readTimeoutMs),
+    rename: (from, to) => renameFile(exec, expandHome(from, env.HOME), expandHome(to, env.HOME), readTimeoutMs),
     keychain: (service, account = "") => readKeychain(exec, service, account),
     http: (request) => httpJSON(exec, request),
   };
@@ -89,6 +91,16 @@ async function readText(exec, path, timeoutMs) {
   return result.exitCode === 0 ? result.stdout : "";
 }
 
+async function writeText(exec, path, text, timeoutMs) {
+  const result = await exec(["/bin/sh", "-c", `cat > "${escapeShell(path)}"`], { stdin: text, timeoutMs });
+  if (result.exitCode !== 0) throw new Error("write failed");
+}
+
+async function renameFile(exec, fromPath, toPath, timeoutMs) {
+  const result = await exec(["/bin/mv", "-f", fromPath, toPath], { timeoutMs });
+  if (result.exitCode !== 0) throw new Error("rename failed");
+}
+
 async function readKeychain(exec, service, account) {
   const argv = ["/usr/bin/security", "find-generic-password", "-s", service, "-w"];
   if (account) argv.splice(2, 0, "-a", account);
@@ -122,6 +134,10 @@ function curlConfig({ url, method = "GET", headers = {}, body = null }) {
 
 function escapeCurl(value) {
   return String(value).replaceAll("\\", "\\\\").replaceAll("\"", "\\\"").replaceAll("\n", "\\n");
+}
+
+function escapeShell(value) {
+  return String(value).replaceAll("\\", "\\\\").replaceAll("\"", "\\\"").replaceAll("`", "\\`").replaceAll("$", "\\$");
 }
 
 function expandHome(path, home) {

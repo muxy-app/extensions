@@ -1,6 +1,6 @@
 {
   "name": "ai-usage",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "type": "module",
   "scripts": {
@@ -26,8 +26,8 @@
       { "id": "ai-usage", "icon": { "symbol": "sparkles" }, "tooltip": "AI Usage", "side": "right", "command": "open-usage" }
     ],
     "marketplace": {
-      "author": "Muxy",
-      "github": "muxy-app",
+      "author": "Wonjin",
+      "github": "wjchoi87",
       "categories": ["productivity", "ai"],
       "icon": "assets/icon.svg",
       "screenshots": ["assets/screenshot-1.png"]
