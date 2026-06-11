@@ -1,7 +1,6 @@
 import * as gh from "@/lib/forge/gh";
 import * as tea from "@/lib/forge/tea";
 
-const hostCache = new Map();
 let teaHostsPromise;
 
 function parseHost(url) {
@@ -49,13 +48,9 @@ async function originHost(cwd) {
 }
 
 async function backendFor(cwd) {
-    if (hostCache.has(cwd))
-        return hostCache.get(cwd);
     const host = await originHost(cwd);
     const hosts = await teaHosts();
-    const backend = host && hosts.has(host) ? tea : gh;
-    hostCache.set(cwd, backend);
-    return backend;
+    return host && hosts.has(host) ? tea : gh;
 }
 
 export const prList = async (cwd, opts) => (await backendFor(cwd)).prList(cwd, opts);

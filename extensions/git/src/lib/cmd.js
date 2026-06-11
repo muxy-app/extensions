@@ -111,15 +111,18 @@ function parsePorcelain(text) {
     return result;
 }
 
+const PENDING_OP_PROBE = [
+    ["REVERT_HEAD", "revert"],
+    ["CHERRY_PICK_HEAD", "cherry-pick"],
+    ["MERGE_HEAD", "merge"],
+    ["REBASE_HEAD", "rebase"],
+]
+    .map(([ref, op]) => `git rev-parse --verify --quiet ${ref} >/dev/null 2>&1 && { printf %s ${op}; exit; }`)
+    .join("; ");
+
 async function pendingOp(cwd) {
-    const refs = ["REVERT_HEAD", "CHERRY_PICK_HEAD", "MERGE_HEAD", "REBASE_HEAD"];
-    const ops = ["revert", "cherry-pick", "merge", "rebase"];
-    const present = await Promise.all(refs.map((ref) => muxy
-        .exec(["git", "rev-parse", "--verify", "--quiet", ref], { cwd })
-        .then((r) => r.exitCode === 0)
-        .catch(() => false)));
-    const idx = present.findIndex(Boolean);
-    return idx >= 0 ? ops[idx] : null;
+    const res = await muxy.exec({ shell: PENDING_OP_PROBE }, { cwd }).catch(() => null);
+    return res?.stdout?.trim() || null;
 }
 
 export function abortOperation(cwd, op) {
