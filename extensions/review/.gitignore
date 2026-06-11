@@ -1,0 +1,8 @@
+.DS_Store
+node_modules/
+dist/
+build/
+*.log
+
+# Generated narrated code-walk for Watchtower (regenerated per change).
+diff.html
