@@ -31,6 +31,34 @@
             <path d="M20 19v-4h-4"></path>
           </svg>
         </button>
+        <div class="nav-sep" aria-hidden="true"></div>
+        <button
+          id="annotate-btn"
+          type="button"
+          class="nav-btn"
+          title="Toggle annotation mode"
+          aria-label="Toggle annotation mode"
+          aria-pressed="false"
+        >
+          <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 2.5c-3.5 0-6.5 2.8-6.5 6.3 0 4.7 6.5 12.7 6.5 12.7s6.5-8 6.5-12.7c0-3.5-3-6.3-6.5-6.3z"></path>
+            <circle cx="12" cy="9" r="2.2"></circle>
+          </svg>
+          <span id="annotate-count" class="annotate-count" hidden>0</span>
+        </button>
+        <button
+          id="export-btn"
+          type="button"
+          class="nav-btn"
+          title="Copy annotations for agent"
+          aria-label="Copy annotations for agent"
+          disabled
+        >
+          <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="8" y="3.5" width="11" height="14" rx="2"></rect>
+            <path d="M16 7h-2.5a2 2 0 0 0-2 2v11.5h-4a2 2 0 0 1-2-2V7.5"></path>
+          </svg>
+        </button>
       </div>
     </header>
 
@@ -46,7 +74,32 @@
         referrerpolicy="no-referrer-when-downgrade"
         sandbox="allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts"
       ></iframe>
+      <div id="annotation-layer" class="annotation-layer" aria-hidden="true"></div>
+      <div id="annotation-toast" class="annotation-toast" role="status" aria-live="polite"></div>
     </section>
+
+    <div id="annotation-popover" class="annotation-popover" role="dialog" aria-label="Annotation comment" hidden>
+      <header class="annotation-popover-head">
+        <span id="annotation-popover-title" class="annotation-popover-title">Pin</span>
+        <button id="annotation-delete" type="button" class="annotation-popover-delete" title="Delete pin" aria-label="Delete pin">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 7h14"></path>
+            <path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"></path>
+            <path d="M7 7l1 12a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2l1-12"></path>
+          </svg>
+        </button>
+      </header>
+      <textarea
+        id="annotation-text"
+        class="annotation-textarea"
+        rows="4"
+        placeholder="Note for the agent…"
+      ></textarea>
+      <footer class="annotation-popover-foot">
+        <button id="annotation-cancel" type="button" class="annotation-btn">Cancel</button>
+        <button id="annotation-save" type="button" class="annotation-btn is-primary">Save</button>
+      </footer>
+    </div>
   </main>
 
   <script type="module" src="./browser.js"></script>

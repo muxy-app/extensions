@@ -104,6 +104,37 @@ body {
   cursor: default;
 }
 
+.nav-btn.is-active {
+  background: var(--muxy-accent-soft);
+  color: var(--muxy-accent);
+}
+
+.nav-btn {
+  position: relative;
+}
+
+.annotate-count {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 7px;
+  background: var(--muxy-accent);
+  color: var(--muxy-background);
+  font: 600 9px/14px -apple-system, "SF Pro", system-ui, sans-serif;
+  text-align: center;
+  pointer-events: none;
+}
+
+.nav-sep {
+  width: 1px;
+  height: 16px;
+  background: var(--muxy-border);
+  margin: 0 var(--s1);
+}
+
 .url-form {
   width: 100%;
 }
@@ -220,6 +251,186 @@ body {
     width: 100%;
     opacity: 0.6;
     animation: none;
+  }
+}
+
+.annotation-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.annotation-layer.is-arming {
+  pointer-events: auto;
+  cursor: crosshair;
+  background: color-mix(in srgb, var(--muxy-accent) 6%, transparent);
+}
+
+.annotation-pin {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  padding: 0;
+  border: 2px solid var(--muxy-background);
+  border-radius: 50%;
+  background: var(--muxy-accent);
+  color: var(--muxy-background);
+  font: 600 11px/1 -apple-system, "SF Pro", system-ui, sans-serif;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  transition: transform 0.12s ease;
+}
+
+.annotation-pin:hover,
+.annotation-pin.is-open {
+  transform: scale(1.15);
+}
+
+.annotation-pin:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--muxy-accent-soft), 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+.annotation-popover {
+  position: absolute;
+  z-index: 10;
+  width: 260px;
+  background: var(--muxy-surface);
+  border: 1px solid var(--muxy-border);
+  border-radius: var(--radius-card);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  padding: var(--s4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+}
+
+.annotation-popover[hidden] {
+  display: none;
+}
+
+.annotation-popover-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+}
+
+.annotation-popover-title {
+  font-size: var(--font-body);
+  font-weight: 600;
+  color: var(--muxy-foreground);
+}
+
+.annotation-popover-delete {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: var(--s1);
+  border-radius: var(--radius-chip);
+  color: var(--muxy-foreground-muted);
+  cursor: pointer;
+  display: inline-flex;
+}
+
+.annotation-popover-delete svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.annotation-popover-delete:hover {
+  background: var(--muxy-hover);
+  color: var(--muxy-foreground);
+}
+
+.annotation-textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 64px;
+  border: 1px solid var(--muxy-border);
+  border-radius: var(--radius);
+  background: var(--muxy-background);
+  color: var(--muxy-foreground);
+  padding: var(--s3) var(--s4);
+  font: var(--font-body) -apple-system, "SF Pro", system-ui, sans-serif;
+}
+
+.annotation-textarea:focus-visible {
+  outline: none;
+  border-color: var(--muxy-accent);
+  box-shadow: 0 0 0 2px var(--muxy-accent-soft);
+}
+
+.annotation-popover-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--s2);
+}
+
+.annotation-btn {
+  appearance: none;
+  height: 26px;
+  padding: 0 var(--s5);
+  border: 1px solid var(--muxy-border);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--muxy-foreground);
+  font: 500 var(--font-body) -apple-system, "SF Pro", system-ui, sans-serif;
+  cursor: pointer;
+}
+
+.annotation-btn:hover {
+  background: var(--muxy-hover);
+}
+
+.annotation-btn.is-primary {
+  background: var(--muxy-accent);
+  border-color: var(--muxy-accent);
+  color: var(--muxy-background);
+}
+
+.annotation-btn.is-primary:hover {
+  filter: brightness(1.05);
+}
+
+.annotation-toast {
+  position: absolute;
+  bottom: var(--s5);
+  left: 50%;
+  transform: translateX(-50%) translateY(8px);
+  background: var(--muxy-surface);
+  color: var(--muxy-foreground);
+  border: 1px solid var(--muxy-border);
+  border-radius: var(--radius);
+  padding: var(--s2) var(--s5);
+  font: 500 var(--font-body) -apple-system, "SF Pro", system-ui, sans-serif;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 6;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.annotation-toast.is-shown {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .annotation-pin,
+  .annotation-toast {
+    transition: none;
   }
 }
 

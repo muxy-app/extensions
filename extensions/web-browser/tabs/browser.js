@@ -1,5 +1,7 @@
 "use strict";
 
+import { initAnnotations } from "./annotations.js";
+
 (() => {
   const STATE_STORAGE_KEY = "muxy.web-browser.state.v1";
   const frame = document.getElementById("browser-frame");
@@ -15,6 +17,27 @@
 
   const historyStack = [];
   let historyIndex = -1;
+
+  let annotations = { setURL() {} };
+  try {
+    annotations = initAnnotations({
+      layer: document.getElementById("annotation-layer"),
+      annotateBtn: document.getElementById("annotate-btn"),
+      exportBtn: document.getElementById("export-btn"),
+      countBadge: document.getElementById("annotate-count"),
+      popover: document.getElementById("annotation-popover"),
+      popoverTitle: document.getElementById("annotation-popover-title"),
+      textArea: document.getElementById("annotation-text"),
+      saveBtn: document.getElementById("annotation-save"),
+      cancelBtn: document.getElementById("annotation-cancel"),
+      deleteBtn: document.getElementById("annotation-delete"),
+      toast: document.getElementById("annotation-toast"),
+      viewport: document.querySelector(".viewport"),
+      getCurrentURL: () => (historyIndex >= 0 ? historyStack[historyIndex] : null),
+    });
+  } catch (error) {
+    console.error("[web-browser] annotations init failed:", error);
+  }
 
   // Register the frame listeners before restoring so a fast (cached) load
   // can't fire before we're listening and leave the loader stuck on screen.
@@ -74,6 +97,11 @@
     loadURL(url);
     renderNavState();
     persistState();
+    try {
+      annotations.setURL(url);
+    } catch (error) {
+      console.error("[web-browser] annotations.setURL failed:", error);
+    }
   }
 
   // Show the returning site's identity immediately, keep the (blank) iframe

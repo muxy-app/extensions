@@ -13,7 +13,7 @@
   "muxy": {
     "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
     "description": "Web browser tab with a right-side status bar launcher.",
-    "permissions": ["tabs:write"],
+    "permissions": ["tabs:write", "files:read", "files:write"],
     "tabTypes": [
       {
         "id": "web-browser",
