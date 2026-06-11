@@ -92,7 +92,7 @@ async function readText(exec, path, timeoutMs) {
 }
 
 async function writeText(exec, path, text, timeoutMs) {
-  const result = await exec(["/bin/sh", "-c", `cat > "${escapeShell(path)}"`], { stdin: text, timeoutMs });
+  const result = await exec(["/bin/sh", "-c", `cat > '${path.replace(/'/g, "'\"'\"'")}'`], { stdin: text, timeoutMs });
   if (result.exitCode !== 0) throw new Error("write failed");
 }
 
@@ -134,10 +134,6 @@ function curlConfig({ url, method = "GET", headers = {}, body = null }) {
 
 function escapeCurl(value) {
   return String(value).replaceAll("\\", "\\\\").replaceAll("\"", "\\\"").replaceAll("\n", "\\n");
-}
-
-function escapeShell(value) {
-  return String(value).replaceAll("\\", "\\\\").replaceAll("\"", "\\\"").replaceAll("`", "\\`").replaceAll("$", "\\$");
 }
 
 function expandHome(path, home) {
