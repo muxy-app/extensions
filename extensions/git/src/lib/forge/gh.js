@@ -22,12 +22,15 @@ function aggregateChecks(statusCheckRollup) {
     let failing = 0;
     let pending = 0;
     for (const check of rollup) {
-        const state = String(check.state || check.status || check.conclusion || "").toUpperCase();
-        if (state === "COMPLETEDSUCCESS" || state === "SUCCESS")
+        const status = String(check.status || "").toUpperCase();
+        const outcome = String(check.conclusion || check.state || "").toUpperCase();
+        if (status && status !== "COMPLETED")
+            pending += 1;
+        else if (outcome === "SUCCESS" || outcome === "NEUTRAL" || outcome === "SKIPPED")
             passing += 1;
-        else if (state === "FAILURE" || state === "ERROR")
+        else if (outcome === "FAILURE" || outcome === "ERROR" || outcome === "TIMED_OUT" || outcome === "CANCELLED" || outcome === "ACTION_REQUIRED")
             failing += 1;
-        else if (state === "PENDING" || state === "IN_PROGRESS" || state === "QUEUED")
+        else if (outcome === "PENDING" || outcome === "EXPECTED")
             pending += 1;
     }
     const total = rollup.length;
