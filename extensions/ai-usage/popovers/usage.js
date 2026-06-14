@@ -210,7 +210,10 @@ function metricView(snapshot, row, preferences) {
     await persistStatusCache(next);
   });
   head.append(pin);
-  if (display.percentText) head.append(textSpan(display.percentText, "metric-value"));
+  if (display.percentText) {
+    const modeLabel = preferences.displayMode === "used" ? "Used" : "Remaining";
+    head.append(textSpan(`${modeLabel} ${display.percentText}`, "metric-value"));
+  }
   wrap.append(head);
   if (display.percent !== null) {
     const bar = document.createElement("div");
