@@ -156,7 +156,7 @@ function providerView(provider, preferences, collapsed = false) {
   title.className = "provider-title";
   title.append(textSpan(provider.name, "provider-name"));
   head.append(icon, title);
-  const state = collapsed ? "Hidden" : snapshot?.state.kind === "available" ? "Live" : snapshot?.state.message || "No usage data";
+  const state = collapsed ? "Hidden" : snapshot?.state.kind === "available" ? (snapshot?.planName || "Live") : snapshot?.state.message || "No usage data";
   const stateClass = !collapsed && snapshot?.state.kind === "available" ? "provider-state available" : "provider-state";
   head.append(textSpan(state, stateClass));
   const toggle = document.createElement("input");
