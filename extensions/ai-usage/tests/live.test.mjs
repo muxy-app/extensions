@@ -282,8 +282,9 @@ test("regression: live provider fetch parses Z.ai quota limits", async () => {
   const zai = snapshots.find((snapshot) => snapshot.id === "zai");
 
   assert.equal(zai.state.kind, "available");
-  assert.equal(zai.rows[0].label, "Session (Pro)");
+  assert.equal(zai.rows[0].label, "Session");
   assert.equal(zai.rows[0].percent, 55);
+  assert.equal(zai.planName, "Pro");
 });
 
 function ok(stdout) {

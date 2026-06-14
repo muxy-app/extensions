@@ -209,8 +209,9 @@ async function fetchZaiUsage(context) {
       context.http({ url: "https://api.z.ai/api/biz/subscription/list", headers: { Authorization: `Bearer ${token}`, Accept: "application/json" } }),
       context.http({ url: "https://api.z.ai/api/monitor/usage/quota/limit", headers: { Authorization: `Bearer ${token}`, Accept: "application/json" } }),
     ]);
-    const rows = parseZaiRows(quota, parseZaiPlanName(subscription));
-    return rows.length > 0 ? { id: provider.id, name: provider.name, icon: provider.icon, fetchedAt: new Date(), state: { kind: "available" }, rows } : unavailable(provider, "No usage data");
+    const planName = parseZaiPlanName(subscription);
+    const rows = parseZaiRows(quota, planName);
+    return rows.length > 0 ? { id: provider.id, name: provider.name, icon: provider.icon, fetchedAt: new Date(), state: { kind: "available" }, rows, planName } : unavailable(provider, "No usage data");
   } catch {
     return unavailable(provider, "Unable to fetch usage", "error");
   }

@@ -98,7 +98,7 @@ export function parseZaiRows(payload, planName) {
   const session = limits.find((item) => upperString(item, ["limitType", "type", "name"]) === "TOKENS_LIMIT" && Number(item.unit) === 3);
   const weekly = limits.find((item) => upperString(item, ["limitType", "type", "name"]) === "TOKENS_LIMIT" && Number(item.unit) === 6);
   return [
-    session && percentOnlyRow(planName ? `Session (${planName})` : "Session", session, 18000),
+    session && percentOnlyRow("Session", session, 18000),
     weekly && percentOnlyRow("Weekly", weekly, 604800),
   ].filter(Boolean);
 }

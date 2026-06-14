@@ -65,7 +65,7 @@ export function jsonPath(value, keys) {
   return nonEmptyString(current) || "";
 }
 
-function snapshot(provider, state, rows = [], message = "") {
+function snapshot(provider, state, rows = [], message = "", planName) {
   return {
     id: provider.id,
     name: provider.name,
@@ -73,6 +73,7 @@ function snapshot(provider, state, rows = [], message = "") {
     fetchedAt: new Date(),
     state: state === "available" ? { kind: "available" } : { kind: state, message },
     rows,
+    ...(planName ? { planName } : {}),
   };
 }
 
