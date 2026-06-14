@@ -13,7 +13,7 @@ issues.
 
 If a **listed extension** behaves maliciously (data exfiltration, unexpected
 shell or network use, etc.) or violates policy, file a
-[report](.github/ISSUE_TEMPLATE/report-extension.yml). Maintainers triage these
+[report](.github/ISSUE_TEMPLATE/1-extension-issue.yml). Maintainers triage these
 with priority and can unlist the extension by removing its directory, which
 drops it from the next published index.
 

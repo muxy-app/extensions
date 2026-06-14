@@ -1,5 +1,5 @@
-name: Bug in the tooling or repo
-description: A problem with validation, packaging, CI, or the schema.
+name: Bug or problem with the repo
+description: A problem with validation, packaging, CI, the schema, or anything else about this repo that isn't tied to one extension.
 title: "[bug] <summary>"
 labels: ["bug"]
 body:

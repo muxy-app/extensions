@@ -1,0 +1,65 @@
+import * as gh from "@/lib/forge/gh";
+import * as tea from "@/lib/forge/tea";
+
+let teaHostsPromise;
+
+function parseHost(url) {
+    const s = (url || "").trim();
+    const scheme = s.match(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\/(?:[^@/]+@)?([^:/]+)/);
+    if (scheme)
+        return scheme[1].toLowerCase();
+    const scp = s.match(/^(?:[^@]+@)?([^:/]+):/);
+    if (scp)
+        return scp[1].toLowerCase();
+    return "";
+}
+
+async function teaHosts() {
+    if (!teaHostsPromise) {
+        teaHostsPromise = (async () => {
+            const res = await muxy.exec(["tea", "login", "list", "--output", "json"]).catch(() => null);
+            if (!res || res.exitCode !== 0 || !res.stdout.trim())
+                return new Set();
+            try {
+                const logins = JSON.parse(res.stdout);
+                const hosts = new Set();
+                for (const login of Array.isArray(logins) ? logins : []) {
+                    const fromUrl = parseHost(login.url);
+                    if (fromUrl)
+                        hosts.add(fromUrl);
+                    if (login.ssh_host)
+                        hosts.add(String(login.ssh_host).toLowerCase());
+                }
+                return hosts;
+            }
+            catch {
+                return new Set();
+            }
+        })();
+    }
+    return teaHostsPromise;
+}
+
+async function originHost(cwd) {
+    const res = await muxy.exec(["git", "remote", "get-url", "origin"], { cwd }).catch(() => null);
+    if (!res || res.exitCode !== 0)
+        return "";
+    return parseHost(res.stdout);
+}
+
+async function backendFor(cwd) {
+    const host = await originHost(cwd);
+    const hosts = await teaHosts();
+    return host && hosts.has(host) ? tea : gh;
+}
+
+export const prList = async (cwd, opts) => (await backendFor(cwd)).prList(cwd, opts);
+export const prInfo = async (cwd) => (await backendFor(cwd)).prInfo(cwd);
+export const statusPr = prInfo;
+export const prCreate = async (cwd, opts) => (await backendFor(cwd)).prCreate(cwd, opts);
+export const prMerge = async (cwd, opts) => (await backendFor(cwd)).prMerge(cwd, opts);
+export const prClose = async (cwd, number) => (await backendFor(cwd)).prClose(cwd, number);
+export const prReady = async (cwd, opts) => (await backendFor(cwd)).prReady(cwd, opts);
+export const prCheckout = async (cwd, number) => (await backendFor(cwd)).prCheckout(cwd, number);
+export const prepareWorktreeBranch = async (cwd, number) => (await backendFor(cwd)).prepareWorktreeBranch(cwd, number);
+export const prDiff = async (cwd, number) => (await backendFor(cwd)).prDiff(cwd, number);

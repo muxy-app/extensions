@@ -1,0 +1,57 @@
+name: Issue with an extension
+description: Report a bug, broken behaviour, or abuse in a published extension. The author is tagged automatically.
+title: "[extension] <extension-name>: <summary>"
+labels: ["extension", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this for anything wrong with a **specific published extension**.
+        The extension's author is pinged automatically from its `package.json`,
+        and the issue is labelled with the extension name.
+
+        For a problem with the **tooling, CI, or schema** (not one extension),
+        open a *Bug in the tooling or repo* issue instead. For a **security
+        vulnerability** in the tooling or app itself, do not file a public issue —
+        follow [SECURITY.md](../blob/main/SECURITY.md).
+  - type: input
+    id: extension
+    attributes:
+      label: Extension
+      description: The extension's directory name, exactly as it appears under `extensions/` (letters, digits, dash, underscore, dot). If this does not match a real extension, the issue is closed automatically.
+      placeholder: git
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The installed extension version (the `version` field in its listing / `package.json`).
+      placeholder: 1.4.0
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Type of problem
+      options:
+        - Broken / fails to load
+        - Bug or incorrect behaviour
+        - Misleading description or permissions
+        - Abusive or policy-violating content
+        - Malicious behaviour (exfiltration, unexpected shell/network use)
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: What happened
+      description: What you observed, what you expected, and how to reproduce it.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Muxy version / OS
+      description: Optional — helps the author reproduce.
+      placeholder: "Muxy 1.2.0, macOS 15"

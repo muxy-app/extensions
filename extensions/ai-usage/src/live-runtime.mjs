@@ -14,6 +14,8 @@ export async function makeRuntimeContext(exec) {
     home: env.HOME || "~",
     exec,
     readText: (path) => readText(exec, expandHome(path, env.HOME), readTimeoutMs),
+    writeText: (path, text) => writeText(exec, expandHome(path, env.HOME), text, readTimeoutMs),
+    rename: (from, to) => renameFile(exec, expandHome(from, env.HOME), expandHome(to, env.HOME), readTimeoutMs),
     keychain: (service, account = "") => readKeychain(exec, service, account),
     http: (request) => httpJSON(exec, request),
   };
@@ -87,6 +89,16 @@ async function readEnvironment(exec) {
 async function readText(exec, path, timeoutMs) {
   const result = await exec(["/bin/cat", path], { timeoutMs });
   return result.exitCode === 0 ? result.stdout : "";
+}
+
+async function writeText(exec, path, text, timeoutMs) {
+  const result = await exec(["/bin/sh", "-c", `cat > '${path.replace(/'/g, "'\"'\"'")}'`], { stdin: text, timeoutMs });
+  if (result.exitCode !== 0) throw new Error("write failed");
+}
+
+async function renameFile(exec, fromPath, toPath, timeoutMs) {
+  const result = await exec(["/bin/mv", "-f", fromPath, toPath], { timeoutMs });
+  if (result.exitCode !== 0) throw new Error("rename failed");
 }
 
 async function readKeychain(exec, service, account) {

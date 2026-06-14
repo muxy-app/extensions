@@ -136,5 +136,5 @@ publish flow applies.
 ## Removing an extension
 
 Open a PR deleting the `extensions/<name>/` directory, or file a
-[report](.github/ISSUE_TEMPLATE/report-extension.yml) if it is not yours and
+[report](.github/ISSUE_TEMPLATE/1-extension-issue.yml) if it is not yours and
 should be taken down.

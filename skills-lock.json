@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "skills": {
+    "muxy-extension": {
+      "source": "muxy-app/muxy",
+      "ref": "main",
+      "sourceType": "github",
+      "skillPath": "Muxy/Resources/skills/muxy-extension/SKILL.md",
+      "computedHash": "ab4f809ae33585e8be68ce5abed69636eab4e258f7340e6d7d0d9b514157c698"
+    }
+  }
+}

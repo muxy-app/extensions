@@ -1,7 +1,7 @@
 import { h } from "@/lib/dom";
 import { relativeTime, MAX_LANES } from "@/lib/graph";
 import { openCommitDiff } from "@/lib/git";
-import { cherryPickCommit, copyHash, openCommitOnGithub, revertCommit } from "@/lib/commit-actions";
+import { cherryPickCommit, copyHash, openCommitInBrowser, revertCommit } from "@/lib/commit-actions";
 import { button, emptyState, menuItem, openFloating, smallIconButton } from "@/ui/shared";
 const COLUMN_WIDTH = 12;
 const ROW_HEIGHT = 34;
@@ -29,7 +29,7 @@ function renderCommitRow(app, commit, lane) {
     }, "flex opacity-0 group-hover:opacity-100"));
 }
 function openCommitMenu(app, commit, anchor) {
-    const content = h("div", { class: "p-1" }, menuItem("View diff", null, () => void openCommitDiff(commit.hash, commit.shortHash)), menuItem("Copy hash", null, () => void copyHash(commit)), menuItem("Open on GitHub", null, () => void openCommitOnGithub(commit)), menuItem("Cherry-pick", null, () => void cherryPickCommit(commit, () => app.refreshAll())), menuItem("Revert", null, () => void revertCommit(commit, (message) => {
+    const content = h("div", { class: "p-1" }, menuItem("View diff", null, () => void openCommitDiff(commit.hash, commit.shortHash)), menuItem("Copy hash", null, () => void copyHash(commit)), menuItem("Open in browser", null, () => void openCommitInBrowser(commit)), menuItem("Cherry-pick", null, () => void cherryPickCommit(commit, () => app.refreshAll())), menuItem("Revert", null, () => void revertCommit(commit, (message) => {
         app.message = message;
         app.setTab("branch");
     }, () => app.refreshAll())));

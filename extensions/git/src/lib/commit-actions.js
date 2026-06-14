@@ -16,7 +16,7 @@ export async function copyHash(commit) {
     }
     await muxy.toast({ body: `Copied ${commit.shortHash}`, variant: "success" }).catch(() => undefined);
 }
-function githubCommitUrl(remote, hash) {
+function commitUrl(remote, hash) {
     const url = remote.trim();
     const ssh = url.match(/git@([^:]+):(.+?)(?:\.git)?$/);
     const https = url.match(/^https?:\/\/(?:[^@]+@)?([^/]+)\/(.+?)(?:\.git)?$/);
@@ -25,18 +25,18 @@ function githubCommitUrl(remote, hash) {
         return null;
     return `https://${match[1]}/${match[2]}/commit/${hash}`;
 }
-export async function openCommitOnGithub(commit) {
+export async function openCommitInBrowser(commit) {
     try {
         const remote = await runPinned((cwd) => cmd.remoteUrl(cwd));
         if (!remote)
             throw new Error("No remote found");
-        const url = githubCommitUrl(remote, commit.hash);
+        const url = commitUrl(remote, commit.hash);
         if (!url)
             throw new Error("Could not parse remote URL");
         openUrl(url);
     }
     catch (err) {
-        await alertError("Open on GitHub failed", err);
+        await alertError("Open in browser failed", err);
     }
 }
 export async function cherryPickCommit(commit, onDone) {
