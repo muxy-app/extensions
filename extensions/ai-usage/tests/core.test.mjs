@@ -68,6 +68,24 @@ test("happy path: fixture snapshots compose into status bar text and available r
   assert.deepEqual(status.icon, { svg: "assets/claude.svg" });
 });
 
+test("happy path: fixture provider with planName parses correctly", () => {
+  const fixture = parseFixture(JSON.stringify({
+    providers: [
+      {
+        id: "codex",
+        name: "Codex",
+        icon: "codex",
+        planName: "Max_5.1",
+        state: "available",
+        rows: [{ label: "5h", percent: 42 }],
+      },
+    ],
+  }));
+
+  assert.equal(fixture[0].planName, "Max_5.1");
+  assert.equal(fixture[0].id, "codex");
+});
+
 test("regression: status bar hides text when no usage data exists", () => {
   assert.equal(statusBarPresentation(null, "used").text, null);
   assert.equal(statusBarPresentation({ snapshot: { icon: "codex", rows: [] }, row: null }, "used").text, null);
@@ -91,6 +109,38 @@ test("regression: cached snapshots hydrate dates for instant reload display", ()
   assert.equal(cached[0].fetchedAt.getTime(), fetchedAt.getTime());
   assert.equal(cached[0].rows[0].resetAt.getTime(), resetAt.getTime());
   assert.deepEqual(statusBarPresentation(selectPreview(cached, ""), "used"), { icon: { svg: "assets/codex.svg" }, text: "42%" });
+});
+
+test("regression: cache round-trip preserves planName when present, omits when absent", () => {
+  const fetchedAt = new Date("2026-06-04T08:00:00.000Z");
+  const resetAt = new Date("2026-06-04T13:00:00.000Z");
+
+  // With planName
+  const raw = serializeSnapshots([{
+    id: "codex",
+    name: "Codex",
+    icon: "codex",
+    planName: "Pro",
+    fetchedAt,
+    state: { kind: "available" },
+    rows: [{ id: "5h", label: "5h", percent: 42, resetAt, detail: "42% used", periodDuration: 18000 }]
+  }], fetchedAt);
+
+  const cached = parseCachedSnapshots(raw);
+  assert.equal(cached[0].planName, "Pro");
+
+  // Without planName (should be undefined, not "undefined")
+  const raw2 = serializeSnapshots([{
+    id: "codex",
+    name: "Codex",
+    icon: "codex",
+    fetchedAt,
+    state: { kind: "available" },
+    rows: [{ id: "5h", label: "5h", percent: 42, resetAt, detail: "42% used", periodDuration: 18000 }]
+  }], fetchedAt);
+
+  const cached2 = parseCachedSnapshots(raw2);
+  assert.equal(cached2[0].planName, undefined);
 });
 
 test("regression: status bar cache stores the selected state for background restore", () => {
