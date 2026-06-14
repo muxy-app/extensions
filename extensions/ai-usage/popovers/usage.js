@@ -78,6 +78,7 @@ async function refresh() {
     ? parseFixture(fixture)
     : await fetchLiveSnapshots({ exec: window.muxy?.exec, providerIDs });
   await applyFetchedUsage(fetched, preferences, cacheApplied);
+  debugKimiStatus();
 }
 
 async function applyCachedUsage(preferences) {
@@ -168,7 +169,28 @@ function providerView(provider, preferences, collapsed = false) {
     if (toggle.checked) next.trackedProviderIDs.add(provider.id);
     else next.trackedProviderIDs.delete(provider.id);
     writePreferences(next);
-    refresh();
+refresh();
+
+async function debugKimiStatus() {
+  try {
+    const exec = window.muxy?.exec;
+    if (!exec) return;
+    const home = window.muxy?.env?.HOME || "~";
+    const result = await exec(["/bin/cat", `${home}/.kimi-code/credentials/kimi-code.json`]);
+    if (result.exitCode !== 0) {
+      elements.status.textContent += " | Kimi: no credential file";
+      return;
+    }
+    const payload = JSON.parse(result.stdout || "{}");
+    const hasAccess = !!payload.access_token;
+    const hasRefresh = !!payload.refresh_token;
+    const expiresAt = payload.expires_at ? new Date(payload.expires_at * 1000).toLocaleString() : "none";
+    const isExpired = payload.expires_at ? Date.now() > payload.expires_at * 1000 : false;
+    elements.status.textContent += ` | Kimi: access=${hasAccess}, refresh=${hasRefresh}, expires=${expiresAt}, expired=${isExpired}`;
+  } catch (e) {
+    elements.status.textContent += ` | Kimi: debug error: ${e.message}`;
+  }
+}
   });
   head.append(toggle);
   section.append(head);
