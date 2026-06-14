@@ -78,7 +78,6 @@ async function refresh() {
     ? parseFixture(fixture)
     : await fetchLiveSnapshots({ exec: window.muxy?.exec, providerIDs });
   await applyFetchedUsage(fetched, preferences, cacheApplied);
-  debugKimiStatus();
 }
 
 async function applyCachedUsage(preferences) {
@@ -170,27 +169,6 @@ function providerView(provider, preferences, collapsed = false) {
     else next.trackedProviderIDs.delete(provider.id);
     writePreferences(next);
 refresh();
-
-async function debugKimiStatus() {
-  try {
-    const exec = window.muxy?.exec;
-    if (!exec) return;
-    const home = window.muxy?.env?.HOME || "~";
-    const result = await exec(["/bin/cat", `${home}/.kimi-code/credentials/kimi-code.json`]);
-    if (result.exitCode !== 0) {
-      elements.status.textContent += " | Kimi: no credential file";
-      return;
-    }
-    const payload = JSON.parse(result.stdout || "{}");
-    const hasAccess = !!payload.access_token;
-    const hasRefresh = !!payload.refresh_token;
-    const expiresAt = payload.expires_at ? new Date(payload.expires_at * 1000).toLocaleString() : "none";
-    const isExpired = payload.expires_at ? Date.now() > payload.expires_at * 1000 : false;
-    elements.status.textContent += ` | Kimi: access=${hasAccess}, refresh=${hasRefresh}, expires=${expiresAt}, expired=${isExpired}`;
-  } catch (e) {
-    elements.status.textContent += ` | Kimi: debug error: ${e.message}`;
-  }
-}
   });
   head.append(toggle);
   section.append(head);
@@ -233,7 +211,6 @@ function metricView(snapshot, row, preferences) {
   });
   head.append(pin);
   if (display.percentText) head.append(textSpan(display.percentText, "metric-value"));
-  if (display.detail) head.append(textSpan(display.detail, "detail"));
   wrap.append(head);
   if (display.percent !== null) {
     const bar = document.createElement("div");
@@ -244,11 +221,10 @@ function metricView(snapshot, row, preferences) {
     bar.append(fill);
     wrap.append(bar);
   }
-  if (row.resetAt || pace?.detail) {
+  if (row.resetAt) {
     const reset = document.createElement("div");
     reset.className = "reset-row";
     reset.append(textSpan(row.resetAt ? `Resets ${row.resetAt.toLocaleDateString([], { month: "short", day: "numeric" })} ${row.resetAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "", ""));
-    reset.append(textSpan(pace?.detail || "", ""));
     wrap.append(reset);
   }
   return wrap;
