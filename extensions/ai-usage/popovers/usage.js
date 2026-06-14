@@ -225,7 +225,7 @@ function metricView(snapshot, row, preferences) {
   if (row.resetAt || pace?.detail) {
     const reset = document.createElement("div");
     reset.className = "reset-row";
-    reset.append(textSpan(row.resetAt ? `Resets ${row.resetAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "", ""));
+    reset.append(textSpan(row.resetAt ? `Resets ${row.resetAt.toLocaleDateString([], { month: "short", day: "numeric" })} ${row.resetAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "", ""));
     reset.append(textSpan(pace?.detail || "", ""));
     wrap.append(reset);
   }
