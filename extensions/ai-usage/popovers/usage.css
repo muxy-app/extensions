@@ -239,8 +239,9 @@ select {
 
 .metric-value {
   margin-left: auto;
-  color: var(--muxy-foreground);
-  font-size: var(--font-emphasis); font-weight: 700;
+  color: var(--muxy-foreground-muted);
+  font-size: var(--font-footnote);
+  font-weight: 400;
 }
 
 .detail {
