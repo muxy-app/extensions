@@ -26,8 +26,6 @@ export async function fetchProviderRows(context, provider, token, request) {
   if (!token) return unavailable(provider, request.unauthenticated);
   try {
     const payload = await context.http(request);
-    // TEMP DEBUG: dump raw payload to inspect planName fields
-    await context.writeText(`/tmp/muxy/ai-usage-raw-${provider.id}.json`, JSON.stringify(payload, null, 2)).catch(() => {});
     const result = request.parse(payload);
     const rows = result?.rows ?? result;
     if (!Array.isArray(rows) || rows.length === 0) return unavailable(provider, "No usage data");

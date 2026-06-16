@@ -495,11 +495,6 @@ async function readClaudeCredentials(context) {
   return { accessToken, planName: plan, refreshToken, expiresAt, credentialPath };
 }
 
-async function readClaudeKeychain(context) {
-  const raw = await context.keychain("Claude Code-credentials", context.env.USER || "");
-  return jsonPath(parseJSON(raw), ["claudeAiOauth", "accessToken"]);
-}
-
 async function readCodexAuth(context) {
   if (context.env.CODEX_ACCESS_TOKEN) {
     return { accessToken: context.env.CODEX_ACCESS_TOKEN, accountID: context.env.CODEX_ACCOUNT_ID || "" };
