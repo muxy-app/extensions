@@ -2,17 +2,30 @@ import { defaultPreferences, providerCatalog } from "./providers.mjs";
 
 const allowedDisplayModes = new Set(["used", "remaining"]);
 const allowedRefreshSeconds = new Set([300, 900, 1800, 3600]);
+const providerCatalogSig = providerCatalog.map((p) => p.id).sort().join(",");
 
-export function preferencesFromStorage(read) {
+export function preferencesFromStorage(read, write) {
   const defaults = defaultPreferences();
+  const tracked = providerSet(read("tracked"), defaults.trackedProviderIDs);
+  const enabled = providerSet(read("providerEnabled"), defaults.enabledProviderIDs);
+  if (write && read("catalogSig") !== providerCatalogSig) {
+    const allIDs = providerCatalog.map((p) => p.id);
+    for (const id of allIDs) {
+      tracked.add(id);
+      enabled.add(id);
+    }
+    write("tracked", JSON.stringify([...tracked]));
+    write("providerEnabled", JSON.stringify([...enabled]));
+    write("catalogSig", providerCatalogSig);
+  }
   return {
     enabled: read("enabled") !== "false",
     displayMode: displayMode(read("displayMode"), defaults.displayMode),
     autoRefreshSeconds: refreshSeconds(read("autoRefreshSeconds"), defaults.autoRefreshSeconds),
     includeSecondary: read("includeSecondary") === "true",
     pinnedPreview: String(read("pinnedPreview") || ""),
-    trackedProviderIDs: providerSet(read("tracked"), defaults.trackedProviderIDs),
-    enabledProviderIDs: providerSet(read("providerEnabled"), defaults.enabledProviderIDs),
+    trackedProviderIDs: tracked,
+    enabledProviderIDs: enabled,
   };
 }
 
