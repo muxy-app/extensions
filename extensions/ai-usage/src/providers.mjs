@@ -5,6 +5,8 @@ export const providerCatalog = [
   { id: "copilot", name: "Copilot", icon: "copilot", integrated: false },
   { id: "cursor", name: "Cursor", icon: "cursor", integrated: true },
   { id: "factory", name: "Factory", icon: "factory", integrated: false },
+  { id: "grok", name: "Grok", icon: "grok", integrated: false },
+  { id: "opencode-go", name: "OpenCode Go", icon: "opencode-go", integrated: false },
   { id: "kimi", name: "Kimi", icon: "kimi", integrated: false },
   { id: "minimax", name: "MiniMax", icon: "minimax", integrated: false },
   { id: "zai", name: "Z.ai", icon: "zai", integrated: false }

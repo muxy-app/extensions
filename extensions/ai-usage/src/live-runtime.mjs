@@ -26,8 +26,12 @@ export async function fetchProviderRows(context, provider, token, request) {
   if (!token) return unavailable(provider, request.unauthenticated);
   try {
     const payload = await context.http(request);
-    const rows = request.parse(payload);
-    return rows.length > 0 ? snapshot(provider, "available", rows) : unavailable(provider, "No usage data");
+    // TEMP DEBUG: dump raw payload to inspect planName fields
+    await context.writeText(`/tmp/muxy/ai-usage-raw-${provider.id}.json`, JSON.stringify(payload, null, 2)).catch(() => {});
+    const result = request.parse(payload);
+    const rows = result?.rows ?? result;
+    if (!Array.isArray(rows) || rows.length === 0) return unavailable(provider, "No usage data");
+    return snapshot(provider, "available", rows, "", formatPlanName(result?.planName || request.planName || ""));
   } catch (error) {
     return unavailable(provider, error instanceof AuthError ? request.unauthenticated : "Unable to fetch usage", error instanceof AuthError ? "unavailable" : "error");
   }
@@ -47,6 +51,26 @@ export async function firstString(candidates) {
     if (value) return value;
   }
   return "";
+}
+
+const KNOWN_PLAN_NAMES = {
+  prolite: "Pro Lite",
+  pro: "Pro",
+  enterprise: "Enterprise",
+  business: "Business",
+  max: "Max",
+  team: "Team",
+  plus: "Plus",
+  hobby: "Hobby",
+  starter: "Starter",
+  free: "Free",
+  personal: "Personal",
+};
+
+export function formatPlanName(name) {
+  if (!name) return "";
+  const lower = String(name).toLowerCase();
+  return KNOWN_PLAN_NAMES[lower] || name.charAt(0).toUpperCase() + name.slice(1);
 }
 
 export function parseJSON(raw) {
@@ -114,13 +138,13 @@ async function httpJSON(exec, request) {
     [curlBinary, "--silent", "--show-error", "--location", "--max-time", "20", "--write-out", "\n%{http_code}", "--config", "-"],
     { stdin: curlConfig(request), timeoutMs: httpTimeoutMs },
   );
-  if (result.exitCode !== 0) throw new Error("request failed");
+  if (result.exitCode !== 0) throw new Error(`request failed (curl exit ${result.exitCode})`);
   const trimmed = result.stdout.trimEnd();
   const split = trimmed.lastIndexOf("\n");
   if (split < 0) throw new Error("missing status");
   const status = Number(trimmed.slice(split + 1));
   if (status === 401 || status === 403) throw new AuthError();
-  if (!Number.isFinite(status) || status < 200 || status >= 300) throw new Error("request failed");
+  if (!Number.isFinite(status) || status < 200 || status >= 300) throw new Error(`request failed (HTTP ${status})`);
   return JSON.parse(trimmed.slice(0, split) || "{}");
 }
 

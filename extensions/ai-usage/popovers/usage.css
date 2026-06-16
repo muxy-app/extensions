@@ -222,6 +222,12 @@ select {
 
 .provider-toggle { margin-left: var(--s2); }
 
+.refresh-message {
+  margin-top: var(--s4);
+  color: var(--muted-soft);
+  font-size: var(--font-footnote);
+}
+
 .metric {
   position: relative;
   display: flex;

@@ -1,7 +1,7 @@
 import { nonEmptyString } from "./values.mjs";
 import { providerCatalog } from "./providers.mjs";
-import { fetchProviderRows, firstString, jsonPath, parseJSON, readJSONPath, unavailable } from "./live-runtime.mjs";
-import { parseAmpRows, parseClaudeRows, parseCodexRows, parseCopilotRows, parseFactoryRows, parseKimiRows, parseMiniMaxRows, parseZaiPlanName, parseZaiRows } from "./live-parsers.mjs";
+import { AuthError, fetchProviderRows, firstString, formatPlanName, jsonPath, parseJSON, readJSONPath, unavailable } from "./live-runtime.mjs";
+import { parseAmpRows, parseClaudeRows, parseCodexRows, parseCopilotRows, parseCursorRows, parseFactoryRows, parseGrokRows, parseKimiRows, parseMiniMaxRows, parseOpenCodeGoRows, parseZaiPlanName, parseZaiRows } from "./live-parsers.mjs";
 
 const providerByID = new Map(providerCatalog.map((provider) => [provider.id, provider]));
 
@@ -10,24 +10,93 @@ export const providerFetchers = [
   { id: "codex", fetch: fetchCodexUsage },
   { id: "amp", fetch: fetchAmpUsage },
   { id: "copilot", fetch: fetchCopilotUsage },
+  { id: "cursor", fetch: fetchCursorUsage },
   { id: "factory", fetch: fetchFactoryUsage },
+  { id: "grok", fetch: fetchGrokUsage },
+  { id: "opencode-go", fetch: fetchOpenCodeGoUsage },
   { id: "kimi", fetch: fetchKimiUsage },
   { id: "minimax", fetch: fetchMiniMaxUsage },
   { id: "zai", fetch: fetchZaiUsage },
 ];
 
 async function fetchClaudeUsage(context) {
-  const token = await firstString([
-    context.env.CLAUDE_CODE_OAUTH_TOKEN,
-    readJSONPath(context, `${context.env.CLAUDE_CONFIG_DIR || `${context.home}/.claude`}/.credentials.json`, ["claudeAiOauth", "accessToken"]),
-    readClaudeKeychain(context),
-  ]);
-  return fetchProviderRows(context, providerByID.get("claude"), token, {
+  const provider = providerByID.get("claude");
+  let credentials = await readClaudeCredentials(context);
+  let token = credentials?.accessToken;
+  if (!token) return unavailable(provider, "Sign in to Claude");
+
+  // If the access token is stale, try to refresh it using the refresh_token.
+  if (credentials.refreshToken && credentials.expiresAt && Date.now() > credentials.expiresAt && credentials.credentialPath) {
+    try {
+      const refreshed = await refreshClaudeAccessToken(context, credentials);
+      if (refreshed?.accessToken) {
+        token = refreshed.accessToken;
+        credentials = refreshed;
+      }
+    } catch {
+      // Fall through to the API call with the expired token
+      // so the user sees the provider's error (e.g. 401 → "Sign in to Claude").
+    }
+  }
+
+  const result = await fetchProviderRows(context, provider, token, {
+    planName: credentials.planName || "",
     unauthenticated: "Sign in to Claude",
     url: "https://api.anthropic.com/api/oauth/usage",
     headers: { Authorization: `Bearer ${token}`, Accept: "application/json", "Content-Type": "application/json", "anthropic-beta": "oauth-2025-04-20" },
     parse: parseClaudeRows,
   });
+  return result;
+}
+
+async function refreshClaudeAccessToken(context, credentials) {
+  if (!credentials.refreshToken || !credentials.credentialPath) return null;
+
+  try {
+    const response = await context.http({
+      url: "https://platform.claude.com/v1/oauth/token",
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: {
+        grant_type: "refresh_token",
+        refresh_token: credentials.refreshToken,
+        client_id: "9d1c250a-e61b-44d9-88ed-5944d1962f5e",
+        scope: "user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload",
+      },
+    });
+
+    if (!response?.access_token) return null;
+
+    const newAccessToken = response.access_token;
+    const newExpiresIn = response.expires_in || 3600;
+    const newExpiresAt = Date.now() + newExpiresIn * 1000;
+
+    // Update only the access_token (and derived fields) in the credentials file.
+    const raw = await context.readText(credentials.credentialPath);
+    const payload = parseJSON(raw);
+    if (payload?.claudeAiOauth) {
+      payload.claudeAiOauth.accessToken = newAccessToken;
+      payload.claudeAiOauth.expiresAt = newExpiresAt;
+      if (response.refresh_token) {
+        payload.claudeAiOauth.refreshToken = response.refresh_token;
+      }
+
+      // Atomic write: write to a temp file, then rename.
+      const tmpPath = `${credentials.credentialPath}.tmp`;
+      await context.writeText(tmpPath, JSON.stringify(payload, null, 2));
+      await context.rename(tmpPath, credentials.credentialPath);
+    }
+
+    return {
+      accessToken: newAccessToken,
+      refreshToken: response.refresh_token || credentials.refreshToken,
+      expiresAt: newExpiresAt,
+      planName: credentials.planName,
+      credentialPath: credentials.credentialPath,
+    };
+  } catch {
+    return null;
+  }
 }
 
 async function fetchCodexUsage(context) {
@@ -52,7 +121,7 @@ async function fetchAmpUsage(context) {
     url: "https://ampcode.com/api/internal",
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", Accept: "application/json" },
-    body: { method: "usage" },
+    body: { method: "userDisplayBalanceInfo", params: {} },
     parse: parseAmpRows,
   });
 }
@@ -74,9 +143,58 @@ async function fetchCopilotUsage(context) {
   });
 }
 
+async function fetchCursorUsage(context) {
+  const credentials = await readCursorCredentials(context);
+  return fetchProviderRows(context, providerByID.get("cursor"), credentials?.accessToken, {
+    planName: credentials?.planName || "",
+    unauthenticated: "Sign in to Cursor",
+    url: "https://api2.cursor.sh/aiserver.v1.DashboardService/GetCurrentPeriodUsage",
+    method: "POST",
+    headers: { Authorization: `Bearer ${credentials?.accessToken}`, "Content-Type": "application/json", "Connect-Protocol-Version": "1" },
+    body: {},
+    parse: parseCursorRows,
+  });
+}
+
+async function readCursorCredentials(context) {
+  const accessToken = nonEmptyString(context.env.CURSOR_ACCESS_TOKEN) || "";
+  if (accessToken) return { accessToken, refreshToken: "", planName: "" };
+
+  const dbPaths = [
+    `${context.home}/Library/Application Support/Cursor/User/globalStorage/state.vscdb`,
+    `${context.home}/.config/Cursor/User/globalStorage/state.vscdb`,
+  ];
+
+  for (const dbPath of dbPaths) {
+    const result = await context.exec(
+      ["/usr/bin/sqlite3", dbPath, "-separator", "|", "SELECT key, value FROM ItemTable WHERE key IN ('cursorAuth/accessToken','cursorAuth/refreshToken','cursorAuth/stripeMembershipType')"],
+      { timeoutMs: 3000 },
+    );
+    if (result.exitCode !== 0) continue;
+
+    const map = {};
+    for (const line of result.stdout.trim().split("\n").filter(Boolean)) {
+      const pipe = line.indexOf("|");
+      if (pipe < 0) continue;
+      map[line.slice(0, pipe)] = line.slice(pipe + 1);
+    }
+
+    const token = map["cursorAuth/accessToken"];
+    if (!token) continue;
+
+    return {
+      accessToken: token,
+      refreshToken: map["cursorAuth/refreshToken"] || "",
+      planName: map["cursorAuth/stripeMembershipType"] || "",
+    };
+  }
+  return null;
+}
+
 async function fetchKimiUsage(context) {
   let credentials = await readKimiCredentials(context);
   let token = credentials?.accessToken;
+  let refreshMessage = null;
 
   // If the access token is stale, try to refresh it using the refresh_token.
   // We only update the access_token in the file; the refresh_token is left
@@ -87,19 +205,23 @@ async function fetchKimiUsage(context) {
       if (refreshed?.accessToken) {
         token = refreshed.accessToken;
         credentials = refreshed;
+        refreshMessage = `Token refreshed ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
       }
-    } catch {
-      // Refresh failed; fall through to the API call with the expired token
+    } catch (e) {
+      refreshMessage = `Token refresh failed: ${e?.message || e}`;
+      // Fall through to the API call with the expired token
       // so the user sees the provider's error (e.g. 401 → "Sign in to Kimi").
     }
   }
 
-  return fetchProviderRows(context, providerByID.get("kimi"), token, {
+  const result = await fetchProviderRows(context, providerByID.get("kimi"), token, {
     unauthenticated: "Sign in to Kimi",
     url: "https://api.kimi.com/coding/v1/usages",
     headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-    parse: (payload) => parseKimiRows(payload).rows,
+    parse: parseKimiRows,
   });
+  if (result && refreshMessage) result.refreshMessage = refreshMessage;
+  return result;
 }
 
 async function readKimiCredentials(context) {
@@ -173,8 +295,120 @@ async function fetchFactoryUsage(context) {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, Accept: "application/json", "Content-Type": "application/json" },
     body: {},
-    parse: (payload) => parseFactoryRows(payload).rows,
+    parse: parseFactoryRows,
   });
+}
+
+async function fetchGrokUsage(context) {
+  const provider = providerByID.get("grok");
+  const credentials = await readGrokCredentials(context);
+  const token = credentials?.accessToken;
+  if (!token) return unavailable(provider, "Sign in to Grok");
+
+  try {
+    const billingResp = await context.http({
+      url: "https://cli-chat-proxy.grok.com/v1/billing",
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}`, "X-XAI-Token-Auth": "xai-grok-cli", Accept: "application/json" },
+    });
+
+    const rows = parseGrokRows(billingResp);
+    if (!Array.isArray(rows) || rows.length === 0) return unavailable(provider, "No usage data");
+
+    // Best-effort plan name from settings
+    let planName = "";
+    try {
+      const settingsResp = await context.http({
+        url: "https://cli-chat-proxy.grok.com/v1/settings",
+        method: "GET",
+        headers: { Authorization: `Bearer ${token}`, "X-XAI-Token-Auth": "xai-grok-cli", Accept: "application/json" },
+      });
+      planName = settingsResp?.subscription_tier_display || "";
+    } catch { /* settings is optional */ }
+
+    return {
+      id: provider.id, name: provider.name, icon: provider.icon,
+      fetchedAt: new Date(), state: { kind: "available" }, rows,
+      ...(planName ? { planName: formatPlanName(planName) } : {}),
+    };
+  } catch (error) {
+    return unavailable(provider,
+      error instanceof AuthError ? "Sign in to Grok" : "Unable to fetch usage",
+      error instanceof AuthError ? "unavailable" : "error");
+  }
+}
+
+async function readGrokCredentials(context) {
+  const envToken = nonEmptyString(context.env.GROK_CODE_XAI_API_KEY) || nonEmptyString(context.env.XAI_API_KEY) || "";
+  if (envToken) return { accessToken: envToken, refreshToken: "", planName: "" };
+
+  const auth = parseJSON(await context.readText(`${context.home}/.grok/auth.json`));
+  if (!auth || typeof auth !== "object") return null;
+
+  for (const key of Object.keys(auth)) {
+    const entry = auth[key];
+    if (!entry || typeof entry !== "object") continue;
+    const token = nonEmptyString(entry.key);
+    if (token) {
+      return {
+        accessToken: token,
+        refreshToken: nonEmptyString(entry.refresh_token) || nonEmptyString(entry.refresh) || "",
+        planName: "",
+        clientId: nonEmptyString(entry.oidc_client_id) || "b1a00492-073a-47ea-816f-4c329264a828",
+      };
+    }
+  }
+  return null;
+}
+
+async function fetchOpenCodeGoUsage(context) {
+  const provider = providerByID.get("opencode-go");
+  const credentials = await readOpenCodeGoCredentials(context);
+  const token = credentials?.accessToken;
+  if (!token) return unavailable(provider, "Sign in to OpenCode Go");
+
+  try {
+    const dbPath = `${context.home}/.local/share/opencode/opencode.db`;
+    const dataSQL = `SELECT CAST(COALESCE(json_extract(data, '$.time.created'), time_created) AS INTEGER) AS createdMs, CAST(json_extract(data, '$.cost') AS REAL) AS cost FROM message WHERE json_valid(data) AND json_extract(data, '$.providerID') = 'opencode-go' AND json_extract(data, '$.role') = 'assistant' AND json_type(data, '$.cost') IN ('integer', 'real')`;
+
+    const result = await context.exec(["/usr/bin/sqlite3", dbPath, "-separator", "|", dataSQL], { timeoutMs: 3000 });
+    if (result.exitCode !== 0) return unavailable(provider, "No usage data");
+
+    const rawRows = [];
+    for (const line of result.stdout.trim().split("\n").filter(Boolean)) {
+      const pipe = line.indexOf("|");
+      if (pipe < 0) continue;
+      const createdMs = Number(line.slice(0, pipe));
+      const cost = Number(line.slice(pipe + 1));
+      if (!Number.isFinite(createdMs) || !Number.isFinite(cost) || createdMs <= 0 || cost < 0) continue;
+      rawRows.push({ createdMs, cost });
+    }
+    if (rawRows.length === 0) return unavailable(provider, "No usage data");
+
+    const rows = parseOpenCodeGoRows(rawRows, Date.now());
+    return {
+      id: provider.id, name: provider.name, icon: provider.icon,
+      fetchedAt: new Date(), state: { kind: "available" }, rows,
+      planName: "Go",
+    };
+  } catch {
+    return unavailable(provider, "Unable to fetch usage", "error");
+  }
+}
+
+async function readOpenCodeGoCredentials(context) {
+  const envToken = nonEmptyString(context.env.OPENCODE_GO_API_KEY) || "";
+  if (envToken) return { accessToken: envToken };
+
+  const auth = parseJSON(await context.readText(`${context.home}/.local/share/opencode/auth.json`));
+  if (!auth || typeof auth !== "object") return null;
+
+  const entry = auth["opencode-go"];
+  if (!entry || typeof entry !== "object") return null;
+  const key = nonEmptyString(entry.key);
+  if (key) return { accessToken: key };
+
+  return null;
 }
 
 async function fetchMiniMaxUsage(context) {
@@ -188,10 +422,11 @@ async function fetchMiniMaxUsage(context) {
     readJSONPath(context, `${context.home}/.mmx/credentials.json`, ["auth", "access_token"]),
   ]);
   const domains = context.env.MINIMAX_CN_API_KEY ? ["api.minimaxi.com"] : ["api.minimax.io", "www.minimax.io"];
+  const endpointPath = context.env.MINIMAX_CN_API_KEY ? "/v1/token_plan/remains" : "/v1/api/openplatform/coding_plan/remains";
   for (const host of domains) {
     const snapshot = await fetchProviderRows(context, providerByID.get("minimax"), token, {
       unauthenticated: "Sign in to MiniMax",
-      url: `https://${host}/v1/api/openplatform/coding_plan/remains`,
+      url: `https://${host}${endpointPath}`,
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
       parse: parseMiniMaxRows,
     });
@@ -215,6 +450,49 @@ async function fetchZaiUsage(context) {
   } catch {
     return unavailable(provider, "Unable to fetch usage", "error");
   }
+}
+
+async function readClaudeCredentials(context) {
+  // Priority: env var → file → keychain
+  let accessToken = nonEmptyString(context.env.CLAUDE_CODE_OAUTH_TOKEN) || "";
+  let subscriptionType = "";
+  let rateLimitTier = "";
+  let refreshToken = "";
+  let expiresAt = null;
+  let credentialPath = null;
+  if (accessToken) return { accessToken, planName: "", refreshToken: "", expiresAt: null, credentialPath: null };
+
+  // File
+  const filePath = `${context.env.CLAUDE_CONFIG_DIR || `${context.home}/.claude`}/.credentials.json`;
+  const fileRaw = await context.readText(filePath);
+  const filePayload = parseJSON(fileRaw);
+  if (filePayload?.claudeAiOauth) {
+    const oauth = filePayload.claudeAiOauth;
+    accessToken = oauth.accessToken || "";
+    refreshToken = oauth.refreshToken || "";
+    expiresAt = oauth.expiresAt || null;
+    subscriptionType = oauth.subscriptionType || "";
+    rateLimitTier = oauth.rateLimitTier || "";
+    credentialPath = filePath;
+  }
+
+  if (!accessToken) {
+    // Keychain
+    const raw = await context.keychain("Claude Code-credentials", context.env.USER || "");
+    const payload = parseJSON(raw);
+    if (payload?.claudeAiOauth) {
+      const oauth = payload.claudeAiOauth;
+      accessToken = oauth.accessToken || "";
+      refreshToken = refreshToken || oauth.refreshToken || "";
+      expiresAt = expiresAt || oauth.expiresAt || null;
+      subscriptionType = subscriptionType || oauth.subscriptionType || "";
+      rateLimitTier = rateLimitTier || oauth.rateLimitTier || "";
+      // keychain-sourced credentials can't be atomically written back with current primitives
+    }
+  }
+
+  const plan = subscriptionType && rateLimitTier ? `${subscriptionType} ${rateLimitTier}` : subscriptionType || rateLimitTier || "";
+  return { accessToken, planName: plan, refreshToken, expiresAt, credentialPath };
 }
 
 async function readClaudeKeychain(context) {
