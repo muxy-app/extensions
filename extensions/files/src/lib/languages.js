@@ -8,6 +8,32 @@ export function is_markdown(path) {
   return MARKDOWN_EXT.has(extname(path));
 }
 
+// Raster image formats the viewer renders from bytes. SVG is deliberately
+// excluded: it stays editable as XML in the code editor, with a "View" toggle.
+const IMAGE_MIME = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+  ".bmp": "image/bmp",
+  ".ico": "image/x-icon",
+  ".avif": "image/avif",
+  ".apng": "image/apng",
+};
+
+export function is_image(path) {
+  return extname(path) in IMAGE_MIME;
+}
+
+export function image_mime(path) {
+  return IMAGE_MIME[extname(path)] ?? "application/octet-stream";
+}
+
+export function is_svg(path) {
+  return extname(path) === ".svg";
+}
+
 const RICH_LANGUAGES = {
   javascript: () => import("@codemirror/lang-javascript").then((m) => m.javascript()),
   jsx: () => import("@codemirror/lang-javascript").then((m) => m.javascript({ jsx: true })),
