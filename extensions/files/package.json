@@ -1,9 +1,10 @@
 {
   "name": "files",
-  "version": "1.5.0",
+  "version": "1.7.0",
   "scripts": {
     "dev": "vite",
     "build": "vite build && node -e \"const fs=require('fs');fs.copyFileSync('package.json','dist/package.json');fs.mkdirSync('dist/scripts',{recursive:true});fs.copyFileSync('scripts/quick-open.js','dist/scripts/quick-open.js')\"",
+    "gen-icons": "node scripts/gen-material-icons.mjs",
     "update-skill": "node scripts/update-skill.mjs"
   },
   "private": true,
@@ -35,11 +36,27 @@
     "@lezer/highlight": "^1.2.3",
     "jsonc-parser": "^3.3.1",
     "mermaid": "^11.15.0",
+    "web-tree-sitter": "^0.26.9",
     "yaml": "^2.9.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.0",
+    "@tree-sitter-grammars/tree-sitter-lua": "^0.4.1",
+    "@tree-sitter-grammars/tree-sitter-toml": "^0.7.0",
+    "@tree-sitter-grammars/tree-sitter-zig": "^1.1.2",
+    "material-icon-theme": "^5.35.0",
     "tailwindcss": "^4.3.0",
+    "tree-sitter-bash": "^0.25.1",
+    "tree-sitter-c": "^0.24.1",
+    "tree-sitter-cpp": "^0.23.4",
+    "tree-sitter-go": "^0.25.0",
+    "tree-sitter-java": "^0.23.5",
+    "tree-sitter-javascript": "^0.25.0",
+    "tree-sitter-php": "^0.24.2",
+    "tree-sitter-python": "^0.25.0",
+    "tree-sitter-ruby": "^0.23.1",
+    "tree-sitter-rust": "^0.24.0",
+    "tree-sitter-typescript": "^0.23.2",
     "vite": "^7.3.5"
   },
   "muxy": {
@@ -81,6 +98,14 @@
             },
             "tooltip": "Show only changed files",
             "command": "files-toggle-dirty-filter"
+          },
+          {
+            "id": "files-toggle-icon-theme",
+            "icon": {
+              "symbol": "paintpalette"
+            },
+            "tooltip": "Toggle file icon theme",
+            "command": "files-toggle-icon-theme"
           }
         ]
       }
@@ -116,6 +141,11 @@
         "id": "files-toggle-dirty-filter",
         "title": "Files: Show Only Changed Files",
         "subtitle": "Toggle filtering the file tree to git changes"
+      },
+      {
+        "id": "files-toggle-icon-theme",
+        "title": "Files: Toggle Icon Theme",
+        "subtitle": "Switch the file tree between stroke and colored icons"
       }
     ],
     "topbarItems": [

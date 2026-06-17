@@ -1,8 +1,9 @@
 import { basename, error_message, open_externally, reveal_in_finder, try_action } from "@/lib/files";
-import { is_markdown } from "@/lib/languages";
+import { is_image, is_markdown, is_svg } from "@/lib/languages";
 import { icon_for } from "@/lib/file-icon";
 import { CodeEditor } from "@/editor/code-editor";
 import { MarkdownEditor } from "@/editor/markdown-editor";
+import { ImageViewer } from "@/editor/image-viewer";
 import { SettingsSheet } from "@/editor/settings-sheet";
 import { OpenIcon, RevealIcon, SaveIcon, SettingsIcon } from "@/editor/icons";
 import {
@@ -39,6 +40,7 @@ export class EditorApp {
     this.isDark = muxy.theme?.colorScheme === "dark";
     this.showSettings = false;
     this.mdMode = "preview";
+    this.svgView = false;
     this.config = load_editor_config();
     this.editorStateId = create_editor_state_id();
     this.disposers = [];
@@ -184,6 +186,14 @@ export class EditorApp {
     return this.filePath ? is_markdown(this.filePath) : false;
   }
 
+  isImage() {
+    return this.filePath ? is_image(this.filePath) : false;
+  }
+
+  isSvg() {
+    return this.filePath ? is_svg(this.filePath) : false;
+  }
+
   async loadTarget() {
     const filePath = this.filePath;
     this.updateTabChrome();
@@ -203,8 +213,21 @@ export class EditorApp {
     this.error = null;
     this.content = null;
     this.mdMode = "preview";
+    this.svgView = false;
     this.setDirty(false);
     this.render();
+
+    // Raster images are binary, so skip the UTF-8 text read entirely; the image
+    // viewer pulls the bytes in itself. `content` is set to an empty string so
+    // renderBody treats the file as ready (it only branches to the viewer).
+    if (this.isImage()) {
+      this.content = "";
+      this.error = null;
+      this.loading = false;
+      this.setDirty(false);
+      this.render();
+      return;
+    }
 
     try {
       const file = await muxy.files.read(filePath);
@@ -258,6 +281,7 @@ export class EditorApp {
 
   async save() {
     if (!this.filePath || !this.child || this.saving) return false;
+    if (typeof this.child.getValue !== "function") return false;
     const next = this.child.getValue();
     this.saving = true;
     this.updateTopbar();
@@ -298,6 +322,15 @@ export class EditorApp {
     this.render();
   }
 
+  setSvgView(view) {
+    if (this.svgView === view) return;
+    // Preserve in-editor edits so toggling to View renders the latest source.
+    if (this.child?.getValue) this.content = this.child.getValue();
+    this.svgView = view;
+    this.bodyKey = null;
+    this.render();
+  }
+
   updateConfig(patch) {
     this.config = update_editor_config(this.config, patch);
     this.child?.updateConfig?.(this.config, this.isDark);
@@ -334,11 +367,44 @@ export class EditorApp {
   updateTopbar() {
     if (!this.topbar || !this.filePath) return;
     const markdown = this.isMarkdown();
+    const image = this.isImage();
+    const svg = this.isSvg();
     clear(this.topbar);
     const title = h("div", { class: "editor-title" }, h("span", { class: "editor-name" }, basename(this.filePath)));
     if (this.dirty) title.appendChild(h("span", { class: "editor-dirty", "aria-label": "Unsaved" }));
 
     const actions = h("div", { class: "toolbar-actions" });
+    if (svg) {
+      actions.appendChild(
+        h(
+          "div",
+          { class: "segmented topbar-segmented", role: "tablist" },
+          h(
+            "button",
+            {
+              type: "button",
+              role: "tab",
+              "aria-selected": !this.svgView,
+              class: cls("segment", !this.svgView && "segment-active"),
+              onClick: () => this.setSvgView(false),
+            },
+            "Code",
+          ),
+          h(
+            "button",
+            {
+              type: "button",
+              role: "tab",
+              "aria-selected": this.svgView,
+              class: cls("segment", this.svgView && "segment-active"),
+              onClick: () => this.setSvgView(true),
+            },
+            "View",
+          ),
+        ),
+      );
+      actions.appendChild(h("span", { class: "toolbar-divider" }));
+    }
     if (markdown) {
       actions.appendChild(
         h(
@@ -371,19 +437,25 @@ export class EditorApp {
       actions.appendChild(h("span", { class: "toolbar-divider" }));
     }
 
+    // Raster images can't be edited here, so they drop Save and editor Settings.
+    if (!image) {
+      actions.append(
+        h(
+          "button",
+          {
+            class: cls("tool-button", this.dirty && "tool-button-accent"),
+            type: "button",
+            "aria-label": "Save",
+            title: "Save",
+            disabled: !this.dirty || this.saving,
+            onClick: () => void this.save(),
+          },
+          SaveIcon(),
+        ),
+      );
+    }
+
     actions.append(
-      h(
-        "button",
-        {
-          class: cls("tool-button", this.dirty && "tool-button-accent"),
-          type: "button",
-          "aria-label": "Save",
-          title: "Save",
-          disabled: !this.dirty || this.saving,
-          onClick: () => void this.save(),
-        },
-        SaveIcon(),
-      ),
       h(
         "button",
         {
@@ -406,22 +478,27 @@ export class EditorApp {
         },
         OpenIcon(),
       ),
-      h("span", { class: "toolbar-divider" }),
-      h(
-        "button",
-        {
-          class: "tool-button",
-          type: "button",
-          "aria-label": "Editor settings",
-          title: "Editor settings",
-          onClick: () => {
-            this.showSettings = true;
-            this.renderSettings();
-          },
-        },
-        SettingsIcon(),
-      ),
     );
+
+    if (!image) {
+      actions.append(
+        h("span", { class: "toolbar-divider" }),
+        h(
+          "button",
+          {
+            class: "tool-button",
+            type: "button",
+            "aria-label": "Editor settings",
+            title: "Editor settings",
+            onClick: () => {
+              this.showSettings = true;
+              this.renderSettings();
+            },
+          },
+          SettingsIcon(),
+        ),
+      );
+    }
 
     this.topbar.append(title, actions);
   }
@@ -444,8 +521,14 @@ export class EditorApp {
       return;
     }
 
+    const image = this.isImage();
+    const svgPreview = this.isSvg() && this.svgView;
     const markdown = this.isMarkdown();
-    const key = markdown ? `${this.filePath}:markdown:${this.mdMode}` : `${this.filePath}:code`;
+    let key;
+    if (image) key = `${this.filePath}:image`;
+    else if (svgPreview) key = `${this.filePath}:svg-view`;
+    else if (markdown) key = `${this.filePath}:markdown:${this.mdMode}`;
+    else key = `${this.filePath}:code`;
     if (this.bodyKey === key && this.child) {
       this.child.updateConfig?.(this.config, this.isDark);
       return;
@@ -453,6 +536,18 @@ export class EditorApp {
 
     this.destroyChild();
     this.bodyKey = key;
+    if (image) {
+      this.child = new ImageViewer({ parent: this.body, filePath: this.filePath });
+      return;
+    }
+    if (svgPreview) {
+      this.child = new ImageViewer({
+        parent: this.body,
+        filePath: this.filePath,
+        svgSource: this.content,
+      });
+      return;
+    }
     if (markdown) {
       this.child = new MarkdownEditor({
         parent: this.body,

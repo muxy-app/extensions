@@ -43,6 +43,8 @@ import { cls, h, icon_svg } from "@/lib/dom";
 import { muxy_cm_theme } from "@/lib/editor-theme";
 import { muxy_highlight_style } from "@/lib/syntax-theme";
 import { language_for } from "@/lib/languages";
+import { tree_sitter_for } from "@/lib/tree-sitter";
+import { tree_sitter_highlight } from "@/editor/tree-sitter-highlight";
 import { linter_for } from "@/lib/linters";
 import { read_cursor_state, write_cursor_state } from "@/lib/cursor-state";
 import { gitGutterExtension, setGitBaseline } from "@/editor/git-gutter";
@@ -424,7 +426,6 @@ export class CodeEditor {
       indentOnInput(),
       search({ top: true, createPanel: (view) => new FindPanel(view) }),
       muxy_cm_theme(isDark),
-      muxy_highlight_style(),
       EditorView.theme({
         "&": { fontSize: `${config.fontSize}px` },
         ".cm-scroller": { fontSize: `${config.fontSize}px` },
@@ -491,10 +492,18 @@ export class CodeEditor {
 
   async loadLanguage(filePath) {
     const loadId = ++this.languageLoadId;
-    const lang = await language_for(filePath);
+    const [lang, treeSitter] = await Promise.all([
+      language_for(filePath),
+      this.config.treeSitter !== false ? tree_sitter_for(filePath).catch(() => null) : Promise.resolve(null),
+    ]);
     if (this.destroyed || loadId !== this.languageLoadId) return;
+    // The Lezer language stays on for structure (folding, indentation); when
+    // tree-sitter handles the file its decorations replace Lezer's
+    // highlight style instead of fighting it.
+    const extensions = lang ? [lang] : [];
+    extensions.push(treeSitter ? tree_sitter_highlight(treeSitter) : muxy_highlight_style());
     this.view.dispatch({
-      effects: this.languageCompartment.reconfigure(lang ? [lang] : []),
+      effects: this.languageCompartment.reconfigure(extensions),
     });
   }
 
@@ -512,6 +521,7 @@ export class CodeEditor {
   }
 
   updateConfig(config, isDark) {
+    const treeSitterChanged = (this.config.treeSitter !== false) !== (config.treeSitter !== false);
     this.config = config;
     this.isDark = isDark;
     if (!this.view) return;
@@ -521,6 +531,7 @@ export class CodeEditor {
         this.lintCompartment.reconfigure(this.lintExtension()),
       ],
     });
+    if (treeSitterChanged) this.loadLanguage(this.filePath);
   }
 
   getValue() {

@@ -7,6 +7,7 @@ export const DEFAULT_CONFIG = {
   codeFolding: true,
   linting: true,
   colorPreview: true,
+  treeSitter: true,
 };
 
 export const FONT_SIZE_MIN = 10;

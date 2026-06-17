@@ -237,6 +237,12 @@ textarea {
   color: var(--muxy-foreground-muted);
 }
 
+.file-tree-kind-icon img {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+}
+
 .file-tree-name {
   min-width: 0;
   overflow: hidden;
@@ -491,6 +497,105 @@ textarea {
 
 .editor-host .cm-scroller {
   font-family: "SF Mono", Menlo, monospace;
+}
+
+.image-viewer {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.image-stage {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: var(--s7);
+  /* Checkerboard so transparent images read clearly in both themes. */
+  background-color: var(--muxy-surface);
+  background-image:
+    linear-gradient(45deg, var(--muxy-hover) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--muxy-hover) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--muxy-hover) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--muxy-hover) 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+
+.image-stage-scroll {
+  align-items: safe center;
+  justify-content: safe center;
+  overflow: auto;
+}
+
+.image-canvas {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: var(--radius);
+  border: 1px solid var(--muxy-border);
+}
+
+.image-canvas-actual {
+  max-width: none;
+  max-height: none;
+  object-fit: none;
+  flex: 0 0 auto;
+}
+
+.image-meta {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s4);
+  padding: var(--s2) var(--s5);
+  border-top: 1px solid var(--muxy-border);
+  background: var(--muxy-background);
+  color: var(--muxy-foreground-muted);
+  font-size: var(--font-footnote);
+}
+
+.image-meta-info {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  min-width: 0;
+}
+
+.image-meta-item {
+  font-family: "SF Mono", Menlo, monospace;
+  white-space: nowrap;
+}
+
+.image-zoom-toggle {
+  flex: 0 0 auto;
+  height: var(--control);
+  padding: 0 var(--s5);
+  border: 1px solid var(--muxy-border);
+  border-radius: var(--radius);
+  background: var(--muxy-surface);
+  color: var(--muxy-foreground);
+  font-size: var(--font-footnote);
+  cursor: pointer;
+}
+
+.image-zoom-toggle:hover {
+  background: var(--muxy-hover);
+  border-color: var(--muxy-accent);
+}
+
+.image-status {
+  padding: var(--s6);
+  color: var(--muxy-foreground-muted);
+  font-size: var(--font-body);
+}
+
+.image-status-error {
+  color: var(--muxy-foreground);
 }
 
 .md-preview {

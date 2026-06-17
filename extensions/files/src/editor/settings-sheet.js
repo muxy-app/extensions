@@ -59,6 +59,11 @@ export class SettingsSheet {
       type: "checkbox",
       onChange: (event) => this.update({ colorPreview: event.target.checked }),
     });
+    this.treeSitter = h("input", {
+      id: "cfg-tree-sitter",
+      type: "checkbox",
+      onChange: (event) => this.update({ treeSitter: event.target.checked }),
+    });
 
     this.overlay = h(
       "div",
@@ -117,6 +122,12 @@ export class SettingsSheet {
         h(
           "div",
           { class: "sheet-row" },
+          h("label", { class: "sheet-label", for: "cfg-tree-sitter" }, "Tree-sitter highlighting"),
+          this.treeSitter,
+        ),
+        h(
+          "div",
+          { class: "sheet-row" },
           h("label", { class: "sheet-label" }, "Tab size"),
           h(
             "div",
@@ -158,6 +169,7 @@ export class SettingsSheet {
     this.codeFolding.checked = config.codeFolding !== false;
     this.linting.checked = config.linting !== false;
     this.colorPreview.checked = config.colorPreview !== false;
+    this.treeSitter.checked = config.treeSitter !== false;
 
     for (const [size, button] of this.tabButtons) {
       button.className = cls("segment", config.tabSize === size && "segment-active");
