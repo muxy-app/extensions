@@ -16,11 +16,16 @@
 //     tabs/review.bundle.js   <- esbuild output (vendor libs inlined)
 //     assets/*                <- topbar icon + marketplace icon/screenshots
 //
-// review.js imports the COMMITTED vendor/*.js bundles, so esbuild bundles
-// everything offline (no network) — which is what CI requires
-// (`npm ci --ignore-scripts` then `npm run build` with npm_config_offline=true).
+// review.js imports the libraries through the thin adapter modules in lib/
+// (which import from the `@codemirror/*`, `@pierre/trees`, and `marked` npm
+// packages declared in package.json `dependencies`). The marketplace pipeline
+// runs `npm ci --ignore-scripts` (registry access) to install that locked tree,
+// then `npm run build` with npm_config_offline=true — so esbuild bundles
+// everything from node_modules with NO network at build time. No vendored
+// bundles are committed: shipping minified source trips the store's
+// readable-source check, and the libs are now first-class dependencies.
 //
-// Local dev is a separate track: scripts/build.sh still writes the root
+// Local dev is a separate track: scripts/build.sh writes the root
 // tabs/review.bundle.js that the locally-installed Muxy loads via manifest.json.
 // This script never touches the repo root; it only writes dist/.
 

@@ -40,7 +40,9 @@ command) showing a file tree on the left and a code viewer on the right:
   `html`/`htm`/`xhtml`) a per-file segmented control appears above the viewer offering a
   rendered **Preview** alongside the CodeMirror **Source**. Renderable files **default to
   Preview**; the choice is a *sticky* preference (one value, remembered in `localStorage`), so
-  switching to Source sticks until you switch back. See "Preview" below.
+  switching to Source sticks until you switch back. HTML previews are **scriptless by default**
+  for safety; a `⚡` toolbar button opts the current file (or, ⌥/right-click, every file for a
+  timed window — or forever) into running inline JS. See "Preview" below.
 - The tree starts **fully collapsed** (`initialExpansion: 'closed'`); the set of folders the
   user opens is **remembered per (root, scope)** and restored on the next visit via
   `initialExpandedPaths`. See "Expansion persistence" below. A topbar **file-browser toggle**
@@ -298,8 +300,8 @@ deletion widgets (which are expected to add rows, unlike comments).
   marker is its gutter wedge, so the document is undisturbed. An **expanded** deletion renders a
   block `Decoration.widget` (`side:-1`, or `+1`/clamped for a deletion past doc end) holding a
   `DeletedLinesWidget` (red rows `.cm-diff-deleted-line`, inert so the text stays selectable —
-  collapse via the gutter). `WidgetType` comes from `vendor-src/cm-entry.js` (already exported —
-  no vendor rebuild). `diffExtensions()` is added to `baseExtensions` ahead of
+  collapse via the gutter). `WidgetType` is re-exported from `lib/codemirror.js` (already in the
+  export list). `diffExtensions()` is added to `baseExtensions` ahead of
   `commentExtensions()`; where a line is both commented and added, the diff wash wins by CSS
   source order (the comment 💬 gutter marker still shows).
 - **The diff gutter (`diffGutter`, behind `diffGutterCompartment`) is the only deletion marker.**
@@ -410,8 +412,9 @@ wash (yellow = open, green = resolved), and the bottom **Comments** drawer lists
   (`pointer-events` on, outside-click/Esc to dismiss, closes on editor scroll). `refreshComments`
   re-renders an open pinned popover so agent replies/resolutions (pulled in on focus) appear live.
   CM exports used (`Decoration`, `gutter`, `GutterMarker`, `StateField`, `StateEffect`,
-  `RangeSet`) are added in `vendor-src/cm-entry.js` — **re-run `scripts/fetch-vendor.sh` if you
-  change that list.**
+  `RangeSet`) are re-exported from `lib/codemirror.js` — **add any new symbol to that file's
+  re-export list before importing it in `review.js`** (esbuild bundles it straight from the
+  `@codemirror/*` packages in `node_modules`; no separate vendor step).
 - **Sending — never on creation.** "Send to agent" builds markdown (`buildMarkdown`) from the
   **open** threads only (resolved ones are done; in-progress ones were already handed off),
   grouped by file, each item carrying its `id`
@@ -526,16 +529,39 @@ file — see "Hunk navigation" under "Diff highlighting".)
   preference intact**, so the next renderable file re-renders. `applyView()` is the one place
   that maps (`currentKind`, `view`) → `show(...)`; `openFile` calls `updateToolbar()` then
   `applyView()`.
-- **Sandboxing — content under review may be hostile.** Both kinds render inside an iframe with
+- **Sandboxing — content under review may be hostile.** Both kinds render inside an iframe whose
+  `sandbox` is set **per render** (`renderPreview`). The default — and markdown **always** — is
   `sandbox=""` (the *empty* token list = maximum restrictions: **no scripts**, opaque origin,
   no form submission, no top-navigation). Inline CSS still applies, so markup/tables/text/inline
-  styles render, but any embedded `<script>` is inert and can't reach the parent — so **no
-  separate HTML sanitizer is needed**. The trade-off: relative external assets (linked CSS/JS,
-  images by relative path) don't load (opaque origin + sandbox), so HTML preview shows structure
-  and inline styling, not a fully-resourced page. This is deliberate for a review tool.
-- **Markdown rendering.** `vendor/marked/marked.js` (the `marked` parser, vendored like the CM
-  and trees bundles — built by `scripts/fetch-vendor.sh`, exported as `renderMarkdown` from
-  `vendor-src/marked-entry.js`, GFM on) turns the source into HTML. `renderPreview` wraps it in
+  styles render, but any embedded `<script>`/`onclick=` is inert and can't reach the parent — so
+  **no separate HTML sanitizer is needed**. The trade-off: relative external assets (linked
+  CSS/JS, images by relative path) don't load (opaque origin + sandbox), so HTML preview shows
+  structure and inline styling, not a fully-resourced page. This is deliberate for a review tool.
+- **Scripts in HTML previews (opt-in).** Authored HTML that relies on inline JS (e.g. `onclick=`
+  links) needs scripts to run. A `#view-scripts` toolbar button (shown only for HTML files,
+  between the diff-nav and the Source|Preview control) lets the user opt in — and even then the
+  iframe gets `sandbox="allow-scripts"` **alone** (no `allow-same-origin`), so the page keeps an
+  opaque origin and still can't touch the parent tab's DOM/cookies/storage. **Plain click** opts
+  the **current file** in (per-file); **⌥-click / right-click** opens a small menu
+  (`openScriptsMenu` — reuses the shared `openMenu`/`positionFixedMenu` machinery) to enable
+  scripts for **every** HTML preview for a **timed window** — presets 10/30/60m plus a remembered
+  custom value, and **custom…** swaps the menu body to an inline minutes input (**not**
+  `window.prompt`, which would freeze the whole webview/bridge) — or **forever** (always on). The
+  button is **lit** (`aria-pressed="true"`) and labelled `⚡ Scripts on` / `⚡ Scripts on · Nm` /
+  `⚡ Scripts on · always` while active; a plain click while on is a **global kill-switch** (clears
+  the file's opt-in, any running window, *and* a persisted forever grant).
+  `scriptsAllowed(path)` gates `renderPreview`'s sandbox; a `setInterval` (`onScriptTick`, 15s)
+  keeps the timed-window countdown fresh and **re-renders to revoke scripts** when the window
+  lapses (forever needs no tick). **State model — `state.scriptsUntil`:** `0` = off, a future ms
+  timestamp = timed window, **`Infinity` = forever**. **Persistence:** the chosen window *length*
+  (`review:scriptwindow`) AND a **forever** grant (`review:scriptsforever`, restored in `init` via
+  `loadScriptsForever`) are remembered; per-file opt-ins and a *timed* window are deliberately
+  **session-only** (a timed grant silently surviving a reload would be surprising and unsafe, but
+  *forever* is an explicit, deliberate, clearly-labelled standing choice — like the Source/Preview
+  preference — so it persists until turned off). `startScriptWindow`/`endScriptWindow` both clear
+  the persisted forever flag (a timed window supersedes it; turning off clears everything).
+- **Markdown rendering.** `lib/markdown.js` (the `marked` parser — an npm dependency — exported as
+  `renderMarkdown`, GFM on) turns the source into HTML. `renderPreview` wraps it in
   a full document with a GitHub-flavored stylesheet (`markdownCss`) themed with **literal**
   colors resolved from the live `--muxy-*` variables (`themeColors()` reads them via
   `getComputedStyle` — CSS variables don't cascade into a separate iframe document). Because
@@ -562,61 +588,74 @@ file — see "Hunk navigation" under "Diff highlighting".)
   manifest body (permissions, tabTypes, commands, topbarItems, marketplace listing) under the
   `muxy` key (no `$schema`/`name`/`version` inside it — the validator flattens
   `{...muxy, name, version}` against an `additionalProperties:false` schema). Declares the `build`
-  script and `esbuild` devDep. `package-lock.json` is committed (CI requires it).
+  script, the runtime libraries as `dependencies` (CodeMirror 6 packages, `@pierre/trees`,
+  `marked`), and `esbuild` as a devDep. `package-lock.json` is committed (CI requires it — the
+  marketplace build runs `npm ci` from it).
 - `README.md` — the marketplace/store readme (description + per-permission justification).
 - `assets/review.svg` — topbar glyph (`currentColor`, tinted by the chrome).
 - `assets/icon.svg` — the 256-canvas marketplace listing icon (self-colored).
 - `tabs/review.html` / `review.css` — the tab shell and styling (themed entirely with
   `--muxy-*` variables; the tree is themed via `--trees-*-override`).
 - `tabs/review.js` — **source** for the tab logic (ESM). Edit this.
-- `tabs/review.bundle.js` — **build artifact**: a classic-script IIFE bundling `review.js`
-  plus the vendored libraries. The HTML loads this (classic `<script>`, so there's no
-  ES-module / `file://` scheme risk in the webview). Do not edit by hand.
-- `vendor/codemirror/codemirror.js` — self-contained CodeMirror 6 bundle (one
-  `@codemirror/state` instance; core + many languages). Built from `vendor-src/cm-entry.js`.
-- `vendor/trees/trees.js` — self-contained `@pierre/trees` bundle (preact inlined). Built
-  from `vendor-src/trees-entry.js`.
-- `vendor/marked/marked.js` — self-contained `marked` (markdown→HTML) bundle, exporting
-  `renderMarkdown`. Built from `vendor-src/marked-entry.js`. Powers the markdown Preview.
+- `tabs/review.bundle.js` — **build artifact** (gitignored): a classic-script IIFE bundling
+  `review.js` plus its npm dependencies. The HTML loads this (classic `<script>`, so there's no
+  ES-module / `file://` scheme risk in the webview). Do not edit by hand; regenerated by
+  `scripts/build.sh` / `scripts/build.mjs`. **Not committed** — shipping minified source trips the
+  store's readable-source check.
+- `lib/codemirror.js` — thin adapter re-exporting from the `@codemirror/*` packages and defining
+  `languageFor` (extension → CM language). One esbuild pass keeps a single `@codemirror/state`
+  instance (core + many languages). Readable source — edit freely.
+- `lib/trees.js` — thin adapter re-exporting `FileTree` (& friends) from `@pierre/trees`.
+- `lib/markdown.js` — thin adapter exporting `renderMarkdown` (built on `marked`, GFM on).
+  Powers the markdown Preview.
 
 ## Build
 
 There are **two build tracks** — local dev (loads from the repo root) and marketplace (ships a
-`dist/`). They share one source (`tabs/review.js` + the committed `vendor/` bundles).
+`dist/`). They share one source (`tabs/review.js` + the `lib/` adapters) and one set of npm
+`dependencies`; the bundle is produced at build time, never committed. **Run `npm install` once**
+to populate `node_modules` before either track (the marketplace pipeline does this for you via
+`npm ci`).
 
-- `scripts/fetch-vendor.sh` — rebuilds the three `vendor/` bundles (CodeMirror, trees, marked)
-  from npm via bun + esbuild. Re-run after bumping a pinned version in the script. **Needs
-  network** — not part of the marketplace build (it consumes the committed bundles).
 - `scripts/build.sh` — **local dev**: rebuilds the root `tabs/review.bundle.js` from
-  `tabs/review.js` (bun, IIFE). **Run this after editing `review.js` (or a vendor bundle), then
-  Reload in Muxy** — the locally-installed app loads the root bundle via `manifest.json`.
+  `tabs/review.js` (bun, IIFE — resolving the libraries from `node_modules`) **and then regenerates
+  `dist/`** (it calls `scripts/build.mjs`), because the locally-installed Muxy serves this extension
+  from **`dist/`** (see the ⚠️ gotcha under "Editing"). **Run this after editing `review.js` (or a
+  `lib/` adapter), then Reload in Muxy.**
 - `scripts/build.mjs` (`npm run build`) — **marketplace**: assembles `dist/` (esbuild bundles
-  `review.js` + inlined vendor → `dist/tabs/review.bundle.js`, then copies `review.html`,
-  `review.css`, `assets/*`, **and `package.json`**, mirroring the root layout). The pipeline now
-  **requires the manifest (`package.json`) inside `dist/`** — build hard-fails otherwise
+  `review.js` + its dependencies from `node_modules` → `dist/tabs/review.bundle.js`, then copies
+  `review.html`, `review.css`, `assets/*`, **and `package.json`**, mirroring the root layout). The
+  pipeline **requires the manifest (`package.json`) inside `dist/`** — build hard-fails otherwise
   (`build did not emit 'package.json' into 'dist/'`) — so `dist/package.json` is the one piece of
-  the source tree that intentionally ships. Offline-safe (esbuild from the lockfile, committed
-  vendor as inputs), matching CI's `npm ci --ignore-scripts` → `npm run build` (npm offline).
-  `dist/` is **gitignored** — it's regenerated and is the *only* thing the marketplace packs/ships,
-  so raw source, `vendor/`, `CLAUDE.md`, `.claude/`, `scripts/`, etc. never reach users (only the
-  bundled runtime + `package.json` do). **Deliberately single-purpose and offline** —
-  it only emits `dist/`; the fork-simulation lives in `preflight.mjs`, not here, so CI's `npm run
-  build` stays fast and network-free.
+  the source tree that intentionally ships. Offline-safe at build time (esbuild reads only
+  `node_modules`): the store pipeline runs `npm ci --ignore-scripts` (registry access, installs the
+  locked dependency tree) **then** `npm run build` with `npm_config_offline=true`, so no network is
+  used during the bundle. `dist/` is **gitignored** — it's regenerated and is the *only* thing the
+  marketplace packs/ships, so raw source, `lib/`, `node_modules/`, `CLAUDE.md`, `.claude/`,
+  `scripts/`, etc. never reach users (only the bundled runtime + `package.json` do). **Deliberately
+  single-purpose and offline** — it only emits `dist/`; the fork-simulation lives in `preflight.mjs`,
+  not here, so CI's `npm run build` stays fast and network-free.
 - `scripts/preflight.mjs` (`npm run preflight`) — **local pre-flight**: runs this extension
   through the *real* `muxy-app/extensions` tooling (build → validate → pack --dry-run) without
   hand-forking. It clones (and refreshes) that repo into a cache under the OS tmpdir —
   **realpath'd**, because macOS `/tmp → /private/tmp` would otherwise break the tooling's
   `process.argv[1] === import.meta.url` self-invoke guard (build/pack are guarded; validate is
   not) and `main()` would silently no-op — stages a copy of us into `extensions/<name>/` (minus
-  `node_modules`/`dist`/`.git`), then drives the tooling. It also **independently validates the
+  the regenerated/gitignored artifacts — `node_modules`/`dist`/`.git`/`vendor`/the root
+  `tabs/review.bundle.js` — so the staged tree mirrors what the PR actually commits, and
+  validate.mjs doesn't false-alarm on a locally-built minified bundle), then drives the tooling. It also **independently validates the
   raw `package.json` against the live `muxy-app/muxy` schema**: as of this writing the tooling on
   `main` *flattens* the manifest to `{...muxy, name, version}` before validating, which disagrees
   with the current schema (it requires top-level `name`/`version`/`scripts`/`muxy`) and so fails
   for *every* extension — the independent check is the trustworthy signal (`package.json` PASSes
   it). Needs git + network; not part of CI.
 
-The root `vendor/` bundles + `tabs/review.bundle.js` are committed because the **local** Muxy
-loads them directly at runtime. The shipped copy is rebuilt into `dist/` from source.
+The bundle (`tabs/review.bundle.js`) and `dist/` are **build artifacts, not committed** — they're
+regenerated from `tabs/review.js` + the `lib/` adapters + the npm `dependencies`. The
+locally-installed Muxy serves the extension from **`dist/`** (it resolves the tab entry to
+`dist/tabs/review.html`; a relaunch errors if `dist/` is missing — see the ⚠️ gotcha under
+"Editing"). That's why `scripts/build.sh` regenerates `dist/` too — so the served tree stays
+current. The shipped copy is rebuilt into `dist/` from source.
 
 ### Publishing to the marketplace
 
@@ -635,10 +674,12 @@ Review tab before submitting; the manifest already references it.
 
 - **Writable editor:** drop the `EditorState.readOnly` / `EditorView.editable.of(false)`
   lines in `baseExtensions()` and wire a save path.
-- **Rendered Preview (markdown / HTML):** ✅ shipped (see "Preview" above). Natural extensions
-  left open: more renderable kinds (SVG, CSV, notebooks), an `allow-scripts` opt-in for trusted
-  pages, a `<base>`/asset-resolver so relative HTML resources load, and anchoring comments to
-  rendered nodes so Preview can show/add threads too.
+- **Rendered Preview (markdown / HTML):** ✅ shipped (see "Preview" above). The **`allow-scripts`
+  opt-in for trusted pages** is ✅ shipped too — per-file or a timed window, see "Scripts in HTML
+  previews" under "Preview". Natural extensions left open: more renderable kinds (SVG, CSV,
+  notebooks), a `<base>`/asset-resolver so relative HTML resources load (an `allow-same-origin`
+  step would be needed for that, and weighed against the opaque-origin guarantee), and anchoring
+  comments to rendered nodes so Preview can show/add threads too.
 - **Per-line comment threads + resolve/reply:** ✅ shipped (see "Comments" above). **Multi-line
   *range* comments** ✅ also shipped (click-drag the line-number gutter; `endLine` on the model).
   Natural extensions left open: live position tracking so a thread follows edits (currently
@@ -651,6 +692,21 @@ After changing `manifest.json` or any tab asset, click "Reload" in the
 Muxy Extensions modal to pick up the changes. Remember to run `scripts/build.sh` first if
 you edited `tabs/review.js`. If you change a path, permission, or listing field, mirror the edit
 into `package.json`'s `muxy` block (the marketplace manifest) so the two stay in sync.
+
+**⚠️ Gotcha — Muxy serves this extension from `dist/`, so keep `dist/` built and current.**
+The locally-installed Muxy resolves the tab entry to **`dist/tabs/review.html`** — a full
+quit+relaunch with `dist/` missing fails outright (`Tab type 'review' entry not found at
+…/review/dist/tabs/review.html`). So editing root source and rebuilding *only* the root
+`tabs/review.bundle.js` is **not** enough — your changes won't appear, because Muxy is serving the
+stale `dist/`. **`scripts/build.sh` now rebuilds BOTH** the root bundle **and** `dist/` (it calls
+`scripts/build.mjs` at the end), so a single `scripts/build.sh` + Reload keeps the served tree
+fresh. **Do NOT delete `dist/`** to "force root loading" — an in-modal *Reload* may transiently
+fall back to root, but a real relaunch hard-expects `dist/` and errors without it (this cost a
+debugging session: first a new toolbar button never rendered because `dist/` was stale, then a
+relaunch broke entirely after `dist/` was removed). The empirical rule is simply: **`dist/` must
+exist and be current** — `scripts/build.sh` (or `npm run build`) ensures that. A fast way to tell
+the live tree is stale during diagnosis: drop a unique static (script-free, so no CSP issue)
+marker in `tabs/review.html`, rebuild, and check whether it appears.
 
 ## Skill
 

@@ -64,8 +64,15 @@ if (!fs.existsSync(path.join(cache, ".git"))) {
   run("git", ["-C", cache, "reset", "--hard", "FETCH_HEAD"]);
 }
 
-// 2. Stage this extension (copy, excluding regenerated/heavy dirs).
-const EXCLUDE = new Set(["node_modules", "dist", ".git"]);
+// 2. Stage this extension (copy, excluding regenerated/heavy dirs). We mirror
+//    what actually ships in the PR: the build artifacts (the root IIFE bundle
+//    and any vendor/ dir) are gitignored and NOT committed, so the marketplace
+//    build regenerates them inside dist/. If we copied the locally-built root
+//    bundle, validate.mjs would flag it as minified — a false alarm the real
+//    git checkout never sees. Exclude both the heavy/regenerated top-level dirs
+//    AND those specific build-artifact paths.
+const EXCLUDE = new Set(["node_modules", "dist", ".git", "vendor"]);
+const EXCLUDE_FILES = new Set(["tabs/review.bundle.js"]);
 fs.rmSync(stageDir, { recursive: true, force: true });
 fs.mkdirSync(stageDir, { recursive: true });
 fs.cpSync(extRoot, stageDir, {
@@ -74,7 +81,8 @@ fs.cpSync(extRoot, stageDir, {
     const rel = path.relative(extRoot, src);
     if (!rel) return true;
     const top = rel.split(path.sep)[0];
-    return !EXCLUDE.has(top);
+    if (EXCLUDE.has(top)) return false;
+    return !EXCLUDE_FILES.has(rel.split(path.sep).join("/"));
   },
 });
 console.log(`staged ${name} -> ${stageDir}`);

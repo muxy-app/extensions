@@ -54,23 +54,25 @@ flip a thread's status.
 
 ## Building from source
 
-The tab loads pre-built bundles (`tabs/review.bundle.js` and the vendored
-CodeMirror / `@pierre/trees` / `marked` libraries under `vendor/`). For **local
-development** these are committed so Muxy can load the directory directly — there
-is no build step on the user's machine. To rebuild after editing the source:
+The runtime libraries — CodeMirror 6, `@pierre/trees`, and `marked` — are
+ordinary npm `dependencies` (see `package.json`); the source tree itself ships
+only readable code (`tabs/review.js` + the thin `lib/` adapter modules), no
+minified vendor bundles. The bundle is produced at build time. First install the
+dependencies, then build:
 
 ```sh
-scripts/fetch-vendor.sh   # rebuild the vendored library bundles (rarely needed)
-scripts/build.sh          # rebuild tabs/review.bundle.js from tabs/review.js
+npm install        # install the libraries into node_modules (writes the lockfile)
+scripts/build.sh   # bundle tabs/review.js + deps -> tabs/review.bundle.js, refresh dist/
 ```
 
 Then click **Reload** in Muxy's Extensions settings.
 
-For the **marketplace**, `npm run build` assembles a self-contained `dist/`
-(the only thing shipped to users — source, `vendor/`, and dev files stay
-behind), and `npm run preflight` runs the extension through the real
-`muxy-app/extensions` tooling (build → validate → pack) locally before you open
-a PR.
+For the **marketplace**, `npm run build` assembles a self-contained `dist/` by
+bundling `tabs/review.js` and its dependencies with esbuild (this is exactly
+what the store pipeline runs after `npm ci --ignore-scripts`). `dist/` is the
+only thing shipped to users — source and dev files stay behind. `npm run
+preflight` runs the extension through the real `muxy-app/extensions` tooling
+(build → validate → pack) locally before you open a PR.
 
 ## License
 

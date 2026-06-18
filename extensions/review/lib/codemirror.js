@@ -1,6 +1,9 @@
-// Single CodeMirror 6 entry point. Everything the review tab needs is imported
-// here and re-exported, so esbuild produces ONE bundle with a single
-// @codemirror/state instance (mixing separate per-language bundles breaks CM6).
+// Single CodeMirror 6 adapter module. Everything the review tab needs is
+// imported here from the `@codemirror/*` npm packages (declared in
+// package.json) and re-exported, so the one esbuild pass over review.js keeps a
+// single @codemirror/state instance (mixing separate per-language copies breaks
+// CM6). npm dedupes @codemirror/state to one version at install time, and
+// esbuild inlines that single copy.
 
 export { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection, highlightSpecialChars, rectangularSelection, crosshairCursor, Decoration, WidgetType, gutter, GutterMarker } from '@codemirror/view';
 export { EditorState, Compartment, StateField, StateEffect, RangeSet, RangeSetBuilder } from '@codemirror/state';

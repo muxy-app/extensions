@@ -1,6 +1,6 @@
-// Single entry point for the `marked` markdown parser. esbuild bundles this
-// into one self-contained ESM file (vendor/marked/marked.js) so the tab needs
-// no install step — same vendoring pattern as the CodeMirror and trees bundles.
+// Adapter for the `marked` markdown parser (declared in package.json). esbuild
+// bundles it into review.bundle.js — same pattern as the CodeMirror and trees
+// adapters — so the tab needs no committed vendor copy.
 //
 // We expose a single `renderMarkdown(src)` that returns an HTML string. GFM is
 // on (tables, strikethrough, task lists, autolinks). The output is rendered

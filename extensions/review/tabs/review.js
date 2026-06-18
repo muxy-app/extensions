@@ -6,9 +6,9 @@ import {
   searchKeymap, highlightSelectionMatches, tags as t, languageFor,
   Decoration, WidgetType, gutter, GutterMarker,
   StateField, StateEffect, RangeSet,
-} from '../vendor/codemirror/codemirror.js';
-import { FileTree } from '../vendor/trees/trees.js';
-import { renderMarkdown } from '../vendor/marked/marked.js';
+} from '../lib/codemirror.js';
+import { FileTree } from '../lib/trees.js';
+import { renderMarkdown } from '../lib/markdown.js';
 
 /* ------------------------------------------------------------------ utils */
 const $ = (id) => document.getElementById(id);
@@ -367,6 +367,9 @@ const state = {
   openToken: 0,       // bumped per openFile() so a superseded read never commits/flashes
   restoreFile: null,  // file to pre-select on first tree build (from the saved session)
   view: 'source',     // 'source' | 'preview' — remembered preference
+  scriptFiles: new Set(), // HTML files the user opted into running scripts for (this session only)
+  scriptsUntil: 0,    // ms timestamp; while in the future, EVERY HTML preview runs scripts (timed window)
+  scriptTimer: 0,     // setInterval id ticking the countdown label / revoking scripts on expiry
   tree: null,
   saveTimer: 0,
   sessionSaveTimer: 0, // debounce for persisting open-file + scroll on editor scroll
@@ -424,6 +427,34 @@ function loadViewMode() {
 }
 function saveViewMode(mode) {
   try { localStorage.setItem(VIEW_MODE_KEY, mode); } catch { /* best-effort */ }
+}
+
+// The "enable scripts for the next N minutes" window length is itself a sticky
+// preference (the user's customizable amount) — remember the last chosen value so
+// the timed-window presets default to it. Persisted like the other prefs; a *timed*
+// window and per-file opt-ins are deliberately NOT persisted (a timed grant
+// surviving a tab reload would be surprising — and unsafe — so they're session-only).
+const SCRIPT_WINDOW_KEY = 'review:scriptwindow';
+function loadScriptWindow() {
+  const n = parseInt(localStorage.getItem(SCRIPT_WINDOW_KEY) || '', 10);
+  return Number.isFinite(n) && n > 0 ? Math.min(n, 720) : 10; // default 10m, cap 12h
+}
+function saveScriptWindow(min) {
+  try { localStorage.setItem(SCRIPT_WINDOW_KEY, String(min)); } catch { /* best-effort */ }
+}
+// "Forever" IS persisted (unlike a timed window): it's an explicit, deliberate
+// "always run scripts" choice — like the Source/Preview preference — so it sticks
+// across reloads until the user turns it off. The button stays lit and labelled
+// "· always" so the standing grant is never a silent surprise.
+const SCRIPTS_FOREVER_KEY = 'review:scriptsforever';
+function loadScriptsForever() {
+  try { return localStorage.getItem(SCRIPTS_FOREVER_KEY) === '1'; } catch { return false; }
+}
+function saveScriptsForever(on) {
+  try {
+    if (on) localStorage.setItem(SCRIPTS_FOREVER_KEY, '1');
+    else localStorage.removeItem(SCRIPTS_FOREVER_KEY);
+  } catch { /* best-effort */ }
 }
 
 /* -------------------------------------------------------- pane layout persistence
@@ -2191,6 +2222,7 @@ function updateToolbar() {
   if (count) count.textContent = n ? `${n} change${n === 1 ? '' : 's'}` : '';
   for (const btn of document.querySelectorAll('.vseg'))
     btn.setAttribute('aria-selected', String(btn.dataset.view === state.view));
+  updateScriptsButton(); // its visibility/label tracks the open file (HTML only)
 }
 
 function setViewMode(mode) {
@@ -2284,13 +2316,179 @@ function renderPreview(text, kind) {
     try { html = renderMarkdown(text); }
     catch (err) { html = `<pre>${escapeHtml(String(err))}</pre>`; }
     iframe.style.background = c.bg;
+    iframe.setAttribute('sandbox', ''); // our own markup — never needs (or runs) scripts
     iframe.srcdoc = `<!doctype html><html><head><meta charset="utf-8">`
       + `<style>${markdownCss(c)}</style></head><body>${html}</body></html>`;
   } else {
     // Authored HTML is rendered as-is (on a white backdrop, as a browser would).
+    // Scripts run only when the user has opted this file in (per-file toggle or an
+    // active timed window) — and even then with `allow-scripts` ALONE, so the page
+    // keeps an opaque origin and can't touch the parent tab. Set the attribute
+    // BEFORE srcdoc so the (re)load picks it up.
     iframe.style.background = '#fff';
+    iframe.setAttribute('sandbox', scriptsAllowed(state.current) ? 'allow-scripts' : '');
     iframe.srcdoc = text || '';
   }
+}
+
+/* ------------------------------------------------ scripts in HTML previews
+ * HTML previews are scriptless by default (sandbox=""). Authored pages that
+ * rely on inline JS (e.g. `onclick=`) need scripts to run, so the user can opt
+ * in — per file (plain click), or for a timed window across files (⌥-click /
+ * right-click → pick a duration, or "forever"). Scripts always run with
+ * `allow-scripts` ALONE (opaque origin, no parent access). Per-file opt-ins and
+ * a *timed* window are session-only; the chosen window length AND a "forever"
+ * grant are remembered (forever persists across reloads until turned off).
+ */
+// scriptsUntil semantics: 0 = off, a future ms timestamp = timed window,
+// Infinity = "forever" (the persisted always-on grant).
+function scriptsForeverOn() { return state.scriptsUntil === Infinity; }
+function scriptsWindowActive() {
+  return state.scriptsUntil > 0 && Date.now() < state.scriptsUntil; // true for Infinity too
+}
+function scriptsAllowed(path) {
+  if (scriptsWindowActive()) return true;            // forever or a live timed window: every HTML file
+  return path != null && state.scriptFiles.has(path); // else this one file, if opted in
+}
+function endScriptWindow() {
+  state.scriptsUntil = 0;
+  saveScriptsForever(false); // turning off also clears any persisted "forever"
+  if (state.scriptTimer) { clearInterval(state.scriptTimer); state.scriptTimer = 0; }
+}
+function startScriptWindow(minutes) {
+  saveScriptWindow(minutes);
+  saveScriptsForever(false); // a timed window supersedes (and clears) a persisted "forever"
+  state.scriptsUntil = Date.now() + minutes * 60_000;
+  if (state.scriptTimer) clearInterval(state.scriptTimer);
+  // Tick to keep the countdown label fresh and to revoke scripts the moment the
+  // window lapses (re-render the live preview without allow-scripts).
+  state.scriptTimer = setInterval(onScriptTick, 15_000);
+  refreshScripts();
+}
+// "Forever" — always run scripts, persisted across reloads (no countdown, so no
+// tick). Restored on load in init() via loadScriptsForever().
+function enableScriptsForever() {
+  saveScriptsForever(true);
+  state.scriptsUntil = Infinity;
+  if (state.scriptTimer) { clearInterval(state.scriptTimer); state.scriptTimer = 0; }
+  refreshScripts();
+}
+function onScriptTick() {
+  if (!scriptsWindowActive()) { endScriptWindow(); refreshScripts(); return; }
+  updateScriptsButton(); // just refresh the "· Nm" countdown
+}
+// The master on/off for the current file. If scripts are on (either reason),
+// turn them fully off — clear this file's opt-in AND any active window (the
+// window is global, so the toggle is a global kill-switch when one is running).
+function toggleScripts() {
+  const path = state.current;
+  if (path == null) return;
+  if (scriptsAllowed(path)) {
+    state.scriptFiles.delete(path);
+    if (scriptsWindowActive()) endScriptWindow();
+  } else {
+    state.scriptFiles.add(path);
+  }
+  refreshScripts();
+}
+// Re-paint the live HTML preview so a scripts on/off change takes effect, then
+// reflect the new state on the toolbar button.
+function refreshScripts() {
+  if (state.currentKind === 'html' && state.view === 'preview') {
+    renderPreview(state.currentText, state.currentKind);
+  }
+  updateScriptsButton();
+}
+function updateScriptsButton() {
+  const wrap = $('view-scripts-wrap'), btn = $('view-scripts');
+  if (!wrap || !btn) return;
+  const isHtml = state.currentKind === 'html';
+  wrap.hidden = !isHtml; // scripts only mean anything for an HTML preview
+  if (!isHtml) return;
+  const on = scriptsAllowed(state.current);
+  btn.setAttribute('aria-pressed', String(on));
+  if (scriptsForeverOn()) {
+    btn.textContent = '⚡ Scripts on · always';
+    btn.title = 'Scripts enabled for every HTML preview, permanently (persists across reloads). '
+      + 'Click to turn off; ⌥-click to change.';
+  } else if (scriptsWindowActive()) {
+    const mins = Math.max(1, Math.ceil((state.scriptsUntil - Date.now()) / 60_000));
+    btn.textContent = `⚡ Scripts on · ${mins}m`;
+    btn.title = `Scripts enabled for every HTML preview for ${mins} more minute${mins === 1 ? '' : 's'}. `
+      + `Click to turn off; ⌥-click to change the window.`;
+  } else if (on) {
+    btn.textContent = '⚡ Scripts on';
+    btn.title = 'Scripts enabled for this file. Click to turn off; ⌥-click (or right-click) for a timed window across files.';
+  } else {
+    btn.textContent = '⚡ Enable scripts';
+    btn.title = 'Run scripts in this HTML preview. Click to enable for this file; ⌥-click (or right-click) for a timed window across files.';
+  }
+}
+function labelMinutes(m) {
+  if (m >= 60 && m % 60 === 0) { const h = m / 60; return `${h} hour${h === 1 ? '' : 's'}`; }
+  return `${m} minute${m === 1 ? '' : 's'}`;
+}
+// ⌥-click / right-click the button: choose a timed window (or turn off). Reuses
+// the shared one-open-at-a-time `openMenu` machinery + positionFixedMenu.
+function openScriptsMenu() {
+  const menuEl = $('scripts-menu'), wrapEl = $('view-scripts-wrap'), anchorEl = $('view-scripts');
+  if (openMenu && openMenu.menuEl === menuEl) { closeSendMenu(); return; } // toggle off
+  closeSendMenu();
+  buildScriptsMenu(menuEl);
+  menuEl.hidden = false;
+  wrapEl.classList.add('menu-open');
+  const place = () => positionFixedMenu(menuEl, anchorEl);
+  openMenu = { menuEl, wrapEl, place };
+  document.addEventListener('click', onDocClickForMenu, true);
+  document.addEventListener('keydown', onDocKeyForMenu, true);
+  place();
+}
+function buildScriptsMenu(menuEl) {
+  menuEl.textContent = '';
+  menuEl.append(menuLabel('run scripts in HTML previews'));
+  const presets = [10, 30, 60];
+  const last = loadScriptWindow();
+  if (!presets.includes(last)) presets.push(last); // surface the custom default too
+  presets.sort((a, b) => a - b);
+  for (const m of presets) {
+    menuEl.append(menuItem(`for ${labelMinutes(m)}`, 'across every file until it expires',
+      () => { closeSendMenu(); startScriptWindow(m); }));
+  }
+  menuEl.append(menuItem('custom…', 'choose a number of minutes',
+    () => customScriptWindow(menuEl)));
+  menuEl.append(menuItem(`${scriptsForeverOn() ? '✓ ' : ''}forever`, 'always on; persists across reloads',
+    () => { closeSendMenu(); enableScriptsForever(); }));
+  if (scriptsWindowActive() || state.scriptFiles.size) {
+    menuEl.append(menuItem('turn off now', 'disable scripts everywhere',
+      () => { closeSendMenu(); state.scriptFiles.clear(); endScriptWindow(); refreshScripts(); }));
+  }
+  openMenu?.place?.();
+}
+// Swap the menu body to an inline minutes input — NOT window.prompt(), which
+// would block the whole webview (a modal dialog freezes the extension bridge).
+function customScriptWindow(menuEl) {
+  menuEl.textContent = '';
+  menuEl.append(menuLabel('minutes to enable scripts'));
+  const row = document.createElement('div');
+  row.className = 'menu-custom';
+  const input = document.createElement('input');
+  input.type = 'number'; input.min = '1'; input.max = '720';
+  input.className = 'menu-custom-input';
+  input.value = String(loadScriptWindow());
+  const go = document.createElement('button');
+  go.type = 'button'; go.className = 'action'; go.textContent = 'Enable';
+  const commit = () => {
+    const n = Math.max(1, Math.min(720, parseInt(input.value, 10) || 0));
+    if (!n) return;
+    closeSendMenu();
+    startScriptWindow(n);
+  };
+  go.addEventListener('click', commit);
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); commit(); } });
+  row.append(input, go);
+  menuEl.append(row);
+  openMenu?.place?.(); // height changed
+  input.focus(); input.select();
 }
 
 // True when a sample of the content reads as binary: an embedded NUL, or a
@@ -2681,6 +2879,12 @@ async function init() {
   $('seg-changed').addEventListener('click', () => selectScope('changed'));
   $('view-source').addEventListener('click', () => setViewMode('source'));
   $('view-preview').addEventListener('click', () => setViewMode('preview'));
+  // Plain click toggles scripts for the open HTML file; ⌥-click (or right-click)
+  // opens the timed-window picker.
+  $('view-scripts').addEventListener('click', (e) => {
+    if (e.altKey) { e.preventDefault(); openScriptsMenu(); } else toggleScripts();
+  });
+  $('view-scripts').addEventListener('contextmenu', (e) => { e.preventDefault(); openScriptsMenu(); });
   $('diff-prev').addEventListener('click', () => gotoHunk(-1));
   $('diff-next').addEventListener('click', () => gotoHunk(1));
   $('refresh').addEventListener('click', () => reloadAll());
@@ -2700,6 +2904,9 @@ async function init() {
     loadComments();
   });
   state.view = loadViewMode();
+  // Restore a persisted "forever" scripts grant (the only scripts state that
+  // survives a reload — timed windows and per-file opt-ins are session-only).
+  if (loadScriptsForever()) state.scriptsUntil = Infinity;
   // Restore the remembered pane layout (sidebar width/open + drawer height/open).
   state.panes.sidebar = loadPane('sidebar');
   state.panes.comments = loadPane('comments');
