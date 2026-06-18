@@ -307,7 +307,30 @@ export async function push(cwd, { setUpstream } = {}) {
 }
 
 export function pull(cwd) {
-    return run(["git", "pull"], cwd);
+    return run(["git", "pull", "--ff-only"], cwd);
+}
+
+export function fetch(cwd) {
+    return run(["git", "fetch"], cwd);
+}
+
+export async function upstreamDivergence(cwd) {
+    const upstream = await muxy.exec(["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], { cwd });
+    if (upstream.exitCode !== 0)
+        return null;
+    const out = await run(["git", "rev-list", "--left-right", "--count", "@{upstream}...HEAD"], cwd);
+    const match = out.trim().match(/^(\d+)\s+(\d+)$/);
+    if (!match)
+        throw new Error(`Unexpected rev-list output: ${out.trim()}`);
+    return { behind: Number(match[1]), ahead: Number(match[2]) };
+}
+
+export function reconcile(cwd, mode) {
+    if (mode === "rebase")
+        return run(["git", "rebase", "@{upstream}"], cwd);
+    if (mode === "merge")
+        return run(["git", "merge", "@{upstream}"], cwd);
+    return run(["git", "merge", "--ff-only", "@{upstream}"], cwd);
 }
 
 export function cherryPick(cwd, hash) {

@@ -44,6 +44,26 @@ function writePrListCache(cache) {
         return;
     }
 }
+async function chooseReconcile() {
+    try {
+        const choice = await muxy.dialog.confirm({
+            title: "Branch has diverged",
+            message: "Your branch and the remote each have new commits. Choose how to combine them.",
+            buttons: ["Merge", "Rebase", "Cancel"],
+            default: "Cancel",
+            cancel: "Cancel",
+            style: "warning",
+        });
+        if (choice === "Merge")
+            return "merge";
+        if (choice === "Rebase")
+            return "rebase";
+        return null;
+    }
+    catch {
+        return null;
+    }
+}
 export class GitPanelApp {
     root;
     repo = { kind: "loading" };
@@ -274,13 +294,31 @@ export class GitPanelApp {
         return ok;
     }
     async sync(op) {
-        const ok = await tryAction(() => runPinned((cwd) => op === "push" ? cmd.push(cwd, {}) : cmd.pull(cwd)), op === "push" ? "Push failed" : "Pull failed");
+        if (op === "pull")
+            return this.pull();
+        const ok = await tryAction(() => runPinned((cwd) => cmd.push(cwd, {})), "Push failed");
         if (ok) {
             await this.loadLocal(true);
             void this.resetGraph(true);
-            if (op === "push" && this.repo.kind === "ready" && this.repo.status.pullRequest)
+            if (this.repo.kind === "ready" && this.repo.status.pullRequest)
                 void this.refreshCurrentPr();
         }
+        return ok;
+    }
+    async pull() {
+        const ok = await tryAction(() => runPinned(async (cwd) => {
+            await cmd.fetch(cwd);
+            const divergence = await cmd.upstreamDivergence(cwd);
+            if (!divergence || divergence.behind === 0)
+                return;
+            if (divergence.ahead === 0)
+                return cmd.reconcile(cwd, "ff");
+            const mode = await chooseReconcile();
+            if (mode)
+                return cmd.reconcile(cwd, mode);
+        }), "Pull failed");
+        await this.loadLocal(true);
+        void this.resetGraph(true);
         return ok;
     }
     async switchBranch(name, create) {
