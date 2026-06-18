@@ -400,6 +400,18 @@ async function loadGitDiff() {
             await renderPatch(res.stdout, data.focusPath ?? "");
             return;
         }
+        if (data.source === "incoming") {
+            const ref = data.ref || "@{upstream}";
+            sourceLabelNode.textContent = "Incoming changes";
+            showLoading("Loading incoming changes...");
+            const res = await window.muxy.exec(["git", "diff", "--no-color", `HEAD...${ref}`], { cwd });
+            if (res.exitCode !== 0) {
+                clearDiff(res.stderr.trim() || "Could not load incoming changes.");
+                return;
+            }
+            await renderPatch(res.stdout, data.focusPath ?? "");
+            return;
+        }
         sourceLabelNode.textContent = "Working Tree";
         showLoading("Loading changes...");
         const [staged, unstaged] = await Promise.all([

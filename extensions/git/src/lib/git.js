@@ -156,6 +156,24 @@ export async function openPrDiff(prNumber) {
     }
 }
 
+export async function openIncomingDiff() {
+    try {
+        const cwd = await activeWorktreePath();
+        void muxy.tabs.open({
+            kind: "extensionWebView",
+            extension: {
+                id: muxy.extensionID,
+                tabType: "diff-viewer",
+                singleton: true,
+                data: { source: "incoming", cwd },
+            },
+        });
+    }
+    catch {
+        return;
+    }
+}
+
 export function openUrl(url) {
     if (!url)
         return;

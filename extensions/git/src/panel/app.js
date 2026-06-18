@@ -1,6 +1,6 @@
 import { clear, h, readPref, writePref } from "@/lib/dom";
 import { computeLanes, toCommitNode } from "@/lib/graph";
-import { alertError, activeWorktreePath, commitAll, confirmAction, hasPendingChanges, isBusy, onBusyChange, openUrl, runPinned, toViewStatus, tryAction, } from "@/lib/git";
+import { alertError, activeWorktreePath, commitAll, confirmAction, hasPendingChanges, isBusy, onBusyChange, openIncomingDiff, openUrl, runPinned, toViewStatus, tryAction, } from "@/lib/git";
 import { repoWebUrl } from "@/lib/repo-web";
 import { checkoutPr, checkoutPrWorktree, cleanupBranch, closePr, confirmOpenExistingPr, createPr, mergePr, parentDir, readyPr, removeWorktreeOrBranch, worktreePathIn, } from "@/lib/pr";
 import * as cmd from "@/lib/cmd";
@@ -53,7 +53,7 @@ async function chooseReconcile() {
         const choice = await muxy.dialog.confirm({
             title: "Branch has diverged",
             message: "Your branch and the remote each have new commits. Choose how to combine them.",
-            buttons: ["Merge", "Rebase", "Cancel"],
+            buttons: ["Merge", "Rebase", "Review changes…", "Cancel"],
             default: "Cancel",
             cancel: "Cancel",
             style: "warning",
@@ -62,6 +62,8 @@ async function chooseReconcile() {
             return "merge";
         if (choice === "Rebase")
             return "rebase";
+        if (choice === "Review changes…")
+            return "review";
         return null;
     }
     catch {
@@ -331,6 +333,8 @@ export class GitPanelApp {
             if (divergence.ahead === 0)
                 return cmd.reconcile(cwd, "ff");
             const mode = await chooseReconcile();
+            if (mode === "review")
+                return openIncomingDiff();
             if (mode)
                 return cmd.reconcile(cwd, mode);
         }), "Pull failed");
