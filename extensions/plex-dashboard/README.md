@@ -22,7 +22,8 @@ not visible.
 
 ## Setup
 
-1. Open the **Plex Dashboard** sidebar on the right.
+1. Click the **Plex Dashboard** icon at the right of Muxy's status bar (or run
+   **Plex Dashboard: Toggle** from the command palette) to open the sidebar.
 2. Click **Sign in with Plex**. Your browser opens
    `https://app.plex.tv/auth` with a pre-filled code. Sign in to your Plex
    account and approve.
