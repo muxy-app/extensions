@@ -67,6 +67,7 @@
       {
         "id": "plex-dashboard",
         "icon": { "symbol": "play.rectangle.on.rectangle" },
+        "text": "Plex",
         "tooltip": "Plex Dashboard",
         "side": "right",
         "command": "toggle-plex"
