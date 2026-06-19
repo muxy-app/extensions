@@ -1,4 +1,4 @@
-import { httpJSON, httpRequest, HttpError } from "./http.js";
+import { httpJSON, httpRequest, HttpError, muxyExec } from "./http.js";
 
 const PRODUCT = "Muxy Plex Dashboard";
 const VERSION = "0.1.0";
@@ -18,13 +18,6 @@ function clientHeaders(clientId, token) {
   };
   if (token) h["X-Plex-Token"] = token;
   return h;
-}
-
-function muxyExec() {
-  if (!window.muxy || typeof window.muxy.exec !== "function") {
-    throw new Error("window.muxy.exec is unavailable — open this panel inside Muxy.");
-  }
-  return window.muxy.exec.bind(window.muxy);
 }
 
 export async function createPin({ clientId }) {
@@ -80,16 +73,6 @@ export async function listOwnedServers({ token, clientId }) {
       platform: r.platform,
       connections: Array.isArray(r.connections) ? r.connections : [],
     }));
-}
-
-export async function getCurrentAccount({ token, clientId }) {
-  const data = await httpJSON({
-    method: "GET",
-    url: `${PLEX_TV}/api/v2/user`,
-    headers: clientHeaders(clientId, token),
-  });
-  if (!data) return null;
-  return { username: data.username || data.title || "Plex user", email: data.email || null };
 }
 
 function rankConnection(c) {

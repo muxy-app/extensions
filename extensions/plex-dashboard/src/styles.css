@@ -11,7 +11,7 @@
   --on-accent: var(--muxy-background, #fff); /* legible label on an accent fill, both themes */
   --ok: var(--muxy-diff-add, #4cd084);
   --danger: var(--muxy-diff-remove, #e5484d);
-  --warn: #e59e48; /* no Muxy token for amber/warn */
+  --warn: var(--muxy-warning, #e59e48); /* no standard Muxy warn token; literal is the fallback */
 
   /* Spacing scale (tracks Muxy's interface-scale setting) */
   --s1: 2px; --s2: 4px; --s3: 6px; --s4: 8px; --s5: 10px;
@@ -48,11 +48,11 @@ html, body {
 #app::-webkit-scrollbar { width: var(--s4); height: var(--s4); }
 #app::-webkit-scrollbar-track { background: transparent; }
 #app::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.18);
+  background: color-mix(in srgb, var(--fg) 18%, transparent);
   border-radius: var(--radius-sm);
 }
 #app::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.32);
+  background: color-mix(in srgb, var(--fg) 32%, transparent);
 }
 #app::-webkit-scrollbar-corner { background: transparent; }
 
@@ -113,8 +113,8 @@ code, .pin {
 }
 
 .error-banner {
-  background: rgba(229, 72, 77, 0.12);
-  border: 1px solid rgba(229, 72, 77, 0.4);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
   color: var(--fg);
   border-radius: var(--radius);
   padding: var(--s4) var(--s5);
@@ -154,8 +154,8 @@ code, .pin {
 }
 .stat-warn .stat-value { color: var(--warn); }
 .stat-danger .stat-value { color: var(--danger); }
-.stat-warn { border-color: rgba(229, 158, 72, 0.4); }
-.stat-danger { border-color: rgba(229, 72, 77, 0.4); }
+.stat-warn { border-color: color-mix(in srgb, var(--warn) 40%, transparent); }
+.stat-danger { border-color: color-mix(in srgb, var(--danger) 40%, transparent); }
 
 .controls {
   display: flex;
@@ -220,11 +220,11 @@ code, .pin {
   color: var(--muted);
 }
 .badge-transcode { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
-.badge-wan { background: rgba(229, 158, 72, 0.16); color: var(--warn); border-color: transparent; }
-.badge-state-playing { background: rgba(46, 184, 110, 0.18); color: var(--ok); border-color: transparent; }
-.badge-state-paused { background: rgba(255, 255, 255, 0.10); color: var(--muted); border-color: transparent; }
-.badge-state-buffering { background: rgba(229, 158, 72, 0.18); color: var(--warn); border-color: transparent; }
-.badge-state-stopped { background: rgba(229, 72, 77, 0.18); color: var(--danger); border-color: transparent; }
+.badge-wan { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); border-color: transparent; }
+.badge-state-playing { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); border-color: transparent; }
+.badge-state-paused { background: color-mix(in srgb, var(--fg) 10%, transparent); color: var(--muted); border-color: transparent; }
+.badge-state-buffering { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); border-color: transparent; }
+.badge-state-stopped { background: color-mix(in srgb, var(--danger) 18%, transparent); color: var(--danger); border-color: transparent; }
 .badge-state-unknown { background: var(--card); color: var(--muted); border-color: transparent; }
 
 .progress { height: var(--s2); background: var(--border); border-radius: var(--radius-pill); overflow: hidden; }

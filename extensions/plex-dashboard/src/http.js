@@ -17,7 +17,7 @@ export class NetworkError extends Error {
   }
 }
 
-function muxyExec() {
+export function muxyExec() {
   if (!window.muxy || typeof window.muxy.exec !== "function") {
     throw new Error("window.muxy.exec is unavailable — open this panel inside Muxy.");
   }

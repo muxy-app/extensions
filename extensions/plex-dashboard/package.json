@@ -21,7 +21,7 @@
       {
         "id": "plex-dashboard",
         "title": "Plex Dashboard",
-        "icon": { "symbol": "play.rectangle.on.rectangle" },
+        "icon": { "symbol": "play.rectangle.on.rectangle", "weight": 600 },
         "entry": "panel.html",
         "position": "right",
         "mode": "pinned",
@@ -29,13 +29,13 @@
         "headerButtons": [
           {
             "id": "refresh",
-            "icon": { "symbol": "arrow.clockwise" },
+            "icon": { "symbol": "arrow.clockwise", "weight": 600 },
             "tooltip": "Refresh sessions",
             "command": "refresh"
           },
           {
             "id": "signout",
-            "icon": { "symbol": "rectangle.portrait.and.arrow.right" },
+            "icon": { "symbol": "rectangle.portrait.and.arrow.right", "weight": 600 },
             "tooltip": "Sign out of Plex",
             "command": "signout"
           }
@@ -66,7 +66,7 @@
     "statusBarItems": [
       {
         "id": "plex-dashboard",
-        "icon": { "symbol": "play.rectangle.on.rectangle" },
+        "icon": { "symbol": "play.rectangle.on.rectangle", "weight": 600 },
         "text": "Plex",
         "tooltip": "Plex Dashboard",
         "side": "right",
