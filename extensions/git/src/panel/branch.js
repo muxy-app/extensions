@@ -184,6 +184,8 @@ function renderSearchBar(app) {
         },
     });
     setTimeout(() => {
+        if (!document.hasFocus())
+            return;
         if (document.activeElement?.getAttribute("data-focus-key") !== "changes-filter")
             field.focus();
     }, 0);

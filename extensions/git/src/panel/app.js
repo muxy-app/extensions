@@ -144,7 +144,7 @@ export class GitPanelApp {
             clearTimeout(this.reconcileTimer);
     }
     render() {
-        const active = document.activeElement;
+        const active = document.hasFocus() ? document.activeElement : null;
         const focusKey = active?.getAttribute?.("data-focus-key");
         const selStart = focusKey ? active.selectionStart : null;
         const selEnd = focusKey ? active.selectionEnd : null;
