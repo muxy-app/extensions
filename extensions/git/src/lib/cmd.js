@@ -126,6 +126,20 @@ async function pendingOp(cwd) {
     return res?.stdout?.trim() || null;
 }
 
+async function untrackedNumstat(paths, cwd) {
+    const map = new Map();
+    const stats = await Promise.all(paths.map(async (path) => {
+        const res = await muxy.exec(["git", "diff", "--numstat", "--no-index", "--", "/dev/null", path], { cwd }).catch(() => null);
+        const [stat] = parseNumstat(res?.stdout ?? "").values();
+        return [path, stat];
+    }));
+    for (const [path, stat] of stats) {
+        if (stat)
+            map.set(path, stat);
+    }
+    return map;
+}
+
 export function abortOperation(cwd, op) {
     return run(["git", op, "--abort"], cwd);
 }
@@ -141,6 +155,11 @@ export async function status(cwd) {
     const parsed = parsePorcelain(porcelainText);
     const unstagedMap = parseNumstat(unstagedStat);
     const stagedMap = parseNumstat(stagedStat);
+    const untrackedPaths = parsed.unstaged.filter((f) => f.code === "?").map((f) => f.path);
+    if (untrackedPaths.length > 0) {
+        for (const [path, stat] of await untrackedNumstat(untrackedPaths, cwd))
+            unstagedMap.set(path, stat);
+    }
     const stagedFiles = parsed.staged.map((f) => ({
         path: f.path,
         status: statusLetter(f.code),
@@ -229,11 +248,30 @@ export async function branches(cwd) {
     return { current, branches: list };
 }
 
+async function diffNoIndex(path, cwd) {
+    const res = await muxy.exec(["git", "diff", "--no-color", "--no-index", "--", "/dev/null", path], { cwd }).catch(() => null);
+    return res?.stdout ?? "";
+}
+
+async function untrackedDiff(cwd) {
+    const out = await tryRun(["git", "ls-files", "--others", "--exclude-standard", "-z"], cwd);
+    const paths = out.split("\0").filter(Boolean);
+    if (paths.length === 0)
+        return "";
+    const diffs = await Promise.all(paths.map((path) => diffNoIndex(path, cwd)));
+    return diffs.filter((d) => d.trim()).join("\n");
+}
+
 export async function diff(cwd, { staged, lineLimit } = {}) {
     const argv = ["git", "diff", "--no-color"];
     if (staged)
         argv.push("--cached");
     let out = await tryRun(argv, cwd);
+    if (!staged) {
+        const untracked = await untrackedDiff(cwd);
+        if (untracked)
+            out = out.trim() ? `${out}\n${untracked}` : untracked;
+    }
     if (lineLimit && out) {
         const lines = out.split("\n");
         if (lines.length > lineLimit)

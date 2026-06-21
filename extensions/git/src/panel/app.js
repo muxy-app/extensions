@@ -1,6 +1,6 @@
 import { clear, h, readPref, writePref } from "@/lib/dom";
 import { computeLanes, toCommitNode } from "@/lib/graph";
-import { alertError, activeWorktreePath, commitAll, confirmAction, hasPendingChanges, isBusy, onBusyChange, openIncomingDiff, openUrl, runPinned, toViewStatus, tryAction, } from "@/lib/git";
+import { alertError, activeWorktreePath, commitAll, confirmAction, hasPendingChanges, isBusy, listBranches, onBusyChange, openIncomingDiff, openUrl, runPinned, toViewStatus, tryAction, } from "@/lib/git";
 import { repoWebUrl } from "@/lib/repo-web";
 import { checkoutPr, checkoutPrWorktree, cleanupBranch, closePr, confirmOpenExistingPr, createPr, mergePr, parentDir, readyPr, removeWorktreeOrBranch, worktreePathIn, } from "@/lib/pr";
 import * as cmd from "@/lib/cmd";
@@ -23,6 +23,7 @@ function emptyCreateForm() {
         title: "",
         body: "",
         newBranch: "",
+        baseBranch: "",
         branchEdited: false,
         draft: false,
         advanced: false,
@@ -100,6 +101,7 @@ export class GitPanelApp {
     runRowPending = new Map();
     graph = { rows: [], hasMore: false, loading: true };
     createForm = emptyCreateForm();
+    baseBranches = [];
     worktreeForm = null;
     refreshId = 0;
     statusCache = new Map();
@@ -390,6 +392,15 @@ export class GitPanelApp {
         if (!confirmed)
             return false;
         return tryAction(() => runPinned((cwd) => cmd.branchDelete(cwd, name, true)), "Could not delete branch");
+    }
+    async loadBaseBranches() {
+        if (this.baseBranches.length > 0)
+            return;
+        const result = await listBranches().catch(() => null);
+        if (!result)
+            return;
+        this.baseBranches = result.branches;
+        this.render();
     }
     async createPullRequest(input) {
         try {

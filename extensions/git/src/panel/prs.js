@@ -73,11 +73,17 @@ function renderCreatePrForm(app, status) {
     const body = textarea(app.createForm.body, "Summary (optional)", 2, (value) => {
         app.createForm.body = value;
     }, "min-h-[48px]", "pr-body");
-    const advanced = app.createForm.advanced
-        ? h("div", { class: "flex flex-col gap-2" }, (branchInput = input(app.createForm.newBranch, "New branch name (optional)", (value) => {
+    const onDefault = onDefaultBranch(status);
+    const newBranchField = onDefault
+        ? (branchInput = input(app.createForm.newBranch, "New branch name (optional)", (value) => {
             app.createForm.branchEdited = true;
             app.createForm.newBranch = value;
-        }, "font-mono", "pr-branch")), h("label", { class: "flex items-center gap-2 text-[11px] text-muted-foreground" }, h("input", {
+        }, "font-mono", "pr-branch"))
+        : status.branch
+            ? h("span", { class: "text-[11px] text-muted-foreground" }, "Source branch ", h("span", { class: "font-mono text-foreground" }, status.branch))
+            : null;
+    const advanced = app.createForm.advanced
+        ? h("div", { class: "flex flex-col gap-2" }, newBranchField, targetBranchField(app, status), h("label", { class: "flex items-center gap-2 text-[11px] text-muted-foreground" }, h("input", {
             type: "checkbox",
             checked: app.createForm.draft,
             class: "accent-primary",
@@ -98,25 +104,50 @@ function renderCreatePrForm(app, status) {
         class: "flex items-center gap-1 self-start text-[11px] text-muted-foreground outline-none hover:text-foreground",
         onclick: () => {
             app.createForm.advanced = !app.createForm.advanced;
-            if (!app.createForm.newBranch && app.createForm.title.trim()) {
-                app.createForm.newBranch = branchNameFromTitle(app.createForm.title);
+            if (app.createForm.advanced) {
+                if (onDefault && !app.createForm.newBranch && app.createForm.title.trim()) {
+                    app.createForm.newBranch = branchNameFromTitle(app.createForm.title);
+                }
+                void app.loadBaseBranches();
             }
             app.render();
         },
     }, icon(app.createForm.advanced ? "chevronDown" : "chevronRight", 12, "", 2), "Advanced"), advanced, submit);
 }
 const SUBMIT_CLASS = "flex h-7 items-center justify-center gap-1.5 rounded-md px-2.5 text-[11px] font-medium outline-none transition-colors disabled:pointer-events-none disabled:opacity-50";
+function onDefaultBranch(status) {
+    return !!status.branch && status.branch === status.defaultBranch;
+}
+function targetBranchField(app, status) {
+    const selected = app.createForm.baseBranch || status.defaultBranch || "";
+    const options = app.baseBranches.filter((name) => name !== status.branch);
+    if (selected && !options.includes(selected))
+        options.unshift(selected);
+    const select = h("select", {
+        class: "flex h-8 w-full rounded-md border border-input bg-secondary px-2 font-mono text-[12px] text-foreground outline-none focus:border-primary",
+        onchange: (event) => {
+            app.createForm.baseBranch = event.target.value;
+        },
+    }, options.length === 0
+        ? h("option", { value: selected }, selected || "default branch")
+        : options.map((name) => h("option", { value: name, selected: name === selected ? "" : null }, name)));
+    return h("label", { class: "flex flex-col gap-1 text-[11px] text-muted-foreground" }, "Target branch", select);
+}
 async function submitCreate(app, status) {
     if (app.createForm.busy || app.createForm.title.trim() === "")
         return;
     app.createForm.busy = true;
     app.render();
     try {
+        const baseBranch = app.createForm.baseBranch.trim() || status.defaultBranch || undefined;
+        const newBranch = onDefaultBranch(status)
+            ? app.createForm.newBranch.trim() || undefined
+            : undefined;
         const created = await app.createPullRequest({
             title: app.createForm.title.trim(),
             body: app.createForm.body.trim(),
-            baseBranch: status.defaultBranch ?? undefined,
-            newBranch: app.createForm.newBranch.trim() || undefined,
+            baseBranch,
+            newBranch,
             draft: app.createForm.draft,
         });
         if (created)

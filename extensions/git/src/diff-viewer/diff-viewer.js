@@ -106,6 +106,8 @@ function parsePatch(patch) {
             return;
         }
         current.rows.push(row);
+        if ((row.kind === "context" || row.kind === "addition" || row.kind === "deletion") && row.text.length > current.maxLen)
+            current.maxLen = row.text.length;
         totalRows += 1;
     };
     for (const raw of lines) {
@@ -119,6 +121,7 @@ function parsePatch(patch) {
                 additions: 0,
                 deletions: 0,
                 rows: [],
+                maxLen: 0,
                 truncated: false,
             };
             result.push(current);
@@ -231,33 +234,75 @@ function renderFile(file) {
         class: "diff-file-header",
         "data-collapsed": isCollapsed ? "true" : "false",
         onclick: () => toggleItemCollapsed(file.id),
-    }, h("span", { class: "file-chevron" }, chevronSvg()), h("span", { class: "diff-file-title", title: file.path }, file.path), file.oldPath ? h("span", { class: "diff-file-previous", title: file.oldPath }, file.oldPath) : null, h("span", { class: "diff-file-stat added" }, `+${file.additions}`), h("span", { class: "diff-file-stat deleted" }, `-${file.deletions}`)), isCollapsed ? null : h("div", { class: "diff-file-body" }, renderRows(file)));
+    }, h("span", { class: "file-chevron" }, chevronSvg()), h("span", { class: "diff-file-title", title: file.path }, file.path), file.oldPath ? h("span", { class: "diff-file-previous", title: file.oldPath }, file.oldPath) : null, h("span", { class: "diff-file-stat added" }, `+${file.additions}`), h("span", { class: "diff-file-stat deleted" }, `-${file.deletions}`)), isCollapsed ? null : h("div", { class: "diff-file-body", style: bodyStyle(file) }, renderRows(file)));
+}
+function bodyStyle(file) {
+    const chars = file.maxLen + 1;
+    return `--code-w: calc(${chars}ch + 20px)`;
 }
 function renderRows(file) {
     const lang = language_for(file.path);
-    const rows = file.rows.map((row) => (diffStyle === "split" ? renderSplitRow(row, lang) : renderUnifiedRow(row, lang)));
-    if (file.truncated) {
-        rows.push(h("div", { class: "diff-row meta unified-row" }, h("span", { class: "line-no" }), h("span", { class: "line-no" }), h("span", { class: "code-cell" }, "Diff truncated for faster rendering.")));
-    }
+    if (diffStyle === "split")
+        return renderSplitBody(file, lang);
+    const rows = file.rows.map((row) => renderUnifiedRow(row, lang));
+    if (file.truncated)
+        rows.push(h("div", { class: "diff-row meta unified-row span-row" }, "Diff truncated for faster rendering."));
     return rows;
+}
+function renderSplitBody(file, lang) {
+    if (wrapLines)
+        return renderSplitWrapRows(file, lang);
+    const left = [];
+    const right = [];
+    for (const row of file.rows) {
+        if (row.kind === "hunk" || row.kind === "meta") {
+            left.push(splitSpan(row.text));
+            right.push(splitSpan(""));
+            continue;
+        }
+        const oldText = row.kind === "addition" ? "" : row.text;
+        const newText = row.kind === "deletion" ? "" : row.text;
+        left.push(...splitCells(row, "old", oldText, lang));
+        right.push(...splitCells(row, "new", newText, lang));
+    }
+    if (file.truncated) {
+        left.push(splitSpan("Diff truncated for faster rendering."));
+        right.push(splitSpan(""));
+    }
+    return [
+        h("div", { class: "split-pane" }, left),
+        h("div", { class: "split-pane" }, right),
+    ];
+}
+function renderSplitWrapRows(file, lang) {
+    const rows = file.rows.map((row) => {
+        if (row.kind === "hunk" || row.kind === "meta")
+            return h("div", { class: `diff-row ${row.kind} split-row span-row` }, row.text);
+        const oldText = row.kind === "addition" ? "" : row.text;
+        const newText = row.kind === "deletion" ? "" : row.text;
+        return h("div", { class: `diff-row ${row.kind} split-row` }, h("span", { class: "line-no" }, row.oldLineNumber === null ? "" : String(row.oldLineNumber)), codeCell("old-cell", "", oldText, lang), h("span", { class: "line-no" }, row.newLineNumber === null ? "" : String(row.newLineNumber)), codeCell("new-cell", "", newText, lang));
+    });
+    if (file.truncated)
+        rows.push(h("div", { class: "diff-row meta split-row span-row" }, "Diff truncated for faster rendering."));
+    return rows;
+}
+function splitSpan(text) {
+    return h("div", { class: "diff-row meta span-row" }, text);
+}
+function splitCells(row, side, text, lang) {
+    const lineNumber = side === "old" ? row.oldLineNumber : row.newLineNumber;
+    return [
+        h("span", { class: `line-no ${row.kind}` }, lineNumber === null ? "" : String(lineNumber)),
+        codeCell(`${side}-cell ${row.kind}`, "", text, lang),
+    ];
 }
 function codeCell(extraClass, mark, text, lang) {
     return h("span", { class: extraClass ? `code-cell ${extraClass}` : "code-cell", html: mark + highlight(text, lang) });
 }
 function renderUnifiedRow(row, lang) {
-    if (row.kind === "hunk" || row.kind === "meta") {
-        return h("div", { class: `diff-row ${row.kind} unified-row` }, h("span", { class: "line-no" }), h("span", { class: "line-no" }), h("span", { class: "code-cell" }, row.text));
-    }
-    const mark = row.kind === "addition" ? "+" : row.kind === "deletion" ? "-" : " ";
-    return h("div", { class: `diff-row ${row.kind} unified-row` }, h("span", { class: "line-no" }, row.oldLineNumber === null ? "" : String(row.oldLineNumber)), h("span", { class: "line-no" }, row.newLineNumber === null ? "" : String(row.newLineNumber)), codeCell("", mark, row.text, lang));
-}
-function renderSplitRow(row, lang) {
-    if (row.kind === "hunk" || row.kind === "meta") {
-        return h("div", { class: `diff-row ${row.kind} split-row span-row` }, row.text);
-    }
-    const oldText = row.kind === "addition" ? "" : row.text;
-    const newText = row.kind === "deletion" ? "" : row.text;
-    return h("div", { class: `diff-row ${row.kind} split-row` }, h("span", { class: "line-no" }, row.oldLineNumber === null ? "" : String(row.oldLineNumber)), codeCell("old-cell", "", oldText, lang), h("span", { class: "line-no" }, row.newLineNumber === null ? "" : String(row.newLineNumber)), codeCell("new-cell", "", newText, lang));
+    if (row.kind === "hunk" || row.kind === "meta")
+        return h("div", { class: `diff-row ${row.kind} unified-row span-row` }, row.text);
+    return h("div", { class: `diff-row ${row.kind} unified-row` }, h("span", { class: "line-no" }, row.oldLineNumber === null ? "" : String(row.oldLineNumber)), h("span", { class: "line-no" }, row.newLineNumber === null ? "" : String(row.newLineNumber)), codeCell("", "", row.text, lang));
 }
 function chevronSvg() {
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -462,6 +507,8 @@ function toggleWrap() {
     wrapLines = !wrapLines;
     writePref("muxy.git.diff.wrap", String(wrapLines));
     applyWrap();
+    if (diffStyle === "split")
+        void renderViewer().then(() => setActiveItem(activeItemId, false));
 }
 applyRailWidth(Number(readPref("muxy.git.diff.rail", "260")) || 260);
 railResize.addEventListener("pointerdown", (event) => {

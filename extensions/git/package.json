@@ -8,7 +8,7 @@
     "update-skill": "node scripts/update-skill.mjs"
   },
   "type": "module",
-  "version": "1.7.2",
+  "version": "1.8.0",
   "dependencies": {},
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.0",
