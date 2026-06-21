@@ -244,7 +244,7 @@ function renderRows(file) {
     const lang = language_for(file.path);
     if (diffStyle === "split")
         return renderSplitBody(file, lang);
-    const rows = file.rows.map((row) => renderUnifiedRow(row, lang));
+    const rows = file.rows.map((row, index) => renderUnifiedRow(row, lang, index));
     if (file.truncated)
         rows.push(h("div", { class: "diff-row meta unified-row span-row" }, "Diff truncated for faster rendering."));
     return rows;
@@ -254,17 +254,17 @@ function renderSplitBody(file, lang) {
         return renderSplitWrapRows(file, lang);
     const left = [];
     const right = [];
-    for (const row of file.rows) {
+    file.rows.forEach((row, index) => {
         if (row.kind === "hunk" || row.kind === "meta") {
             left.push(splitSpan(row.text));
             right.push(splitSpan(""));
-            continue;
+            return;
         }
         const oldText = row.kind === "addition" ? "" : row.text;
         const newText = row.kind === "deletion" ? "" : row.text;
-        left.push(...splitCells(row, "old", oldText, lang));
-        right.push(...splitCells(row, "new", newText, lang));
-    }
+        left.push(...splitCells(row, index, "old", oldText, lang));
+        right.push(...splitCells(row, index, "new", newText, lang));
+    });
     if (file.truncated) {
         left.push(splitSpan("Diff truncated for faster rendering."));
         right.push(splitSpan(""));
@@ -275,12 +275,12 @@ function renderSplitBody(file, lang) {
     ];
 }
 function renderSplitWrapRows(file, lang) {
-    const rows = file.rows.map((row) => {
+    const rows = file.rows.map((row, index) => {
         if (row.kind === "hunk" || row.kind === "meta")
             return h("div", { class: `diff-row ${row.kind} split-row span-row` }, row.text);
         const oldText = row.kind === "addition" ? "" : row.text;
         const newText = row.kind === "deletion" ? "" : row.text;
-        return h("div", { class: `diff-row ${row.kind} split-row` }, h("span", { class: "line-no" }, row.oldLineNumber === null ? "" : String(row.oldLineNumber)), codeCell("old-cell", "", oldText, lang), h("span", { class: "line-no" }, row.newLineNumber === null ? "" : String(row.newLineNumber)), codeCell("new-cell", "", newText, lang));
+        return h("div", { class: `diff-row ${row.kind} split-row` }, h("span", { class: "line-no" }, row.oldLineNumber === null ? "" : String(row.oldLineNumber)), codeCell("old-cell", "", oldText, lang, row.oldLineNumber !== null, index, "old"), h("span", { class: "line-no" }, row.newLineNumber === null ? "" : String(row.newLineNumber)), codeCell("new-cell", "", newText, lang, row.newLineNumber !== null, index, "new"));
     });
     if (file.truncated)
         rows.push(h("div", { class: "diff-row meta split-row span-row" }, "Diff truncated for faster rendering."));
@@ -289,20 +289,27 @@ function renderSplitWrapRows(file, lang) {
 function splitSpan(text) {
     return h("div", { class: "diff-row meta span-row" }, text);
 }
-function splitCells(row, side, text, lang) {
+function splitCells(row, index, side, text, lang) {
     const lineNumber = side === "old" ? row.oldLineNumber : row.newLineNumber;
     return [
         h("span", { class: `line-no ${row.kind}` }, lineNumber === null ? "" : String(lineNumber)),
-        codeCell(`${side}-cell ${row.kind}`, "", text, lang),
+        codeCell(`${side}-cell ${row.kind}`, "", text, lang, lineNumber !== null, index, side),
     ];
 }
-function codeCell(extraClass, mark, text, lang) {
-    return h("span", { class: extraClass ? `code-cell ${extraClass}` : "code-cell", html: mark + highlight(text, lang) });
+function codeCell(extraClass, mark, text, lang, present = true, rowIndex = null, side = "unified") {
+    const body = mark + highlight(text, lang);
+    const attrs = { class: extraClass ? `code-cell ${extraClass}` : "code-cell", html: present && !body ? "\n" : body };
+    if (present && rowIndex !== null) {
+        attrs["data-copy-row"] = String(rowIndex);
+        attrs["data-copy-side"] = side;
+        attrs["data-copy-text"] = text;
+    }
+    return h("span", attrs);
 }
-function renderUnifiedRow(row, lang) {
+function renderUnifiedRow(row, lang, index) {
     if (row.kind === "hunk" || row.kind === "meta")
         return h("div", { class: `diff-row ${row.kind} unified-row span-row` }, row.text);
-    return h("div", { class: `diff-row ${row.kind} unified-row` }, h("span", { class: "line-no" }, row.oldLineNumber === null ? "" : String(row.oldLineNumber)), h("span", { class: "line-no" }, row.newLineNumber === null ? "" : String(row.newLineNumber)), codeCell("", "", row.text, lang));
+    return h("div", { class: `diff-row ${row.kind} unified-row` }, h("span", { class: "line-no" }, row.oldLineNumber === null ? "" : String(row.oldLineNumber)), h("span", { class: "line-no" }, row.newLineNumber === null ? "" : String(row.newLineNumber)), codeCell("", "", row.text, lang, true, index, "unified"));
 }
 function chevronSvg() {
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -532,6 +539,36 @@ railResize.addEventListener("pointerdown", (event) => {
     };
     railResize.addEventListener("pointermove", onMove);
     railResize.addEventListener("pointerup", onUp);
+});
+function selectionToText(selection) {
+    const sections = Array.from(viewerRoot.querySelectorAll("[data-item-id]"));
+    const groups = new Map();
+    for (const cell of viewerRoot.querySelectorAll(".code-cell[data-copy-text]")) {
+        if (!selection.containsNode(cell, true))
+            continue;
+        const section = cell.closest("[data-item-id]");
+        const order = sections.indexOf(section) * 1e7 + Number(cell.dataset.copyRow);
+        const existing = groups.get(order);
+        if (!existing || sidePriority(cell.dataset.copySide) > sidePriority(existing.dataset.copySide))
+            groups.set(order, cell);
+    }
+    if (!groups.size)
+        return null;
+    return Array.from(groups.keys()).sort((a, b) => a - b)
+        .map((order) => groups.get(order).dataset.copyText).join("\n");
+}
+function sidePriority(side) {
+    return side === "unified" ? 2 : side === "new" ? 1 : 0;
+}
+viewerRoot.addEventListener("copy", (event) => {
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed)
+        return;
+    const text = selectionToText(selection);
+    if (text === null)
+        return;
+    event.preventDefault();
+    event.clipboardData?.setData("text/plain", text);
 });
 viewerRoot.addEventListener("scroll", syncActiveFromScroll);
 zoomInButton.addEventListener("click", () => setZoom(zoom + ZOOM_STEP));
