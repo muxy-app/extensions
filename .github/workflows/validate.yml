@@ -95,7 +95,11 @@ jobs:
         run: node scripts/validate.mjs ${{ steps.changed.outputs.names }}
 
       - name: Dry-run pack (prove deterministic zip + hash)
-        run: node scripts/pack.mjs --dry-run
+        # Pack only the extension(s) this PR built (same target list as the build
+        # and validate steps). Packing all extensions here would fail on any whose
+        # `dist/` wasn't built in this run. Empty names => tooling-only PR, which
+        # built everything above, so pack everything to match.
+        run: node scripts/pack.mjs --dry-run ${{ steps.changed.outputs.names }}
 
   pr-meta:
     name: Enforce version bump and PR title
