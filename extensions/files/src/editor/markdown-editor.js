@@ -2,13 +2,14 @@ import { CodeEditor } from "@/editor/code-editor";
 import { MarkdownView } from "@/editor/markdown-view";
 
 export class MarkdownEditor {
-  constructor({ parent, filePath, value, isDark, config, mode, onDirty, onSave }) {
+  constructor({ parent, filePath, value, isDark, config, mode, initialPosition, onDirty, onSave }) {
     this.parent = parent;
     this.filePath = filePath;
     this.source = value;
     this.isDark = isDark;
     this.config = config;
     this.mode = mode;
+    this.initialPosition = initialPosition;
     this.onDirty = onDirty;
     this.onSave = onSave;
     this.child = null;
@@ -33,9 +34,11 @@ export class MarkdownEditor {
       value: this.source,
       isDark: this.isDark,
       config: this.config,
+      initialPosition: this.initialPosition,
       onDirty: this.onDirty,
       onSave: this.onSave,
     });
+    this.initialPosition = null;
   }
 
   destroyChild() {

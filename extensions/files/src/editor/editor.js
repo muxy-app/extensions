@@ -549,6 +549,8 @@ export class EditorApp {
       return;
     }
     if (markdown) {
+      const initialPosition = this.initialPosition();
+      if (initialPosition) this.mdMode = "edit";
       this.child = new MarkdownEditor({
         parent: this.body,
         filePath: this.filePath,
@@ -556,6 +558,7 @@ export class EditorApp {
         isDark: this.isDark,
         config: this.config,
         mode: this.mdMode,
+        initialPosition,
         onDirty: () => this.markDirty(),
         onSave: () => this.save(),
       });
@@ -569,10 +572,21 @@ export class EditorApp {
       value: this.content,
       isDark: this.isDark,
       config: this.config,
+      initialPosition: this.initialPosition(),
       onDirty: () => this.markDirty(),
       onSave: () => this.save(),
     });
     this.focusEditor();
+  }
+
+  initialPosition() {
+    const line = Number(this.data.line);
+    if (!Number.isInteger(line) || line < 1) return null;
+    const column = Number(this.data.column);
+    return {
+      line,
+      column: Number.isInteger(column) && column >= 1 ? column : 1,
+    };
   }
 
   focusEditor() {

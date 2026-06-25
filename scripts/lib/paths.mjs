@@ -5,10 +5,14 @@ import fs from "node:fs";
 export const repoRoot = path.resolve(fileURLToPath(new URL("../..", import.meta.url)));
 export const extensionsDir = path.join(repoRoot, "extensions");
 
-// The manifest schema is owned by the Muxy app repo (muxy-app/muxy). This repo no
-// longer keeps a local copy; the tooling fetches it from there at validation time.
+// The manifest schema is owned by the Muxy app repo (muxy-app/muxy). During
+// local cross-repo development, prefer a sibling checkout or MUXY_MANIFEST_SCHEMA;
+// otherwise fetch the published schema from muxy-app/muxy.
 export const schemaURL =
   "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json";
+export const localSchemaPath =
+  process.env.MUXY_MANIFEST_SCHEMA ??
+  path.resolve(repoRoot, "../muxy/docs/extensions/schema/manifest.schema.json");
 
 // Permissions the live app and docs ship that the published schema enum may not
 // yet list. Merged into the fetched schema so a lagging schema doesn't reject a
@@ -16,11 +20,16 @@ export const schemaURL =
 export const EXTRA_PERMISSIONS = ["files:read", "files:write"];
 
 export async function fetchSchema() {
-  const res = await fetch(schemaURL);
-  if (!res.ok) {
-    throw new Error(`failed to fetch manifest schema from ${schemaURL} (HTTP ${res.status})`);
+  let schema;
+  if (fs.existsSync(localSchemaPath)) {
+    schema = readJSON(localSchemaPath);
+  } else {
+    const res = await fetch(schemaURL);
+    if (!res.ok) {
+      throw new Error(`failed to fetch manifest schema from ${schemaURL} (HTTP ${res.status})`);
+    }
+    schema = await res.json();
   }
-  const schema = await res.json();
   const permEnum = schema?.$defs?.permission?.enum;
   if (Array.isArray(permEnum)) {
     for (const perm of EXTRA_PERMISSIONS) {

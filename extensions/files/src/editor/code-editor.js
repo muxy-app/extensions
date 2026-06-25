@@ -273,7 +273,7 @@ class FindPanel {
 }
 
 export class CodeEditor {
-  constructor({ parent, filePath, value, isDark, config, onDirty, onSave }) {
+  constructor({ parent, filePath, value, isDark, config, initialPosition, onDirty, onSave }) {
     this.parent = parent;
     this.filePath = filePath;
     this.value = value;
@@ -291,12 +291,14 @@ export class CodeEditor {
     this.container = h("div", { class: "editor-host" });
     this.parent.replaceChildren(this.container);
 
-    const saved = read_cursor_state(filePath);
+    const initialSelection = this.selectionFromPosition(value, initialPosition);
+    const saved = initialSelection ? null : read_cursor_state(filePath);
     const selection =
-      saved && saved.anchor <= value.length && saved.head <= value.length
+      initialSelection ??
+      (saved && saved.anchor <= value.length && saved.head <= value.length
         ? { anchor: saved.anchor, head: saved.head }
-        : undefined;
-    this.savedScrollTop = saved?.scrollTop ?? 0;
+        : undefined);
+    this.savedScrollTop = initialSelection ? 0 : (saved?.scrollTop ?? 0);
 
     this.view = new EditorView({
       parent: this.container,
@@ -322,7 +324,8 @@ export class CodeEditor {
       }),
     });
 
-    this.restoreScroll();
+    if (initialSelection) this.revealInitialSelection(initialSelection.anchor);
+    else this.restoreScroll();
 
     this.keyHandler = (event) => {
       if (!(event.metaKey || event.ctrlKey) || event.shiftKey) return;
@@ -340,6 +343,28 @@ export class CodeEditor {
     this.loadLinter();
     this.loadGitBaseline(filePath);
     this.gitBaselineDisposer = muxy.events.subscribe("file.changed", () => this.loadGitBaseline(filePath));
+  }
+
+  selectionFromPosition(value, position) {
+    if (!position) return null;
+    const targetLine = Math.max(1, position.line);
+    const targetColumn = Math.max(1, position.column ?? 1);
+    const lines = value.split("\n");
+    const lineIndex = Math.min(targetLine, lines.length) - 1;
+    let offset = 0;
+    for (let index = 0; index < lineIndex; index += 1) {
+      offset += lines[index].length + 1;
+    }
+    offset += Math.min(targetColumn - 1, lines[lineIndex]?.length ?? 0);
+    return { anchor: Math.min(offset, value.length), head: Math.min(offset, value.length) };
+  }
+
+  revealInitialSelection(pos) {
+    if (!this.view) return;
+    this.view.dispatch({
+      selection: EditorSelection.cursor(pos),
+      effects: EditorView.scrollIntoView(pos, { y: "center" }),
+    });
   }
 
   async loadGitBaseline(filePath) {

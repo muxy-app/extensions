@@ -76,6 +76,12 @@ function checkCrossReferences(report, manifest) {
     }
   }
 
+  for (const opener of manifest.fileOpeners ?? []) {
+    if (!tabTypeIDs.has(opener.tabType)) {
+      report.error(`file opener '${opener.id}' references unknown tabType '${opener.tabType}'`);
+    }
+  }
+
   for (const item of manifest.topbarItems ?? []) {
     if (!commandIDs.has(item.command)) {
       report.error(`topbar item '${item.id}' references unknown command '${item.command}'`);
@@ -94,6 +100,7 @@ function checkDuplicateIDs(report, manifest) {
     panel: manifest.panels,
     popover: manifest.popovers,
     command: manifest.commands,
+    "file opener": manifest.fileOpeners,
     "topbar item": manifest.topbarItems,
     "status bar item": manifest.statusBarItems,
   };
