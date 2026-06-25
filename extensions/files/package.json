@@ -1,6 +1,6 @@
 {
   "name": "files",
-  "version": "1.8.1",
+  "version": "1.8.2",
   "scripts": {
     "dev": "vite",
     "build": "vite build && node -e \"const fs=require('fs');fs.copyFileSync('package.json','dist/package.json');fs.mkdirSync('dist/scripts',{recursive:true});fs.copyFileSync('scripts/quick-open.js','dist/scripts/quick-open.js')\"",
@@ -115,17 +115,6 @@
         "id": "code-editor",
         "title": "Editor",
         "entry": "panel/editor.html"
-      }
-    ],
-    "fileOpeners": [
-      {
-        "id": "editor",
-        "title": "Editor",
-        "tabType": "code-editor",
-        "patterns": [
-          "*"
-        ],
-        "singleton": true
       }
     ],
     "commands": [
