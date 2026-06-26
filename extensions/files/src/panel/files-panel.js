@@ -23,6 +23,7 @@ import { FOLDER_PATHS, icon_paths_for } from "@/lib/file-icon";
 import { load_icon_theme, save_icon_theme, subscribe_icon_theme } from "@/lib/icon-theme";
 import { load_tree_memory, save_tree_memory } from "@/lib/tree-memory";
 import { GitStatusStore } from "@/lib/git-status";
+import { OpenTabsStore } from "@/lib/open-tabs";
 
 const RECONCILE_DEBOUNCE_MS = 250;
 
@@ -159,6 +160,7 @@ export class FilesPanelApp {
     this.contextDisposers = [];
     this.disposers = [];
     this.gitStatus = new GitStatusStore();
+    this.openTabs = new OpenTabsStore();
     this.dirtyFilter = false;
     this.iconTheme = load_icon_theme();
 
@@ -171,9 +173,14 @@ export class FilesPanelApp {
       reveal: (rel) => reveal_in_finder(rel),
       openExternally: (rel) => open_externally(rel),
       copyPath: (rel) => copy_path(rel),
-      openInEditor: (rel) => open_in_editor(rel),
+      openInEditor: (rel) => this.openFile(rel),
       refresh: () => this.loadRoot(),
     };
+  }
+
+  async openFile(rel) {
+    const tabId = await this.openTabs.resolveTabId(rel);
+    return open_in_editor(rel, tabId);
   }
 
   start() {
@@ -196,8 +203,11 @@ export class FilesPanelApp {
     });
     this.wrap.appendChild(this.list);
 
+    this.openTabs.start();
+
     document.addEventListener("contextmenu", this.preventNativeContextMenu);
     this.disposers.push(
+      () => this.openTabs.dispose(),
       this.gitStatus.subscribe(() => this.onGitStatusChange()),
       muxy.events.subscribe("worktree.switched", () => void this.loadRoot()),
       muxy.events.subscribe("project.switched", () => void this.loadRoot()),
@@ -535,7 +545,7 @@ export class FilesPanelApp {
     }
     this.render();
     this.persistMemory();
-    void open_in_editor(path);
+    void this.openFile(path);
   }
 
   async toggleDirectory(path) {

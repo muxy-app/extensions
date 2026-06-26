@@ -1,6 +1,6 @@
 {
   "name": "files",
-  "version": "1.9.1",
+  "version": "1.10.0",
   "scripts": {
     "dev": "vite",
     "build": "vite build && node -e \"const fs=require('fs');fs.copyFileSync('package.json','dist/package.json');fs.mkdirSync('dist/scripts',{recursive:true});fs.copyFileSync('scripts/quick-open.js','dist/scripts/quick-open.js')\"",
@@ -74,7 +74,10 @@
     "events": [
       "file.changed",
       "worktree.switched",
-      "project.switched"
+      "project.switched",
+      "tab.created",
+      "tab.updated",
+      "tab.closed"
     ],
     "panels": [
       {
