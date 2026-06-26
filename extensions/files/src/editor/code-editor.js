@@ -522,9 +522,6 @@ export class CodeEditor {
       this.config.treeSitter !== false ? tree_sitter_for(filePath).catch(() => null) : Promise.resolve(null),
     ]);
     if (this.destroyed || loadId !== this.languageLoadId) return;
-    // The Lezer language stays on for structure (folding, indentation); when
-    // tree-sitter handles the file its decorations replace Lezer's
-    // highlight style instead of fighting it.
     const extensions = lang ? [lang] : [];
     extensions.push(treeSitter ? tree_sitter_highlight(treeSitter) : muxy_highlight_style());
     this.view.dispatch({

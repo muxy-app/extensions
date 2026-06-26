@@ -217,9 +217,6 @@ export class EditorApp {
     this.setDirty(false);
     this.render();
 
-    // Raster images are binary, so skip the UTF-8 text read entirely; the image
-    // viewer pulls the bytes in itself. `content` is set to an empty string so
-    // renderBody treats the file as ready (it only branches to the viewer).
     if (this.isImage()) {
       this.content = "";
       this.error = null;
@@ -324,7 +321,6 @@ export class EditorApp {
 
   setSvgView(view) {
     if (this.svgView === view) return;
-    // Preserve in-editor edits so toggling to View renders the latest source.
     if (this.child?.getValue) this.content = this.child.getValue();
     this.svgView = view;
     this.bodyKey = null;
@@ -437,7 +433,6 @@ export class EditorApp {
       actions.appendChild(h("span", { class: "toolbar-divider" }));
     }
 
-    // Raster images can't be edited here, so they drop Save and editor Settings.
     if (!image) {
       actions.append(
         h(

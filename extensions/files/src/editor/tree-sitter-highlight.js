@@ -2,14 +2,9 @@ import { RangeSetBuilder } from "@codemirror/state";
 import { Decoration, EditorView, ViewPlugin } from "@codemirror/view";
 import { syn } from "@/lib/syntax-theme";
 
-// Incremental parsing keeps edits cheap, but the first parse of a very large
-// document would block the UI, so tree-sitter bows out above this size.
 const MAX_TREE_SITTER_DOC = 1_500_000;
 const READ_CHUNK = 8192;
 
-// Highlight capture names → token classes. Lookup walks dotted names up
-// ("function.method" → "function"), and unmapped captures keep the default
-// foreground.
 const CAPTURE_CLASSES = {
   comment: "comment",
   keyword: "keyword",
@@ -66,9 +61,6 @@ function mark_for(capture_name) {
   return null;
 }
 
-// Rule order is the tie-breaker when nested captures overlap (an escape
-// inside a string ends up with both classes on one span), so the more
-// specific tokens come last.
 const tree_sitter_theme = EditorView.baseTheme({
   ".mxf-syn-punct": { color: "var(--muxy-foreground-muted)" },
   ".mxf-syn-comment": { color: "var(--muxy-foreground-muted)", fontStyle: "italic" },
@@ -113,8 +105,6 @@ class TreeSitterHighlighter {
     if (update.docChanged) {
       const old = this.tree;
       if (old) {
-        // A single edit spanning all changed ranges over-approximates the
-        // dirty region, which is safe for incremental reparsing.
         let start = Infinity;
         let oldEnd = -1;
         let newEnd = -1;
@@ -146,9 +136,6 @@ class TreeSitterHighlighter {
     for (const range of this.view.visibleRanges) {
       let captures;
       try {
-        // The range is passed as whole rows: QueryOptions index/column values
-        // reach the wasm side as UTF-16 byte offsets (2× the document
-        // position), but row numbers are unit-agnostic.
         captures = this.query.captures(this.tree.rootNode, {
           startPosition: { row: doc.lineAt(range.from).number - 1, column: 0 },
           endPosition: { row: doc.lineAt(range.to).number, column: 0 },
@@ -162,8 +149,6 @@ class TreeSitterHighlighter {
         const from = capture.node.startIndex;
         const to = Math.min(capture.node.endIndex, doc.length);
         if (to <= from) continue;
-        // Queries list generic patterns first; for a node captured by
-        // several, keep the last (most specific) one.
         spans.set(`${from}:${to}`, { from, to, mark });
       }
     }

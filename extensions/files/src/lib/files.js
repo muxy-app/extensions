@@ -1,4 +1,12 @@
-import { has_dirty_replaceable_editor_for_other_file } from "@/lib/editor-state";
+async function focus_tab(tabId) {
+  if (!tabId) return false;
+  try {
+    await muxy.tabs.switchTo(tabId);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export function strip_slash(path) {
   return path.replace(/\/+$/, "");
@@ -87,16 +95,15 @@ export async function try_action(action, error_title) {
   }
 }
 
-export async function open_in_editor(rel) {
+export async function open_in_editor(rel, focusTabId = null) {
   try {
-    const singleton = !has_dirty_replaceable_editor_for_other_file(rel);
+    if (focusTabId && (await focus_tab(focusTabId))) return;
     await muxy.tabs.open({
       kind: "extensionWebView",
       extension: {
         id: muxy.extensionID,
         tabType: "code-editor",
-        singleton,
-        data: { filePath: rel, replaceable: singleton },
+        data: { filePath: rel, replaceable: false },
       },
     });
   } catch (err) {

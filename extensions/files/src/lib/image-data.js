@@ -2,9 +2,6 @@ import { strip_slash } from "@/lib/files";
 import { image_mime } from "@/lib/languages";
 import { worktree_root } from "@/lib/worktree-root";
 
-// `muxy.files.read` only returns UTF-8 text, so image bytes are pulled in by
-// shelling out to `base64` (always present on macOS) from the worktree root.
-// The relative path keeps reads scoped to the same root the file tree uses.
 export async function read_image_data_url(filePath) {
   const rel = strip_slash(filePath);
   if (!rel) throw new Error("No file path");
