@@ -75,9 +75,9 @@
         "productivity",
         "project-management"
       ],
-      "icon": "assets/icon.svg",
+      "icon": "icon.svg",
       "screenshots": [
-        "assets/screenshot-1.png"
+        "screenshots/screenshot-1.png"
       ]
     }
   },

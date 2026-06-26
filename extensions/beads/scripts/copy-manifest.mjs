@@ -10,9 +10,14 @@ const dist = resolve(root, "dist");
 mkdirSync(dist, { recursive: true });
 copyFileSync(resolve(root, "package.json"), resolve(dist, "package.json"));
 
-const assets = resolve(root, "assets");
-if (existsSync(assets)) {
-  cpSync(assets, resolve(dist, "assets"), { recursive: true });
+const icon = resolve(root, "icon.svg");
+if (existsSync(icon)) {
+  copyFileSync(icon, resolve(dist, "icon.svg"));
 }
 
-console.log("package.json and assets copied to dist/");
+const screenshots = resolve(root, "screenshots");
+if (existsSync(screenshots)) {
+  cpSync(screenshots, resolve(dist, "screenshots"), { recursive: true });
+}
+
+console.log("package.json, icon.svg, and screenshots copied to dist/");

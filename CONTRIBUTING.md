@@ -88,8 +88,8 @@ Every extension must carry a `marketplace` block in `manifest.json` with a
   "homepage": "https://example.com",
   "repository": "https://github.com/you/your-ext",
   "categories": ["git", "productivity"],
-  "icon": "assets/icon.svg",
-  "screenshots": ["assets/screenshot-1.png", "assets/screenshot-2.png"]
+  "icon": "icon.svg",
+  "screenshots": ["screenshots/screenshot-1.png", "screenshots/screenshot-2.png"]
 }
 ```
 

@@ -197,9 +197,7 @@ function normalizeIssues(rawIssues, readyIDs) {
 }
 
 function normalizeStatus(status) {
-  const value = String(status || "open").replaceAll("-", "_").toLowerCase();
-  if (value === "in-progress") return "in_progress";
-  return value;
+  return String(status || "open").replaceAll("-", "_").toLowerCase();
 }
 
 function normalizePriority(priority) {
