@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Beads">
+  <rect width="256" height="256" rx="56" fill="#111827"/>
+  <circle cx="72" cy="88" r="24" fill="#60a5fa"/>
+  <circle cx="128" cy="128" r="28" fill="#34d399"/>
+  <circle cx="184" cy="168" r="24" fill="#fbbf24"/>
+  <path d="M94 101l18 14M150 141l14 12" stroke="#f9fafb" stroke-width="14" stroke-linecap="round"/>
+</svg>
