@@ -145,12 +145,23 @@ async function loadIssuesFromExport() {
   const candidates = ["issues.jsonl", ".beads/issues.jsonl"];
 
   for (const path of candidates) {
+    let res;
     try {
-      const res = await muxy.files.read(path);
-      if (!res?.content) continue;
-      return { ok: true, issues: parseJSONLines(res.content), source: path };
+      res = await muxy.files.read(path);
     } catch {
       continue;
+    }
+
+    if (!res?.content) continue;
+
+    try {
+      return { ok: true, issues: parseJSONLines(res.content, path), source: path };
+    } catch (error) {
+      return {
+        ok: false,
+        issues: [],
+        error: error?.message ?? String(error),
+      };
     }
   }
 
@@ -167,12 +178,22 @@ function unwrapIssues(value) {
   return [];
 }
 
-function parseJSONLines(content) {
-  return content
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => JSON.parse(line));
+function parseJSONLines(content, path) {
+  const issues = [];
+  const lines = content.split("\n");
+
+  lines.forEach((line, index) => {
+    const trimmed = line.trim();
+    if (!trimmed) return;
+
+    try {
+      issues.push(JSON.parse(trimmed));
+    } catch (error) {
+      throw new Error(`Failed to parse ${path} line ${index + 1}: ${error?.message ?? String(error)}`);
+    }
+  });
+
+  return issues;
 }
 
 function normalizeIssues(rawIssues, readyIDs) {

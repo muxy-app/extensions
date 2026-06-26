@@ -16,6 +16,7 @@
   --font-body: 12px;
   --font-emphasis: 13px;
   --font-title: 14px;
+  --font-heading: 18px;
   --radius: 6px;
   --radius-card: 8px;
 }
@@ -482,7 +483,7 @@ button:disabled {
 h1 {
   margin: var(--s3) 0 var(--s4);
   color: var(--muxy-foreground);
-  font-size: 18px;
+  font-size: var(--font-heading);
   line-height: 1.25;
 }
 
