@@ -16,9 +16,6 @@ function format_size(bytes) {
   return `${rounded} ${units[unit]}`;
 }
 
-// Renders an image file on the editor surface. Exposes the same child contract
-// the editor expects (`destroy()`); it never reports dirty state or save, since
-// images are read-only here.
 export class ImageViewer {
   constructor({ parent, filePath, svgSource = null }) {
     this.parent = parent;
@@ -42,7 +39,6 @@ export class ImageViewer {
   async load() {
     let dataUrl;
     if (this.svgSource !== null) {
-      // SVG text is already in hand; encode it inline rather than re-reading.
       dataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(this.svgSource)}`;
     } else {
       try {
@@ -83,7 +79,6 @@ export class ImageViewer {
     if (width && height) {
       info.appendChild(h("span", { class: "image-meta-item" }, `${width} × ${height}`));
     }
-    // Filled in asynchronously by addFileSize; appended now to keep order stable.
     const sizeSlot = h("span", { class: "image-meta-item" });
     info.appendChild(sizeSlot);
     void this.addFileSize(sizeSlot);
@@ -108,7 +103,6 @@ export class ImageViewer {
       const label = format_size(stat?.size);
       if (label) slot.textContent = label;
     } catch {
-      // Size is supplementary; ignore failures.
     }
   }
 
@@ -124,7 +118,6 @@ export class ImageViewer {
     this.stage.classList.toggle("image-stage-scroll", this.actualSize);
   }
 
-  // The editor calls updateConfig on theme/config changes; images don't react.
   updateConfig() {}
 
   focus() {}

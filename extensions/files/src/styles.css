@@ -514,7 +514,6 @@ textarea {
   justify-content: center;
   overflow: hidden;
   padding: var(--s7);
-  /* Checkerboard so transparent images read clearly in both themes. */
   background-color: var(--muxy-surface);
   background-image:
     linear-gradient(45deg, var(--muxy-hover) 25%, transparent 25%),

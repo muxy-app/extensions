@@ -1,8 +1,3 @@
-// Resolves the absolute path of the active worktree root and caches it until
-// the project or worktree changes. Several features (git baseline, image
-// viewer) need this to run `muxy.exec` against absolute file paths, since the
-// paths handed out by `muxy.files` are relative to this root.
-
 let cachedRoot;
 let resolved = false;
 

@@ -31,10 +31,6 @@ import zigHighlights from "@tree-sitter-grammars/tree-sitter-zig/queries/highlig
 import phpHighlights from "tree-sitter-php/queries/highlights.scm?raw";
 import { extname } from "@/lib/files";
 
-// Query files compose by concatenation, later patterns overriding earlier
-// ones. The TypeScript grammars wrap parameters in required_parameter /
-// optional_parameter nodes, so the javascript params query only compiles
-// against plain javascript.
 const GRAMMARS = {
   javascript: { wasm: jsWasm, highlights: [jsHighlights, jsxHighlights, jsParamsHighlights] },
   typescript: { wasm: tsWasm, highlights: [jsHighlights, tsHighlights] },
@@ -49,7 +45,6 @@ const GRAMMARS = {
   lua: { wasm: luaWasm, highlights: [luaHighlights] },
   toml: { wasm: tomlWasm, highlights: [tomlHighlights] },
   zig: { wasm: zigWasm, highlights: [zigHighlights] },
-  // The full grammar (vs php_only) also parses PHP embedded in HTML.
   php: { wasm: phpWasm, highlights: [phpHighlights] },
 };
 
@@ -112,9 +107,6 @@ function load_grammar(name) {
   return loaded.get(name);
 }
 
-// Resolves to { Parser, language, query } when the file has a bundled
-// tree-sitter grammar, or null. Rejections mean wasm failed to load or the
-// query failed to compile; callers fall back to the Lezer highlighter.
 export function tree_sitter_for(path) {
   const name = GRAMMAR_BY_EXT[extname(path)];
   return name ? load_grammar(name) : Promise.resolve(null);

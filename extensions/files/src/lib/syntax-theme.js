@@ -5,16 +5,6 @@ const FG = "var(--muxy-foreground)";
 const MUTED = "var(--muxy-foreground-muted)";
 const ACCENT = "var(--muxy-accent)";
 
-// The muxy theme exposes a single accent hue, which is not enough on its own to
-// tell keywords, strings, types and functions apart. Rather than ship a private
-// hardcoded palette, every syntax token is derived from the theme's own tokens
-// — the accent and the diff add/remove/hunk semantic colors — via color-mix, so
-// the highlighting tracks the user's accent and inverts with the live light/
-// dark theme automatically (no runtime re-injection on theme switch needed).
-//
-// color-mix toward --muxy-foreground keeps each hue legible against the
-// background in both schemes; the mix ratios fan the few source hues out into
-// distinguishable token colors.
 const PALETTE = {
   keyword: "color-mix(in oklab, var(--muxy-diff-remove) 78%, var(--muxy-foreground))",
   string: "color-mix(in oklab, var(--muxy-accent) 82%, var(--muxy-foreground))",

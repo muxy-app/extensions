@@ -1,9 +1,3 @@
-// Generates src/lib/material-icons.generated.js — a trimmed, inlined subset of
-// the Material Icon Theme (https://github.com/material-extensions/vscode-material-icon-theme,
-// MIT) covering the file types we surface in the tree. We inline the SVG markup
-// for only the icons we reference (not all 1200+) so the bundle stays small and
-// the runtime needs no extra requests. Re-run with `npm run gen-icons`.
-
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,9 +6,6 @@ const here = dirname(fileURLToPath(import.meta.url));
 const pkgRoot = resolve(here, "..", "node_modules", "material-icon-theme");
 const manifest = JSON.parse(readFileSync(resolve(pkgRoot, "dist", "material-icons.json"), "utf8"));
 
-// Extensions we want a branded icon for. The value is the Material icon name;
-// where the theme already maps the extension we let it resolve, but pinning the
-// name here keeps the generated set stable and reviewable.
 const EXTENSIONS = [
   "ts", "tsx", "js", "jsx", "mjs", "cjs", "json", "jsonc",
   "py", "rb", "go", "rs", "java", "kt", "swift", "php", "cs",
@@ -30,7 +21,6 @@ const EXTENSIONS = [
   "lock", "wasm", "csv", "log",
 ];
 
-// Exact filenames that get a dedicated icon regardless of extension.
 const FILENAMES = [
   "package.json", "tsconfig.json", "dockerfile", "docker-compose.yml",
   "makefile", "license", "readme.md", ".gitignore", ".gitattributes",
@@ -44,17 +34,12 @@ const DEFAULT_FOLDER = manifest.folder;
 function svgFor(iconName) {
   const def = manifest.iconDefinitions[iconName];
   if (!def) return null;
-  // iconPath is relative to dist/ (e.g. "./../icons/typescript.svg").
   const file = resolve(pkgRoot, "dist", def.iconPath);
   let svg = readFileSync(file, "utf8").trim();
-  // Strip the XML declaration / xmlns boilerplate variance to a stable head and
-  // drop any trailing newline so the inlined string compares cleanly.
   svg = svg.replace(/\s*xml:space="preserve"/g, "");
   return svg;
 }
 
-// Resolve an extension/filename through the theme's own maps, falling back to
-// the default file icon so every key always yields something renderable.
 function iconNameForExt(ext) {
   return manifest.fileExtensions[ext] ?? manifest.languageIds?.[ext] ?? DEFAULT_FILE;
 }
@@ -62,23 +47,19 @@ function iconNameForName(name) {
   return manifest.fileNames[name] ?? DEFAULT_FILE;
 }
 
-const icons = {}; // iconName -> svg string, deduped
-const byExt = {}; // ext -> iconName
-const byName = {}; // filename -> iconName
+const icons = {};
+const byExt = {};
+const byName = {};
 
 function register(iconName) {
   if (iconName && !icons[iconName]) {
     const svg = svgFor(iconName);
     if (svg) icons[iconName] = svg;
-    else return DEFAULT_FILE; // missing asset → fall back
+    else return DEFAULT_FILE;
   }
   return iconName;
 }
 
-// Only record a mapping when the theme has a real icon for it — entries that
-// would resolve to the default file icon are left out so they fall through to
-// the runtime default (and, for dotfiles, to extension matching) instead of
-// being pinned to the generic icon.
 for (const ext of EXTENSIONS) {
   const name = iconNameForExt(ext);
   if (name !== DEFAULT_FILE) byExt[ext] = register(name);

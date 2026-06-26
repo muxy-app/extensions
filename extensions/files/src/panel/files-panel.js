@@ -84,8 +84,6 @@ function chevron_icon(expanded) {
   return icon_svg([{ d: expanded ? "M6 9l6 6 6-6" : "M9 6l6 6-6 6" }]);
 }
 
-// Nesting depth of a relative path, used to restore expanded dirs parent-first.
-// Directory rels carry a trailing slash, so trim it before counting separators.
 function depth_of(rel) {
   const trimmed = rel.endsWith("/") ? rel.slice(0, -1) : rel;
   return trimmed ? trimmed.split("/").length : 0;
@@ -293,16 +291,11 @@ export class FilesPanelApp {
     void this.gitStatus.refresh();
   }
 
-  // Re-applies the saved expanded dirs and selection for the active worktree.
-  // Expanded dirs are restored shallow-to-deep so each parent is loaded before
-  // its children are looked up; entries that no longer exist are skipped.
   async restoreMemory() {
     const { expanded, selected } = await load_tree_memory();
     const ordered = expanded.slice().sort((a, b) => depth_of(a) - depth_of(b));
     for (const dir of ordered) {
       const parent = parent_dir(dir);
-      // The parent must be loaded and itself expanded (or root) for this dir to
-      // be a real, reachable node; otherwise drop it from restoration.
       if (parent !== "" && !this.expandedDirs.has(parent)) continue;
       await this.ensureLoaded(parent);
       if (!this.entries.has(dir)) continue;
@@ -312,8 +305,6 @@ export class FilesPanelApp {
     if (selected && this.entries.has(selected)) this.selectedPath = selected;
   }
 
-  // Snapshots the current view for the active worktree. Best-effort and async;
-  // callers fire-and-forget after a state change.
   persistMemory() {
     void save_tree_memory(this.expandedDirs, this.selectedPath);
   }
