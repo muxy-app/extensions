@@ -152,6 +152,7 @@ export class FilesPanelApp {
     this.loadedDirs = new Set();
     this.expandedDirs = new Set();
     this.selectedPath = null;
+    this.worktreeRoot = null;
     this.dropTarget = null;
     this.renameState = null;
     this.pendingDirs = new Set();
@@ -283,6 +284,7 @@ export class FilesPanelApp {
     this.expandedDirs.clear();
     this.selectedPath = null;
     this.closeContextMenu();
+    this.worktreeRoot = await this.resolveRoot();
     try {
       const entries = await muxy.files.list("");
       this.recordChildren("", entries);
@@ -459,7 +461,18 @@ export class FilesPanelApp {
           this.showContextMenu({ kind: entry.kind, name: basename(path), path }, event.clientX, event.clientY);
         },
         onDragStart: (event) => {
-          event.dataTransfer?.setData("text/plain", path);
+          if (!event.dataTransfer) return;
+          // Internal moves read this relative path back in dropPaths().
+          event.dataTransfer.setData("application/x-muxy-path", path);
+          // External drops (terminal, chat) need an absolute file:// URI —
+          // Muxy's DroppedPathsParser rejects bare relative paths.
+          const abs = this.abs_path(path);
+          if (abs) {
+            event.dataTransfer.setData("text/uri-list", this.file_url(abs));
+            event.dataTransfer.setData("text/plain", abs);
+          } else {
+            event.dataTransfer.setData("text/plain", path);
+          }
         },
         onDragOver: (event) => {
           if (!directory) return;
@@ -641,10 +654,32 @@ export class FilesPanelApp {
     this.render();
   }
 
+  async resolveRoot() {
+    // muxy.exec defaults its cwd to the active worktree root — the same root
+    // muxy.files paths are relative to — so `pwd` yields the absolute base
+    // without needing the worktrees:read permission.
+    try {
+      const res = await muxy.exec(["pwd"]);
+      if (res?.exitCode === 0) return res.stdout.trim() || null;
+    } catch {
+      /* fall through */
+    }
+    return null;
+  }
+
+  abs_path(rel) {
+    if (!this.worktreeRoot) return null;
+    return `${this.worktreeRoot.replace(/\/+$/, "")}/${strip_slash(rel)}`;
+  }
+
+  file_url(abs) {
+    return `file://${abs.split("/").map(encodeURIComponent).join("/")}`;
+  }
+
   async dropPaths(event, targetDirRel) {
     event.preventDefault();
     event.stopPropagation();
-    const dragged = event.dataTransfer?.getData("text/plain");
+    const dragged = event.dataTransfer?.getData("application/x-muxy-path");
     this.dropTarget = null;
     if (!dragged) return;
     const target = canonical_dir(targetDirRel);
