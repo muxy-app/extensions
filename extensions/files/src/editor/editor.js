@@ -58,6 +58,7 @@ export class EditorApp {
     this.reloadTimer = 0;
     this.conflictPending = false;
     this.autoSaveTimer = 0;
+    this.lastWritten = null;
   }
 
   start() {
@@ -215,6 +216,7 @@ export class EditorApp {
     }
     this.cancelAutoSave();
     this.conflictPending = false;
+    this.lastWritten = null;
 
     if (!filePath) {
       this.fileLoadId += 1;
@@ -300,6 +302,11 @@ export class EditorApp {
       return;
     }
     if (this.filePath !== filePath || this.saving || this.conflictPending) return;
+
+    if (next === this.lastWritten) {
+      this.content = next;
+      return;
+    }
 
     if (!this.dirty) {
       // Clean buffer: silently adopt the new bytes. Ignore no-op events (e.g. our own save).
@@ -413,6 +420,7 @@ export class EditorApp {
     this.saving = false;
     if (ok) {
       this.content = next;
+      this.lastWritten = next;
       this.setDirty(false);
     }
     this.updateTopbar();
