@@ -1,4 +1,4 @@
-import { basename, error_message, open_externally, reveal_in_finder, try_action } from "@/lib/files";
+import { basename, error_message, open_externally, reveal_in_finder, same_file, try_action } from "@/lib/files";
 import { is_image, is_markdown, is_svg } from "@/lib/languages";
 import { icon_for } from "@/lib/file-icon";
 import { CodeEditor } from "@/editor/code-editor";
@@ -20,28 +20,6 @@ import {
 import { clear, cls, h } from "@/lib/dom";
 
 const RELOAD_DEBOUNCE_MS = 250;
-
-function path_segments(path) {
-  return String(path ?? "")
-    .replace(/\/+$/, "")
-    .split("/")
-    .filter(Boolean);
-}
-
-// file.changed payloads carry an absolute path, while this.filePath is relative
-// to the worktree root — so a strict === never matches. Treat them as the same
-// file when the relative path is the tail of the changed path (or they're equal).
-function same_file(changedPath, filePath) {
-  const want = path_segments(filePath);
-  if (want.length === 0) return false;
-  const got = path_segments(changedPath);
-  if (got.length < want.length) return false;
-  const offset = got.length - want.length;
-  for (let i = 0; i < want.length; i += 1) {
-    if (got[offset + i] !== want[i]) return false;
-  }
-  return true;
-}
 
 function read_data() {
   return window.muxy?.data ?? {};

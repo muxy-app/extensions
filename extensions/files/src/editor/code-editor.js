@@ -50,6 +50,7 @@ import { read_cursor_state, write_cursor_state } from "@/lib/cursor-state";
 import { gitGutterExtension, setGitBaseline } from "@/editor/git-gutter";
 import { colorSwatchExtension } from "@/editor/color-swatch";
 import { head_baseline } from "@/lib/git-baseline";
+import { same_file } from "@/lib/files";
 
 const replacePanelMode = new WeakMap();
 
@@ -284,6 +285,8 @@ export class CodeEditor {
     this.destroyed = false;
     this.cursorSaveTimer = 0;
     this.languageLoadId = 0;
+    this.baselineLoadId = 0;
+    this.baseline = null;
     this.languageCompartment = new Compartment();
     this.lintCompartment = new Compartment();
     this.configCompartment = new Compartment();
@@ -342,7 +345,11 @@ export class CodeEditor {
     this.loadLanguage(filePath);
     this.loadLinter();
     this.loadGitBaseline(filePath);
-    this.gitBaselineDisposer = muxy.events.subscribe("file.changed", () => this.loadGitBaseline(filePath));
+    this.gitBaselineDisposer = muxy.events.subscribe("file.changed", (payload) => {
+      const changed = payload && typeof payload === "object" && "path" in payload ? payload.path : undefined;
+      if (typeof changed !== "string" || !same_file(changed, filePath)) return;
+      this.loadGitBaseline(filePath);
+    });
   }
 
   selectionFromPosition(value, position) {
@@ -368,8 +375,11 @@ export class CodeEditor {
   }
 
   async loadGitBaseline(filePath) {
+    const loadId = ++this.baselineLoadId;
     const baseline = await head_baseline(filePath);
-    if (this.destroyed || !this.view) return;
+    if (this.destroyed || !this.view || loadId !== this.baselineLoadId) return;
+    if (baseline === this.baseline) return;
+    this.baseline = baseline;
     this.view.dispatch({ effects: setGitBaseline.of(baseline) });
   }
 

@@ -72,9 +72,19 @@ function diff_middle(oldLines, newLines, offset, changed, removedBefore) {
   record_block(block, changed, removedBefore);
 }
 
+function strip_final_newline(text) {
+  if (text.endsWith("\r\n")) return text.slice(0, -2);
+  if (text.endsWith("\n")) return text.slice(0, -1);
+  return text;
+}
+
 export function diff_lines(baseline, current) {
   const changed = new Map();
   const removedBefore = new Set();
+  if (baseline === current) return { changed, removedBefore, removedAtEnd: false };
+
+  baseline = strip_final_newline(baseline);
+  current = strip_final_newline(current);
   if (baseline === current) return { changed, removedBefore, removedAtEnd: false };
 
   const oldLines = split_lines(baseline);

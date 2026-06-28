@@ -12,6 +12,25 @@ export function strip_slash(path) {
   return path.replace(/\/+$/, "");
 }
 
+function path_segments(path) {
+  return String(path ?? "")
+    .replace(/\/+$/, "")
+    .split("/")
+    .filter(Boolean);
+}
+
+export function same_file(changedPath, filePath) {
+  const want = path_segments(filePath);
+  if (want.length === 0) return false;
+  const got = path_segments(changedPath);
+  if (got.length < want.length) return false;
+  const offset = got.length - want.length;
+  for (let i = 0; i < want.length; i += 1) {
+    if (got[offset + i] !== want[i]) return false;
+  }
+  return true;
+}
+
 export function canonical_dir(rel) {
   const clean = strip_slash(rel);
   return clean ? `${clean}/` : clean;
