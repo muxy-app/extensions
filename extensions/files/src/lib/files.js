@@ -149,6 +149,17 @@ export async function open_in_new_tab(rel) {
   }
 }
 
+export async function is_internal_file(rel) {
+  const path = strip_slash(rel);
+  if (!path) return false;
+  try {
+    const stat = await muxy.files.stat(path);
+    return Boolean(stat) && !stat.isDirectory;
+  } catch {
+    return false;
+  }
+}
+
 export async function reveal_in_finder(rel) {
   await muxy.exec(["open", "-R", strip_slash(rel)]).catch(() => undefined);
 }
