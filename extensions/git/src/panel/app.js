@@ -127,6 +127,11 @@ export class GitPanelApp {
             muxy.events.subscribe("worktree.switched", () => void this.switchScope()),
             muxy.events.subscribe("file.changed", () => this.reconcile()),
             muxy.events.subscribe("command.refresh-scm", () => this.runRefresh()),
+            muxy.events.subscribe("panel.opened", (payload) => {
+                const id = typeof payload === "string" ? payload : payload?.panel ?? payload?.id ?? payload?.panelId;
+                if (id === "scm")
+                    requestAnimationFrame(() => this.focusPanel());
+            }),
             muxy.events.subscribe("project.switched", () => void this.resetGraph(false)),
             muxy.events.subscribe("worktree.switched", () => void this.resetGraph(false)),
             muxy.events.subscribe("project.switched", () => this.reloadPrListOnScopeChange()),
@@ -144,6 +149,21 @@ export class GitPanelApp {
             dispose();
         if (this.reconcileTimer)
             clearTimeout(this.reconcileTimer);
+    }
+    focusPanel() {
+        const root = this.root;
+        if (!root)
+            return;
+        const active = document.activeElement;
+        if (active && root.contains(active) && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.isContentEditable))
+            return;
+        const focusable = root.querySelector('button, [href], input, textarea, select, [tabindex]:not([tabindex="-1"])');
+        if (focusable) {
+            focusable.focus({ preventScroll: true });
+            return;
+        }
+        root.tabIndex = -1;
+        root.focus({ preventScroll: true });
     }
     render() {
         const active = document.hasFocus() ? document.activeElement : null;
