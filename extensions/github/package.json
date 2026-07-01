@@ -1,0 +1,58 @@
+{
+  "devDependencies" : {
+    "vite" : "^5.0.0"
+  },
+  "muxy" : {
+    "$schema" : "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
+    "description" : "Browse and manage GitHub Issues and Pull Requests for the current project without leaving Muxy.",
+    "panels" : [
+      {
+        "id" : "issues",
+        "title" : "GitHub",
+        "icon" : { "svg" : "assets/icon.svg" },
+        "entry" : "index.html",
+        "position" : "right",
+        "mode" : "pinned"
+      }
+    ],
+    "commands" : [
+      {
+        "id" : "toggle-issues-panel",
+        "title" : "GitHub: Toggle Sidebar",
+        "action" : { "kind" : "togglePanel", "panel" : "issues" }
+      }
+    ],
+    "topbarItems" : [
+      {
+        "id" : "issues-panel",
+        "icon" : { "svg" : "assets/icon.svg" },
+        "tooltip" : "Toggle GitHub sidebar",
+        "command" : "toggle-issues-panel"
+      }
+    ],
+    "events" : [
+      "project.switched"
+    ],
+    "permissions" : [
+      "commands:exec",
+      "projects:read",
+      "panels:write"
+    ],
+    "marketplace" : {
+      "author" : "ryohei",
+      "github" : "mountain1009",
+      "repository" : "https://github.com/muxy-app/extensions",
+      "categories" : ["git", "productivity"],
+      "icon" : "assets/icon.svg",
+      "screenshots" : ["screenshots/screenshot-1.png"]
+    }
+  },
+  "name" : "github",
+  "private" : true,
+  "scripts" : {
+    "build" : "vite build && node -e \"require('fs').copyFileSync('package.json','dist/package.json')\"",
+    "dev" : "vite"
+  },
+  "type" : "module",
+  "version" : "0.1.0"
+}
