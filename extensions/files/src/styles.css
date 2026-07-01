@@ -144,6 +144,11 @@ textarea {
   font-size: var(--font-body);
 }
 
+.file-tree-list:focus,
+.file-tree-list:focus-visible {
+  outline: none;
+}
+
 .file-tree-row {
   display: flex;
   height: 24px;
@@ -164,6 +169,14 @@ textarea {
 
 .file-tree-row-selected {
   background: var(--muxy-hover);
+}
+
+/* When the tree itself is focused, the active row reads as a keyboard cursor
+   using the accent, matching native focus treatment. */
+.file-tree-list:focus .file-tree-row-selected,
+.file-tree-list:focus-within .file-tree-row-selected {
+  background: var(--muxy-accent-soft);
+  box-shadow: inset 0 0 0 1px var(--muxy-accent);
 }
 
 .file-tree-row-ignored {
