@@ -3,8 +3,7 @@ import { highlight_code } from "@/lib/preview-highlight";
 import { render_mermaid } from "@/lib/mermaid-render";
 import { ensure_preview_highlight_css } from "@/lib/syntax-theme";
 import { split_frontmatter } from "@/lib/frontmatter";
-import { is_markdown } from "@/lib/languages";
-import { open_in_new_tab, open_url, resolve_rel } from "@/lib/files";
+import { is_internal_file, open_in_new_tab, open_url, resolve_rel } from "@/lib/files";
 
 function has_scheme(href) {
   return /^[a-z][a-z0-9+.-]*:/i.test(href);
@@ -232,8 +231,15 @@ export class MarkdownView {
       void open_url(href);
       return;
     }
-    if (is_markdown(target)) void open_in_new_tab(target);
-    else void open_url(hash ? `${target}#${hash}` : target);
+    void this.openLinkTarget(target, hash);
+  }
+
+  async openLinkTarget(target, hash) {
+    if (await is_internal_file(target)) {
+      void open_in_new_tab(target);
+      return;
+    }
+    void open_url(hash ? `${target}#${hash}` : target);
   }
 
   update(source, fontSize, isDark) {
