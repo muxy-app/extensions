@@ -162,6 +162,7 @@ export class FilesPanelApp {
     this.worktreeRoot = null;
     this.dropTarget = null;
     this.renameState = null;
+    this.activeRenameInput = null;
     this.pendingDirs = new Set();
     this.reconcileTimer = null;
     this.contextMenu = null;
@@ -440,6 +441,23 @@ export class FilesPanelApp {
 
   render() {
     if (!this.list) return;
+    const active = this.activeRenameInput;
+    if (active && document.activeElement === active) {
+      this.renameSelection = { start: active.selectionStart, end: active.selectionEnd };
+    } else {
+      this.renameSelection = null;
+    }
+    this.reRendering = true;
+    try {
+      this.renderTree();
+    } finally {
+      this.reRendering = false;
+    }
+    this.focusRenameInput();
+  }
+
+  renderTree() {
+    if (!this.list) return;
     this.renderFilterBar();
     this.list.replaceChildren();
     this.visiblePaths = [];
@@ -459,12 +477,10 @@ export class FilesPanelApp {
         return;
       }
       for (const path of visible) this.renderRow(path, 0);
-      this.focusRenameInput();
       this.syncActiveDescendant();
       return;
     }
     for (const path of rootChildren) this.renderRow(path, 0);
-    this.focusRenameInput();
     this.syncActiveDescendant();
   }
 
@@ -566,9 +582,17 @@ export class FilesPanelApp {
   }
 
   renderRenameInput(path, directory) {
+    if (this.activeRenameInput && this.renameState?.path === path) {
+      return this.activeRenameInput;
+    }
     const input = h("input", {
       class: "file-tree-rename-input",
+      type: "text",
       value: basename(path),
+      spellcheck: "false",
+      autocapitalize: "off",
+      autocomplete: "off",
+      autocorrect: "off",
       onClick: (event) => event.stopPropagation(),
       onKeyDown: (event) => {
         if (event.key === "Enter") {
@@ -579,19 +603,37 @@ export class FilesPanelApp {
           void this.cancelRename();
         }
       },
-      onBlur: () => void this.commitRename(path, input.value, directory),
+      onBlur: () => {
+        if (this.reRendering) return;
+        void this.commitRename(path, input.value, directory);
+      },
     });
+    this.activeRenameInput = input;
     this.pendingRenameInput = input;
     return input;
   }
 
   focusRenameInput() {
-    const input = this.pendingRenameInput;
+    const fresh = this.pendingRenameInput;
     this.pendingRenameInput = null;
-    if (!input) return;
+    if (fresh) {
+      requestAnimationFrame(() => {
+        fresh.focus();
+        fresh.select();
+      });
+      return;
+    }
+    const restore = this.renameSelection;
+    const input = this.activeRenameInput;
+    this.renameSelection = null;
+    if (!restore || !input) return;
     requestAnimationFrame(() => {
+      if (document.activeElement === input) return;
       input.focus();
-      input.select();
+      const len = input.value.length;
+      const start = restore.start ?? len;
+      const end = restore.end ?? len;
+      input.setSelectionRange(Math.min(start, len), Math.min(end, len));
     });
   }
 
@@ -841,6 +883,7 @@ export class FilesPanelApp {
 
   startRename(path, options = {}) {
     if (!this.entries.has(path)) return;
+    this.activeRenameInput = null;
     this.renameState = { path, removeIfCanceled: Boolean(options.removeIfCanceled), committing: false };
     this.selectedPath = path;
     this.render();
@@ -852,6 +895,7 @@ export class FilesPanelApp {
     const newName = rawName.trim();
     if (!newName || newName === basename(path)) {
       this.renameState = null;
+      this.activeRenameInput = null;
       this.render();
       return;
     }
@@ -859,6 +903,7 @@ export class FilesPanelApp {
     const dest = path_after_rename(path, newName, directory);
     const ok = await rename_fs(path, dest, directory);
     this.renameState = null;
+    this.activeRenameInput = null;
     if (ok) {
       this.removeSubtree(path);
       await this.reconcileDir(parent_dir(dest));
@@ -871,6 +916,7 @@ export class FilesPanelApp {
     const state = this.renameState;
     if (!state) return;
     this.renameState = null;
+    this.activeRenameInput = null;
     if (state.removeIfCanceled) {
       await muxy.files.delete([state.path]).catch(() => undefined);
       await this.reconcileDir(parent_dir(state.path));
