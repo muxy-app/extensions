@@ -150,8 +150,5 @@ button { font-family: inherit; cursor: pointer; }
 }
 .url-input:focus { outline: none; border-color: var(--muxy-accent); }
 
-.btn.ghost { background: var(--muxy-background); height: 30px; }
-.hidden-file { display: none; }
-
 .icon-img { object-fit: contain; border-radius: 3px; display: block; }
 .cmd-icon .icon-img, .row-icon .icon-img { object-fit: contain; }

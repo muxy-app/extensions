@@ -6,7 +6,7 @@ in a fresh interactive terminal.
 
 ## Usage
 
-- Click the bolt icon in the topbar to open the launcher.
+- Click the terminal icon in the topbar to open the launcher.
 - Pick a command to run it in a new terminal tab.
 - Keyboard: `↑`/`↓` to move, `Enter` to run, `Esc` to close, and number keys
   `1`–`9` to run that command directly. With many commands a search box appears
@@ -15,7 +15,7 @@ in a fresh interactive terminal.
 
 Each command has a **name**, the **command** to run, an optional **working dir**
 relative to the active worktree root, and an **icon**. Icons can be a built-in
-glyph, an emoji, an uploaded image file, or an image URL — **Reset to defaults**
+glyph, an emoji, or a cached image URL — **Reset to defaults**
 restores the built-in Claude and Codex commands.
 
 ## Develop
