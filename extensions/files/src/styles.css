@@ -610,6 +610,22 @@ textarea {
   color: var(--muxy-foreground);
 }
 
+.html-viewer {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  background: var(--muxy-background);
+}
+
+.html-frame {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  border: 0;
+  background: #ffffff;
+}
+
 .md-preview {
   display: block;
   overflow: auto;
