@@ -623,7 +623,7 @@ textarea {
   min-height: 0;
   width: 100%;
   border: 0;
-  background: #ffffff;
+  background: var(--muxy-background);
 }
 
 .md-preview {
