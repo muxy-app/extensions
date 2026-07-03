@@ -6,7 +6,7 @@ import { MarkdownEditor } from "@/editor/markdown-editor";
 import { ImageViewer } from "@/editor/image-viewer";
 import { HtmlViewer } from "@/editor/html-viewer";
 import { SettingsSheet } from "@/editor/settings-sheet";
-import { OpenIcon, RevealIcon, SaveIcon, SettingsIcon } from "@/editor/icons";
+import { OpenIcon, RevealIcon, SaveIcon, SettingsIcon, TocIcon } from "@/editor/icons";
 import {
   AUTO_SAVE_DELAY_MS,
   load_editor_config,
@@ -18,9 +18,10 @@ import {
   create_editor_state_id,
   write_editor_state,
 } from "@/lib/editor-state";
-import { clear, cls, h } from "@/lib/dom";
+import { clear, cls, h, read_pref, write_pref } from "@/lib/dom";
 
 const RELOAD_DEBOUNCE_MS = 250;
+const TOC_PREF_KEY = "files:md-toc";
 
 function read_data() {
   return window.muxy?.data ?? {};
@@ -44,6 +45,7 @@ export class EditorApp {
     this.isDark = muxy.theme?.colorScheme === "dark";
     this.showSettings = false;
     this.mdMode = "preview";
+    this.showToc = read_pref(TOC_PREF_KEY, "0") === "1";
     this.svgView = false;
     this.htmlView = false;
     this.config = load_editor_config();
@@ -468,6 +470,13 @@ export class EditorApp {
     this.render();
   }
 
+  toggleToc() {
+    this.showToc = !this.showToc;
+    write_pref(TOC_PREF_KEY, this.showToc ? "1" : "0");
+    this.child?.setShowToc?.(this.showToc);
+    this.updateTopbar();
+  }
+
   setSvgView(view) {
     if (this.svgView === view) return;
     if (this.child?.getValue) this.content = this.child.getValue();
@@ -629,6 +638,22 @@ export class EditorApp {
           ),
         ),
       );
+      if (this.mdMode === "preview") {
+        actions.appendChild(
+          h(
+            "button",
+            {
+              class: cls("tool-button", this.showToc && "tool-button-active"),
+              type: "button",
+              "aria-label": "Table of contents",
+              "aria-pressed": this.showToc,
+              title: "Table of contents",
+              onClick: () => this.toggleToc(),
+            },
+            TocIcon(),
+          ),
+        );
+      }
       actions.appendChild(h("span", { class: "toolbar-divider" }));
     }
 
@@ -763,6 +788,7 @@ export class EditorApp {
         config: this.config,
         mode: this.mdMode,
         initialPosition,
+        showToc: this.showToc,
         onDirty: () => this.markDirty(),
         onSave: () => this.save(),
       });

@@ -453,6 +453,11 @@ textarea {
   color: var(--muxy-accent);
 }
 
+.tool-button-active:not(:disabled) {
+  background: var(--muxy-accent-soft);
+  color: var(--muxy-accent);
+}
+
 .toolbar-divider {
   width: 1px;
   height: 16px;
@@ -629,10 +634,23 @@ textarea {
 }
 
 .md-preview {
+  position: relative;
   display: block;
+  overflow: hidden;
+  line-height: 1.7;
+}
+
+.md-scroll {
+  height: 100%;
   overflow: auto;
   padding: var(--s6) var(--s7);
-  line-height: 1.7;
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .md-scroll {
+    scroll-behavior: auto;
+  }
 }
 
 .md-preview-document {
@@ -640,6 +658,97 @@ textarea {
   width: min(76ch, 100%);
   margin-right: auto;
   margin-left: auto;
+}
+
+.md-toc {
+  position: absolute;
+  top: var(--s5);
+  right: var(--s5);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  width: 260px;
+  max-width: calc(100% - var(--s8));
+  max-height: calc(100% - var(--s8));
+  overflow-y: auto;
+  padding: var(--s3) var(--s4) var(--s4);
+  border: 1px solid var(--muxy-border);
+  border-radius: var(--radius-card);
+  background: var(--muxy-background);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.16);
+  line-height: 1.3;
+}
+
+.md-preview:not(.md-preview-with-toc) .md-toc {
+  display: none;
+}
+
+.md-toc-heading {
+  margin-bottom: var(--s2);
+  padding: 0 var(--s2);
+  color: var(--muxy-foreground-muted);
+  font-size: var(--font-caption);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.md-preview .md-toc-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.md-preview .md-toc-item {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  line-height: 1.3;
+}
+
+.md-preview .md-toc-item::marker {
+  content: none;
+}
+
+.md-toc-link {
+  display: block;
+  padding: 3px var(--s3);
+  padding-left: calc(var(--s3) + var(--depth, 0) * var(--s4));
+  border-left: 2px solid transparent;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  color: var(--muxy-foreground-muted);
+  font-size: var(--font-footnote);
+  line-height: 1.3;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.md-toc-link[data-depth="1"] {
+  --depth: 1;
+}
+
+.md-toc-link[data-depth="2"] {
+  --depth: 2;
+}
+
+.md-toc-link[data-depth="3"] {
+  --depth: 3;
+}
+
+.md-preview .md-toc-link:hover {
+  background: var(--muxy-hover);
+  color: var(--muxy-foreground);
+  text-decoration: none;
+}
+
+.md-toc-link-active {
+  border-left-color: var(--muxy-accent);
+  background: var(--muxy-accent-soft);
+  color: var(--muxy-foreground);
+  font-weight: 500;
 }
 
 .md-preview-document > :first-child {

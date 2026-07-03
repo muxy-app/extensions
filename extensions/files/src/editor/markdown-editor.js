@@ -2,7 +2,7 @@ import { CodeEditor } from "@/editor/code-editor";
 import { MarkdownView } from "@/editor/markdown-view";
 
 export class MarkdownEditor {
-  constructor({ parent, filePath, value, isDark, config, mode, initialPosition, onDirty, onSave }) {
+  constructor({ parent, filePath, value, isDark, config, mode, initialPosition, showToc, onDirty, onSave }) {
     this.parent = parent;
     this.filePath = filePath;
     this.source = value;
@@ -10,6 +10,7 @@ export class MarkdownEditor {
     this.config = config;
     this.mode = mode;
     this.initialPosition = initialPosition;
+    this.showToc = showToc === true;
     this.onDirty = onDirty;
     this.onSave = onSave;
     this.child = null;
@@ -24,6 +25,7 @@ export class MarkdownEditor {
         fontSize: this.config.fontSize,
         isDark: this.isDark,
         filePath: this.filePath,
+        showToc: this.showToc,
       });
       this.parent.replaceChildren(this.child.element);
       return;
@@ -53,6 +55,15 @@ export class MarkdownEditor {
   focus() {
     if (this.mode !== "edit") return;
     this.child?.focus?.();
+  }
+
+  setShowToc(showToc) {
+    this.showToc = showToc;
+    if (this.mode === "preview") this.child?.setShowToc?.(showToc);
+  }
+
+  hasToc() {
+    return this.mode === "preview" && Boolean(this.child?.hasToc?.());
   }
 
   openSearch() {
