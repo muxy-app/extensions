@@ -111,37 +111,18 @@ function path_after_rename(sourcePath, newName, isFolder) {
   return isFolder ? canonical_dir(`${parent}${newName}`) : `${parent}${newName}`;
 }
 
-function create_context_menu(item, ops, close, selection = []) {
-  const isDir = item.kind === "directory";
+function context_menu_actions(item, ops, selection) {
   const path = item.path;
-  const createDir = isDir ? path : parent_dir(path);
   const multi = selection.length > 1 && selection.includes(path);
   if (multi) {
-    const actions = [
+    return [
       { label: "Reveal in Finder", run: () => void ops.revealPaths(selection) },
       { label: "Copy Paths", run: () => void ops.copyPaths(selection) },
       { label: `Delete ${selection.length} items`, run: () => void ops.deletePaths(selection), critical: true },
     ];
-    return h(
-      "div",
-      { class: "ctx-menu ctx-menu-floating", dataset: { fileTreeContextMenuRoot: "true" } },
-      actions.map((action, index) =>
-        h(
-          "button",
-          {
-            type: "button",
-            class: cls("ctx-item", action.critical && "ctx-item-critical", action.critical && index > 0 && "ctx-item-spaced"),
-            onClick: () => {
-              close();
-              action.run();
-            },
-          },
-          action.label,
-        ),
-      ),
-    );
   }
 
+  const createDir = item.kind === "directory" ? path : parent_dir(path);
   const actions = [
     { label: "New File", run: () => void ops.createFile(createDir) },
     { label: "New Folder", run: () => void ops.createFolder(createDir) },
@@ -160,6 +141,11 @@ function create_context_menu(item, ops, close, selection = []) {
     actions.push({ label: "Refresh", run: () => void ops.refresh() });
   }
 
+  return actions;
+}
+
+function create_context_menu(item, ops, close, selection = []) {
+  const actions = context_menu_actions(item, ops, selection);
   return h(
     "div",
     { class: "ctx-menu ctx-menu-floating", dataset: { fileTreeContextMenuRoot: "true" } },
