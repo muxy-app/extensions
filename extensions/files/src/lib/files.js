@@ -164,6 +164,12 @@ export async function reveal_in_finder(rel) {
   await muxy.exec(["open", "-R", strip_slash(rel)]).catch(() => undefined);
 }
 
+export async function reveal_paths(rels) {
+  const paths = rels.map((rel) => strip_slash(rel));
+  if (paths.length === 0) return;
+  await muxy.exec(["open", "-R", ...paths]).catch(() => undefined);
+}
+
 export async function open_externally(rel) {
   await muxy.exec(["open", strip_slash(rel)]).catch(() => undefined);
 }
@@ -179,5 +185,17 @@ export async function copy_path(rel) {
     await muxy.toast({ body: "Path copied", variant: "info" }).catch(() => undefined);
   } catch {
     await muxy.toast({ title: "Copy path", body: path, variant: "info" }).catch(() => undefined);
+  }
+}
+
+export async function copy_paths(rels) {
+  const paths = rels.map((rel) => strip_slash(rel));
+  const text = paths.join("\n");
+  const body = paths.length === 1 ? "Path copied" : `${paths.length} paths copied`;
+  try {
+    await navigator.clipboard.writeText(text);
+    await muxy.toast({ body, variant: "info" }).catch(() => undefined);
+  } catch {
+    await muxy.toast({ title: "Copy paths", body: text, variant: "info" }).catch(() => undefined);
   }
 }
