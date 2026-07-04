@@ -18,6 +18,7 @@ import {
   create_editor_state_id,
   write_editor_state,
 } from "@/lib/editor-state";
+import { clear_draft, read_draft, write_draft } from "@/lib/draft-state";
 import { clear, cls, h, read_pref, write_pref } from "@/lib/dom";
 
 const RELOAD_DEBOUNCE_MS = 250;
@@ -170,7 +171,7 @@ export class EditorApp {
     this.heartbeat = window.setInterval(() => this.publishEditorState(), 2000);
     const clearState = () => clear_editor_state(this.editorStateId);
     window.addEventListener("pagehide", clearState);
-    const offBeforeClose = muxy.lifecycle?.onBeforeClose?.(() => this.confirmClose());
+    const offBeforeClose = muxy.lifecycle?.onBeforeClose?.(() => this.handleBeforeClose());
     this.disposers.push(() => {
       window.clearInterval(this.heartbeat);
       window.removeEventListener("pagehide", clearState);
@@ -261,10 +262,12 @@ export class EditorApp {
     try {
       const file = await muxy.files.read(filePath);
       if (this.fileLoadId !== loadId) return;
-      this.content = file.content;
-      this.baseline = file.content;
+      const draft = await this.restorableDraft(filePath, file.content);
+      if (this.fileLoadId !== loadId) return;
+      this.content = draft ? draft.content : file.content;
+      this.baseline = draft ? draft.baseline : file.content;
       this.error = null;
-      this.setDirty(false);
+      this.setDirty(Boolean(draft));
     } catch (err) {
       if (this.fileLoadId !== loadId) return;
       this.content = null;
@@ -275,6 +278,21 @@ export class EditorApp {
         this.render();
       }
     }
+  }
+
+  async restorableDraft(filePath, diskContent) {
+    let draft;
+    try {
+      draft = await read_draft(filePath);
+    } catch {
+      return null;
+    }
+    if (!draft) return null;
+    if (draft.content === diskContent) {
+      void clear_draft(filePath);
+      return null;
+    }
+    return draft;
   }
 
   onFileChanged(payload) {
@@ -341,6 +359,7 @@ export class EditorApp {
     this.baseline = next;
     this.error = null;
     this.bodyKey = null;
+    this.dropDraft();
     this.setDirty(false);
     this.render();
   }
@@ -398,7 +417,19 @@ export class EditorApp {
     } else {
       this.setDirty(true);
     }
+    this.persistDraft();
     this.scheduleAutoSave();
+  }
+
+  persistDraft() {
+    if (!this.filePath || this.isImage() || this.baseline === null) return;
+    if (typeof this.child?.getValue !== "function") return;
+    void write_draft(this.filePath, this.child.getValue(), this.baseline);
+  }
+
+  dropDraft(filePath = this.filePath) {
+    if (!filePath) return;
+    void clear_draft(filePath);
   }
 
   scheduleAutoSave() {
@@ -438,10 +469,17 @@ export class EditorApp {
       // A deliberate save commits a new baseline; auto-saves stay discardable
       // back to the content the tab was opened with.
       if (deliberate) this.baseline = next;
+      this.dropDraft();
       this.setDirty(false);
     }
     this.updateTopbar();
     return ok;
+  }
+
+  async handleBeforeClose() {
+    const block = await this.confirmClose();
+    if (!block) this.dropDraft();
+    return block;
   }
 
   async confirmClose() {
@@ -486,6 +524,7 @@ export class EditorApp {
     if (ok) {
       this.content = this.baseline;
       this.lastWritten = this.baseline;
+      this.dropDraft();
       this.setDirty(false);
     }
     return !ok; // Block the close only if restoring the original failed.
