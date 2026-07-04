@@ -940,8 +940,19 @@ textarea {
   list-style: decimal;
 }
 
-.md-preview input[type="checkbox"] {
-  margin-right: var(--s3);
+.md-preview li.md-task-item {
+  list-style: none;
+  margin-left: -1.35em;
+  padding-left: 0;
+}
+
+.md-preview .md-task-checkbox {
+  width: 1em;
+  height: 1em;
+  margin: 0 var(--s3) 0 0;
+  vertical-align: -0.1em;
+  accent-color: var(--muxy-accent);
+  cursor: pointer;
 }
 
 .sheet-overlay {

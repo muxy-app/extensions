@@ -69,6 +69,27 @@ function is_blank(line) {
   return line.trim() === "";
 }
 
+const TASK_MARKER_RE = /^(\s*(?:[-*]|\d+\.)\s+\[)( |x|X)(\]\s+)/;
+
+// Flip the Nth task-list marker in `source` to `checked`, scanning lines in the
+// same top-to-bottom order the renderer assigns checkbox indices. Returns the
+// updated source, or null when the index has no matching marker.
+function toggle_task_in_source(source, index, checked) {
+  const newline = source.includes("\r\n") ? "\r\n" : "\n";
+  const lines = source.split(/\r?\n/);
+  let count = 0;
+  for (let i = 0; i < lines.length; i += 1) {
+    const match = TASK_MARKER_RE.exec(lines[i]);
+    if (!match) continue;
+    if (count === index) {
+      lines[i] = lines[i].replace(TASK_MARKER_RE, `$1${checked ? "x" : " "}$3`);
+      return lines.join(newline);
+    }
+    count += 1;
+  }
+  return null;
+}
+
 function is_table_separator(line) {
   return /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(line);
 }
@@ -209,7 +230,16 @@ function render_markdown(parent, source, isDark, ctx) {
         const task = /^\[( |x|X)\]\s+/.exec(body);
         const item = h("li");
         if (task) {
-          item.appendChild(h("input", { type: "checkbox", disabled: true, checked: task[1].toLowerCase() === "x" }));
+          const taskIndex = ctx ? ctx.tasks++ : -1;
+          item.classList.add("md-task-item");
+          const checkbox = h("input", {
+            type: "checkbox",
+            class: "md-task-checkbox",
+            checked: task[1].toLowerCase() === "x",
+            disabled: taskIndex < 0,
+          });
+          if (taskIndex >= 0) checkbox.dataset.taskIndex = String(taskIndex);
+          item.appendChild(checkbox);
           body = body.slice(task[0].length);
         }
         item.insertAdjacentHTML("beforeend", inline_html(body));
@@ -233,10 +263,11 @@ function render_markdown(parent, source, isDark, ctx) {
 const TOC_MIN_HEADINGS = 2;
 
 export class MarkdownView {
-  constructor({ source, fontSize, isDark, filePath, showToc = false }) {
+  constructor({ source, fontSize, isDark, filePath, showToc = false, onToggleTask = null }) {
     ensure_preview_highlight_css();
     this.filePath = filePath;
     this.showToc = showToc;
+    this.onToggleTask = onToggleTask;
     this.headings = [];
     this.tocLinks = new Map();
     this.activeId = null;
@@ -263,6 +294,26 @@ export class MarkdownView {
   }
 
   handleClick(event) {
+    const checkbox =
+      event.target instanceof HTMLInputElement && event.target.classList.contains("md-task-checkbox")
+        ? event.target
+        : null;
+    if (checkbox) {
+      const index = Number(checkbox.dataset.taskIndex);
+      if (!this.onToggleTask || !Number.isInteger(index) || index < 0) {
+        event.preventDefault();
+        return;
+      }
+      const next = this.toggleTask(index, checkbox.checked);
+      if (next === null) {
+        event.preventDefault();
+        return;
+      }
+      this.source = next;
+      this.onToggleTask(next);
+      return;
+    }
+
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.altKey) return;
 
     const tocLink = event.target instanceof Element ? event.target.closest("a.md-toc-link") : null;
@@ -320,6 +371,14 @@ export class MarkdownView {
     void open_url(hash ? `${target}#${hash}` : target);
   }
 
+  toggleTask(index, checked) {
+    const { body } = split_frontmatter(this.source);
+    const prefix = this.source.slice(0, this.source.length - body.length);
+    const nextBody = toggle_task_in_source(body, index, checked);
+    if (nextBody === null) return null;
+    return prefix + nextBody;
+  }
+
   update(source, fontSize, isDark) {
     this.source = source;
     this.fontSize = fontSize;
@@ -339,7 +398,7 @@ export class MarkdownView {
       );
     }
     this.headings = [];
-    render_markdown(documentElement, body, isDark, { slug: make_slugger(), headings: this.headings });
+    render_markdown(documentElement, body, isDark, { slug: make_slugger(), headings: this.headings, tasks: 0 });
     this.scroller.replaceChildren(documentElement);
     this.activeId = null;
     this.renderToc();

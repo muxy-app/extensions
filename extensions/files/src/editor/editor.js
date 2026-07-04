@@ -64,6 +64,7 @@ export class EditorApp {
     this.conflictPending = false;
     this.autoSaveTimer = 0;
     this.lastWritten = null;
+    this.baseline = null;
   }
 
   start() {
@@ -261,6 +262,7 @@ export class EditorApp {
       const file = await muxy.files.read(filePath);
       if (this.fileLoadId !== loadId) return;
       this.content = file.content;
+      this.baseline = file.content;
       this.error = null;
       this.setDirty(false);
     } catch (err) {
@@ -336,6 +338,7 @@ export class EditorApp {
 
   applyDiskContent(next) {
     this.content = next;
+    this.baseline = next;
     this.error = null;
     this.bodyKey = null;
     this.setDirty(false);
@@ -409,7 +412,7 @@ export class EditorApp {
       this.autoSaveTimer = 0;
       // Re-check at fire time: the buffer may be clean again, or a save/conflict in flight.
       if (!this.dirty || this.saving || this.conflictPending) return;
-      void this.save();
+      void this.save(false);
     }, AUTO_SAVE_DELAY_MS);
   }
 
@@ -420,7 +423,7 @@ export class EditorApp {
     }
   }
 
-  async save() {
+  async save(deliberate = true) {
     if (!this.filePath || !this.child || this.saving) return false;
     if (typeof this.child.getValue !== "function") return false;
     this.cancelAutoSave();
@@ -432,6 +435,9 @@ export class EditorApp {
     if (ok) {
       this.content = next;
       this.lastWritten = next;
+      // A deliberate save commits a new baseline; auto-saves stay discardable
+      // back to the content the tab was opened with.
+      if (deliberate) this.baseline = next;
       this.setDirty(false);
     }
     this.updateTopbar();
@@ -439,27 +445,55 @@ export class EditorApp {
   }
 
   async confirmClose() {
-    if (!this.dirty) return false;
-    // With auto save on, just flush silently instead of prompting on close.
-    if (this.config.autoSave !== false && this.filePath && !this.isImage()) {
-      const ok = await this.save();
-      return !ok; // Block the close only if the save failed.
-    }
-    const name = this.filePath ? basename(this.filePath) : "This file";
+    if (!this.dirty || !this.filePath || this.isImage()) return false;
+    this.cancelAutoSave();
+    const name = basename(this.filePath);
     const choice = await muxy.dialog.confirm({
       title: "Unsaved changes",
-      message: `${name} has unsaved changes. Save before closing?`,
-      buttons: ["Save", "Don't Save", "Cancel"],
+      message: `${name} has unsaved changes. Save them before closing?`,
+      buttons: ["Save", "Discard", "Cancel"],
       default: "Save",
       cancel: "Cancel",
       style: "warning",
     });
-    if (choice === null || choice === "Cancel") return true;
+    if (choice === null || choice === "Cancel") {
+      // Reinstate auto-save the user cancelled out of, so pending edits still flush.
+      this.scheduleAutoSave();
+      return true;
+    }
     if (choice === "Save") {
       const ok = await this.save();
-      return !ok;
+      if (!ok) this.scheduleAutoSave();
+      return !ok; // Block the close only if the save failed.
     }
-    return false;
+    // Discard: if auto-save already flushed edits to disk, restore the content
+    // the file had when this tab was opened before letting the close proceed.
+    return await this.discardChanges();
+  }
+
+  async discardChanges() {
+    if (this.baseline === null) return false;
+    let onDisk;
+    try {
+      const file = await muxy.files.read(this.filePath);
+      onDisk = file.content;
+    } catch {
+      // Can't read disk — nothing safe to restore; allow the close.
+      return false;
+    }
+    if (onDisk === this.baseline) return false; // Disk already holds the original.
+    const ok = await try_action(() => muxy.files.write(this.filePath, this.baseline), "Discard failed");
+    if (ok) {
+      this.content = this.baseline;
+      this.lastWritten = this.baseline;
+      this.setDirty(false);
+    }
+    return !ok; // Block the close only if restoring the original failed.
+  }
+
+  onTaskToggled(next) {
+    this.content = next;
+    void this.save();
   }
 
   setMarkdownMode(mode) {
@@ -791,6 +825,7 @@ export class EditorApp {
         showToc: this.showToc,
         onDirty: () => this.markDirty(),
         onSave: () => this.save(),
+        onToggleTask: (next) => this.onTaskToggled(next),
       });
       this.focusEditor();
       return;
