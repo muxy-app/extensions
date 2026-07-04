@@ -26,6 +26,11 @@ function file_path_of(entry) {
   return typeof filePath === "string" && filePath ? filePath : null;
 }
 
+function is_active_entry(entry) {
+  if (!entry || typeof entry !== "object") return false;
+  return entry.active === true || entry.focused === true || entry.isActive === true || entry.selected === true;
+}
+
 export class OpenTabsStore {
   constructor() {
     this.byPath = new Map();
@@ -95,8 +100,35 @@ export class OpenTabsStore {
     return this.byPath.get(filePath) ?? null;
   }
 
+  filePathFor(tabId) {
+    return this.byTab.get(tabId) ?? null;
+  }
+
   async resolveTabId(filePath) {
     await this.seed();
     return this.tabIdFor(filePath);
+  }
+
+  async resolveFilePath(tabId) {
+    if (!tabId) return null;
+    const known = this.filePathFor(tabId);
+    if (known) return known;
+    await this.seed();
+    return this.filePathFor(tabId);
+  }
+
+  async activeFilePath() {
+    let tabs;
+    try {
+      tabs = await muxy.tabs.list();
+    } catch {
+      return null;
+    }
+    if (!Array.isArray(tabs)) return null;
+    for (const entry of tabs) {
+      if (!is_editor_entry(entry) || !is_active_entry(entry)) continue;
+      return file_path_of(entry);
+    }
+    return null;
   }
 }

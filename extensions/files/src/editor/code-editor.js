@@ -122,6 +122,10 @@ class FindPanel {
       name: "search",
       form: "",
       "main-field": "true",
+      spellcheck: "false",
+      autocapitalize: "off",
+      autocomplete: "off",
+      autocorrect: "off",
       onInput: () => this.commit(),
       onChange: () => this.commit(),
     });
@@ -153,6 +157,10 @@ class FindPanel {
       class: "cm-textfield",
       name: "replace",
       form: "",
+      spellcheck: "false",
+      autocapitalize: "off",
+      autocomplete: "off",
+      autocorrect: "off",
       onInput: () => this.commit(),
       onChange: () => this.commit(),
     });
@@ -309,6 +317,12 @@ export class CodeEditor {
         doc: value,
         selection,
         extensions: [
+          EditorView.contentAttributes.of({
+            spellcheck: "false",
+            autocapitalize: "off",
+            autocorrect: "off",
+            translate: "no",
+          }),
           this.configCompartment.of(this.configExtensions(config, isDark)),
           this.languageCompartment.of([]),
           this.lintCompartment.of([]),

@@ -64,6 +64,15 @@ function panel_id_of(payload) {
   return null;
 }
 
+function focused_tab_id_of(payload) {
+  if (typeof payload === "string") return payload;
+  if (payload && typeof payload === "object") {
+    const id = payload.tabID ?? payload.tabId ?? payload.id ?? payload.tabInstanceID ?? payload.instanceID;
+    return typeof id === "string" && id ? id : null;
+  }
+  return null;
+}
+
 function block_ends_within(dirSegs, pathSegs, maxEnd) {
   if (dirSegs.length === 0) return true;
   for (let start = 0; start + dirSegs.length <= maxEnd; start++) {
@@ -218,6 +227,36 @@ export class FilesPanelApp {
     return open_in_editor(rel, tabId);
   }
 
+  async revealActiveTab(payload) {
+    const tabId = focused_tab_id_of(payload);
+    if (!tabId) return;
+    const rel = await this.openTabs.resolveFilePath(tabId);
+    if (!rel) return;
+    await this.revealFile(rel);
+  }
+
+  async revealFile(rel) {
+    if (!rel || this.dirtyFilter) return;
+    const ancestors = [];
+    let parent = parent_dir(rel);
+    while (parent !== "") {
+      ancestors.unshift(parent);
+      parent = parent_dir(parent);
+    }
+    for (const dir of ancestors) {
+      await this.ensureLoaded(parent_dir(dir));
+      if (!this.entries.has(dir)) return;
+      this.expandedDirs.add(dir);
+      await this.ensureLoaded(dir);
+    }
+    if (!this.entries.has(rel)) return;
+    this.setSelection(rel);
+    this.render();
+    this.persistMemory();
+    const el = this.rowElements.get(rel);
+    if (el) el.scrollIntoView({ block: "nearest" });
+  }
+
   start() {
     this.filterBar = h("div", { class: "file-tree-filter-bar", hidden: true });
     const panel = h("div", { class: "files-panel" }, this.filterBar, h("div", { class: "file-tree-wrap" }));
@@ -266,6 +305,9 @@ export class FilesPanelApp {
       // navigable immediately without a click.
       muxy.events.subscribe("panel.opened", (payload) => {
         if (panel_id_of(payload) === "files") requestAnimationFrame(() => this.focusList());
+      }),
+      muxy.events.subscribe("tab.focused", (payload) => {
+        void this.revealActiveTab(payload);
       }),
       muxy.events.subscribe("file.changed", (payload) => {
         this.scheduleReconcile(payload);
@@ -361,6 +403,12 @@ export class FilesPanelApp {
     this.render();
     this.maybeInitialFocus();
     void this.gitStatus.refresh();
+    void this.revealActiveOnLoad();
+  }
+
+  async revealActiveOnLoad() {
+    const rel = await this.openTabs.activeFilePath();
+    if (rel) await this.revealFile(rel);
   }
 
   async restoreMemory() {

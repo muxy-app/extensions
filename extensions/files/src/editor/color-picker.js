@@ -160,6 +160,9 @@ class ColorPicker {
     this.hexInput = el("muxy-color-picker__hex", "input");
     this.hexInput.type = "text";
     this.hexInput.spellcheck = false;
+    this.hexInput.setAttribute("autocapitalize", "off");
+    this.hexInput.setAttribute("autocomplete", "off");
+    this.hexInput.setAttribute("autocorrect", "off");
     row.appendChild(this.preview);
     row.appendChild(this.hexInput);
 
