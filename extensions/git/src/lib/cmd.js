@@ -112,7 +112,7 @@ function parsePorcelain(text) {
 }
 
 const PENDING_OP_PROBE = [
-    `[ -d "$(git rev-parse --git-path rebase-merge)" ] || [ -d "$(git rev-parse --git-path rebase-apply)" ] && { printf %s rebase; exit; }`,
+    `[ -f "$(git rev-parse --git-path rebase-merge/head-name)" ] || [ -f "$(git rev-parse --git-path rebase-apply/head-name)" ] && { printf %s rebase; exit; }`,
     ...[
         ["REVERT_HEAD", "revert"],
         ["CHERRY_PICK_HEAD", "cherry-pick"],
