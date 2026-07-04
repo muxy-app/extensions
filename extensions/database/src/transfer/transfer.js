@@ -1,5 +1,3 @@
-import { h } from "../lib/dom.js";
-import { icon } from "../ui/icons.js";
 import { toast } from "../ui/toast.js";
 import { serializeCsv } from "../lib/parse/csv.js";
 import { quoteIdent, quoteLiteral, qualifiedName } from "../lib/sql/quote.js";
@@ -66,37 +64,13 @@ export async function exportResult(engine, ref, result, format) {
     }
 }
 
-export function openTransferMenu(session, ref, anchor) {
-    const engine = session.conn.engine;
-    const backdrop = h("div", { class: "backdrop", onclick: (e) => { if (e.target === backdrop) backdrop.remove(); } });
-    const item = (label, iconName, onClick) => h("button", {
-        class: "tree-row w-full text-left",
-        onclick: async () => {
-            backdrop.remove();
-            await onClick();
-        },
-    }, icon(iconName, 12), label);
-
-    const sheet = h("div", { class: "sheet", style: "width: 320px" },
-        h("div", { class: "flex items-center gap-[var(--s4)] border-b px-[var(--s7)] py-[var(--s5)] text-[var(--font-title)] font-semibold", style: "border-color: var(--muxy-border)" },
-            icon("download", 16), "Import / Export", h("div", { class: "flex-1" }), h("button", { class: "icon-btn", onclick: () => backdrop.remove() }, icon("x"))),
-        h("div", { class: "py-[var(--s3)]" },
-            item("Export table as CSV", "download", () => exportTable(session, ref, "csv")),
-            item("Export table as JSON", "download", () => exportTable(session, ref, "json")),
-            item("Export table as SQL INSERTs", "download", () => exportTable(session, ref, "sql")),
-            ref ? item("Import CSV into table", "upload", () => importCsv(session, ref)) : null,
-            item("Dump entire database", "save", () => dumpDatabase(session))));
-    backdrop.appendChild(sheet);
-    document.body.appendChild(backdrop);
-}
-
 async function fetchAll(session, ref) {
     const sql = buildSelect(session.conn.engine, ref, { limit: 1000000, offset: 0 });
     const results = await session.driver.runQuery(session.ctx, sql, { timeoutMs: session.timeoutMs });
     return results[0];
 }
 
-async function exportTable(session, ref, format) {
+export async function exportTable(session, ref, format) {
     setBusy("Exporting…");
     try {
         const result = await fetchAll(session, ref);
@@ -107,7 +81,7 @@ async function exportTable(session, ref, format) {
     }
 }
 
-async function importCsv(session, ref) {
+export async function importCsv(session, ref) {
     const folder = await muxy.dialog.pickFolder({ title: "Folder containing the CSV" });
     if (!folder)
         return;
@@ -124,7 +98,7 @@ async function importCsv(session, ref) {
     }
 }
 
-async function dumpDatabase(session) {
+export async function dumpDatabase(session) {
     const conn = session.conn;
     const stamp = new Date(Date.now()).toISOString().replace(/[:.]/g, "-");
     const path = await chooseFile(`${conn.name.replace(/\W+/g, "_")}-${stamp}.sql`);

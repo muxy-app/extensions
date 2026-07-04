@@ -1,5 +1,6 @@
 import { run, tryRun } from "./exec.js";
 import { which } from "./cli-detect.js";
+import { saveConnection } from "./connections.js";
 
 const SERVICE = "muxy-database";
 const session = new Map();
@@ -61,5 +62,10 @@ export async function ensurePassword(conn) {
     if (entered === null)
         return false;
     session.set(conn.id, entered);
+    if (await hasKeychain()) {
+        await storePassword(conn.id, entered);
+        conn.keychain = true;
+        await saveConnection(conn).catch(() => undefined);
+    }
     return true;
 }
