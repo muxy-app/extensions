@@ -20,7 +20,7 @@ export function Pager({ page, pageSize, rowsOnPage, total, onPage, onCount, chil
                 <Icon name="right" size={12} />
             </button>
             {total == null ? (
-                <button className="btn" style={{ height: "22px", fontSize: "var(--font-footnote)" }} onClick={onCount}>
+                <button className="btn control-compact" onClick={onCount}>
                     Count rows
                 </button>
             ) : null}

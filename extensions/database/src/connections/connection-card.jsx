@@ -37,7 +37,7 @@ export function ConnectionCard({ conn, panel, onOpen, onEdit, onChanged }) {
     };
 
     return (
-        <div className={`card group flex cursor-default items-center gap-[var(--s4)] ${panel ? "!p-[var(--s3)]" : ""}`} onClick={() => onOpen(conn)}>
+        <div className={`card connection-card ${panel ? "compact !p-[var(--s3)]" : ""} flex cursor-default items-center gap-[var(--s4)]`} onClick={() => onOpen(conn)}>
             <div className="h-2.5 w-2.5 flex-shrink-0 rounded-full" style={{ background: conn.color }} />
             <div className="min-w-0 flex-1">
                 <div className="truncate text-[var(--font-body)] font-semibold">{conn.name || "Untitled"}</div>
@@ -45,7 +45,7 @@ export function ConnectionCard({ conn, panel, onOpen, onEdit, onChanged }) {
                     {`${ENGINES[conn.engine].label} · ${connectionTarget(conn)}`}
                 </div>
             </div>
-            <div className="hidden items-center gap-[var(--s1)] group-hover:flex">
+            <div className="connection-actions">
                 <ActionButton icon="pencil" title="Edit" onClick={(e) => { e.stopPropagation(); onEdit(conn); }} />
                 <ActionButton icon="copy" title="Duplicate" onClick={duplicate} />
                 <ActionButton icon="trash" title="Delete" onClick={remove} />

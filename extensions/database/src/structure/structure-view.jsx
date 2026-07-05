@@ -136,8 +136,8 @@ export function StructureView({ session, tableRef, setStatus, reloadTables }) {
                 {ddl ? (
                     <Section title="DDL">
                         <pre
-                            className="mono error-box"
-                            style={{ color: "var(--muxy-foreground)", borderColor: "var(--muxy-border)", maxHeight: "260px", overflow: "auto" }}
+                            className="mono error-box ddl-block"
+                            style={{ color: "var(--muxy-foreground)", borderColor: "var(--muxy-border)" }}
                         >
                             {ddl}
                         </pre>

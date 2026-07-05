@@ -50,8 +50,7 @@ export function SavedPanel({ session, onPick, getCurrentSql }) {
                     entries.map((entry) => (
                         <div
                             key={entry.id}
-                            className="tree-row group"
-                            style={{ height: "auto", paddingTop: "var(--s2)", paddingBottom: "var(--s2)" }}
+                            className="tree-row tree-row-stacked group"
                             onClick={() => onPick(entry.sql)}
                         >
                             <div className="min-w-0 flex-1">

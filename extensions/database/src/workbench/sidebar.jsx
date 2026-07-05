@@ -13,15 +13,15 @@ export function Sidebar({ onNewTable, onTransfer }) {
 
     return (
         <div className="flex w-56 flex-shrink-0 flex-col border-r" style={{ borderColor: "var(--muxy-border)" }}>
-            <div className="flex items-center gap-[var(--s3)] p-[var(--s4)]">
+            <div className="pane-header-row">
                 <input type="text" placeholder="Filter tables" className="flex-1" value={filter} onChange={(e) => setFilter(e.target.value)} />
                 {onNewTable ? (
-                    <button className="icon-btn" title="New table" onClick={onNewTable}>
+                    <button className="icon-btn icon-btn-bordered" title="New table" onClick={onNewTable}>
                         <Icon name="plus" />
                     </button>
                 ) : null}
                 {onTransfer ? (
-                    <button className="icon-btn" title="Import / Export" onClick={onTransfer}>
+                    <button className="icon-btn icon-btn-bordered" title="Import / Export" onClick={onTransfer}>
                         <Icon name="download" />
                     </button>
                 ) : null}
@@ -47,7 +47,7 @@ export function Sidebar({ onNewTable, onTransfer }) {
                     })
                 )}
             </div>
-            <div className="border-t px-[var(--s5)] py-[var(--s2)] text-[var(--font-footnote)] text-muted-foreground" style={{ borderColor: "var(--muxy-border)" }}>
+            <div className="pane-footer-row text-[var(--font-footnote)] text-muted-foreground" style={{ borderColor: "var(--muxy-border)" }}>
                 {`${tableCount} tables${viewCount ? ` · ${viewCount} views` : ""}`}
             </div>
         </div>

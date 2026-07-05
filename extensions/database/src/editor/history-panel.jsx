@@ -38,8 +38,7 @@ export function HistoryPanel({ session, refreshToken, onPick }) {
                     entries.map((entry) => (
                         <div
                             key={entry.id}
-                            className="tree-row"
-                            style={{ height: "auto", paddingTop: "var(--s2)", paddingBottom: "var(--s2)" }}
+                            className="tree-row tree-row-stacked"
                             onClick={() => onPick(entry.sql)}
                         >
                             <div className="min-w-0 flex-1">

@@ -38,10 +38,18 @@
   --icon-sm: 12px;
   --icon: 14px;
   --control: 24px;
+  --input-height: var(--control);
+  --button-height: 28px;
+  --pane-header-height: var(--muxy-topbar-height);
   --radius-control: 6px;
   --radius-card: 8px;
   --row-height: 28px;
+  --result-grid-max-height: 320px;
   --font-mono: "SF Mono", Menlo, monospace;
+}
+
+* {
+  box-sizing: border-box;
 }
 
 html,
@@ -76,6 +84,20 @@ textarea {
   border-radius: var(--radius-control);
   padding: var(--s2) var(--s4);
   outline: none;
+}
+
+input,
+select {
+  height: var(--input-height);
+}
+
+input[type="checkbox"] {
+  width: var(--icon);
+  height: var(--icon);
+  min-width: var(--icon);
+  padding: 0;
+  margin: 0;
+  accent-color: var(--muxy-accent);
 }
 
 input:focus,
@@ -115,11 +137,25 @@ textarea:focus {
   stroke-width: 1.5px;
 }
 
+.icon-btn-compact {
+  width: var(--control);
+  height: var(--control);
+}
+
+.icon-btn-bordered {
+  background: var(--muxy-surface);
+  border: 1px solid var(--muxy-border);
+}
+
+.icon-btn-bordered:hover {
+  border-color: var(--muxy-accent);
+}
+
 .btn {
   display: inline-flex;
   align-items: center;
   gap: var(--s3);
-  height: 28px;
+  height: var(--button-height);
   padding: 0 var(--s5);
   font-size: var(--font-emphasis);
   color: var(--muxy-foreground);
@@ -133,7 +169,7 @@ textarea:focus {
 }
 
 .btn-sm {
-  height: 22px;
+  height: var(--control);
   padding: 0 var(--s4);
   font-size: var(--font-footnote);
   gap: var(--s2);
@@ -232,12 +268,32 @@ textarea:focus {
 
 .field input,
 .field select {
-  height: 26px;
+  height: var(--input-height);
+}
+
+.control-compact {
+  height: var(--control);
+  min-height: var(--control);
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.btn.control-compact {
+  height: var(--control);
+  font-size: var(--font-footnote);
+}
+
+.select-compact {
+  height: var(--control);
+  min-height: var(--control);
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 .seg {
   display: inline-flex;
   align-items: center;
+  height: var(--control);
   background: var(--muxy-surface);
   border: 1px solid var(--muxy-border);
   border-radius: var(--radius-control);
@@ -249,7 +305,7 @@ textarea:focus {
   display: inline-flex;
   align-items: center;
   gap: var(--s2);
-  height: 20px;
+  height: 18px;
   border: none;
   background: transparent;
   color: var(--muxy-foreground-muted);
@@ -272,6 +328,48 @@ textarea:focus {
   background: var(--muxy-hover);
   color: var(--muxy-foreground);
   font-weight: 600;
+}
+
+.tab-close-btn {
+  width: var(--icon);
+  height: var(--icon);
+  border-radius: 4px;
+}
+
+.tab-close-btn svg {
+  width: 9px;
+  height: 9px;
+}
+
+.pane-header-row {
+  height: var(--pane-header-height);
+  box-sizing: content-box;
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: 0 var(--s5);
+  border-bottom: 1px solid var(--muxy-border);
+  flex-shrink: 0;
+}
+
+.pane-header-row input {
+  min-width: 0;
+}
+
+.query-tabs-row {
+  gap: var(--s1);
+  padding-right: var(--s3);
+}
+
+.query-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  height: var(--input-height);
+  padding: 0 var(--s4);
+  border: 1px solid var(--muxy-border);
+  border-radius: 4px 4px 0 0;
+  font-size: var(--font-body);
 }
 
 .tree-row {
@@ -299,9 +397,33 @@ textarea:focus {
   color: var(--muxy-foreground-muted);
 }
 
+.pane-footer-row {
+  height: var(--s10);
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: 0 var(--s5);
+  border-top: 1px solid var(--muxy-border);
+  flex-shrink: 0;
+}
+
+.tree-row-stacked {
+  height: auto;
+  min-height: var(--row-height);
+  padding-top: var(--s2);
+  padding-bottom: var(--s2);
+}
+
 .grid-wrap {
   overflow: auto;
   flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.grid-wrap-inline {
+  flex: none;
+  max-width: 100%;
 }
 
 .grid-table {
@@ -310,15 +432,23 @@ textarea:focus {
   font-family: var(--font-mono);
   font-size: var(--font-body);
   min-width: 100%;
+  line-height: var(--s7);
+}
+
+.grid-table th,
+.grid-table td {
+  height: var(--row-height);
+  vertical-align: middle;
+  border-bottom: 1px solid var(--muxy-border);
+  border-right: 1px solid var(--muxy-border);
+  padding: 0 var(--s4);
 }
 
 .grid-table th {
   position: sticky;
   top: 0;
+  z-index: 1;
   background: var(--muxy-surface);
-  border-bottom: 1px solid var(--muxy-border);
-  border-right: 1px solid var(--muxy-border);
-  padding: var(--s2) var(--s4);
   text-align: left;
   font-weight: 600;
   white-space: nowrap;
@@ -330,9 +460,6 @@ textarea:focus {
 }
 
 .grid-table td {
-  border-bottom: 1px solid var(--muxy-border);
-  border-right: 1px solid var(--muxy-border);
-  padding: var(--s1) var(--s4);
   white-space: nowrap;
   max-width: 360px;
   overflow: hidden;
@@ -375,8 +502,106 @@ textarea:focus {
 }
 
 .grid-table td.editing {
-  padding: 0 2px;
+  padding: var(--s1) var(--s2);
   overflow: visible;
+}
+
+.grid-cell-editor {
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+  min-width: 120px;
+}
+
+.grid-cell-editor input,
+.grid-cell-editor select {
+  height: var(--control);
+  min-height: var(--control);
+}
+
+.grid-cell-editor input {
+  width: 100%;
+  min-width: 80px;
+  padding: 0 var(--s4);
+}
+
+.grid-table-structure {
+  font-family: inherit;
+}
+
+.grid-table-structure td {
+  max-width: 420px;
+}
+
+.column-designer-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+}
+
+.column-designer-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(96px, 130px) auto auto var(--control);
+  align-items: center;
+  gap: var(--s3);
+  min-height: 28px;
+}
+
+.column-designer-row input[type="text"] {
+  width: 100%;
+}
+
+.column-designer-check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  min-height: var(--control);
+  white-space: nowrap;
+}
+
+.connection-card {
+  min-height: calc(var(--control) + var(--s8));
+}
+
+.connection-card.compact {
+  min-height: calc(var(--control) + var(--s6));
+}
+
+.connection-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.connection-card:hover .connection-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.result-block {
+  max-height: 100%;
+}
+
+.result-grid {
+  max-height: var(--result-grid-max-height);
+}
+
+.pending-bar {
+  height: var(--s10);
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  padding: 0 var(--s5);
+  border-top: 1px solid var(--muxy-border);
+  background: var(--muxy-accent-soft);
+  flex-shrink: 0;
+}
+
+.ddl-block {
+  max-height: 260px;
+  overflow: auto;
 }
 
 .error-box {

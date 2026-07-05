@@ -15,7 +15,7 @@ function metaLine(result) {
 
 function ResultBlock({ result, index, count }) {
     return (
-        <div className="flex min-h-0 flex-col rounded-[var(--radius-card)] border" style={{ borderColor: "var(--muxy-border)", maxHeight: "100%" }}>
+        <div className="result-block flex min-h-0 flex-col rounded-[var(--radius-card)] border" style={{ borderColor: "var(--muxy-border)" }}>
             <div
                 className="flex items-center gap-[var(--s4)] border-b px-[var(--s4)] py-[var(--s2)] text-[var(--font-footnote)] text-muted-foreground"
                 style={{ borderColor: "var(--muxy-border)" }}
@@ -25,7 +25,7 @@ function ResultBlock({ result, index, count }) {
                 {metaLine(result)}
             </div>
             {result.columns.length ? (
-                <div className="flex min-h-0 flex-col" style={{ maxHeight: "320px" }}>
+                <div className="result-grid flex min-h-0 flex-col">
                     <Grid columns={result.columns} rows={result.rows} />
                 </div>
             ) : (

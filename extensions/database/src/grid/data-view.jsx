@@ -178,7 +178,7 @@ export function DataView({ session, tableRef, setStatus }) {
                 onDiscard={() => { clearChanges(model); bumpChanges(); }}
                 onApply={() => openReview(true)}
             />
-            <div className="flex items-center gap-[var(--s3)] border-t px-[var(--s4)] py-[var(--s2)]" style={{ borderColor: "var(--muxy-border)" }}>
+            <div className="pane-footer-row" style={{ borderColor: "var(--muxy-border)" }}>
                 <Pager
                     page={gridState.page}
                     pageSize={session.pageSize}
@@ -191,7 +191,7 @@ export function DataView({ session, tableRef, setStatus }) {
                     }}
                 >
                     {page.editable ? (
-                        <button className="btn" style={{ height: "22px", fontSize: "var(--font-footnote)" }} onClick={addRow}>
+                        <button className="btn control-compact" onClick={addRow}>
                             <Icon name="plus" size={10} />
                             Row
                         </button>

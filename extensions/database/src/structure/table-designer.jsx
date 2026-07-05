@@ -89,33 +89,31 @@ export function TableDesignerModal({ session, onDone, onClose }) {
                 <div className="field">
                     <div className="flex items-center">
                         <label className="flex-1">Columns</label>
-                        <button className="btn" style={{ height: "22px" }} onClick={addColumn}>
+                        <button className="btn control-compact" onClick={addColumn}>
                             <Icon name="plus" size={10} />
                             Column
                         </button>
                     </div>
-                    <div className="flex flex-col gap-[var(--s3)]">
+                    <div className="column-designer-grid">
                         {columns.map((col, index) => (
-                            <div key={index} className="flex items-center gap-[var(--s3)]">
+                            <div key={index} className="column-designer-row">
                                 <input
                                     type="text"
                                     placeholder="column"
                                     value={col.name}
-                                    style={{ flex: 1 }}
                                     onChange={(e) => patch(index, { name: e.target.value })}
                                 />
                                 <input
                                     type="text"
                                     list="db-types"
                                     value={col.type}
-                                    style={{ width: "130px" }}
                                     onChange={(e) => patch(index, { type: e.target.value })}
                                 />
-                                <label className="flex items-center gap-[var(--s2)] text-[var(--font-footnote)]">
+                                <label className="column-designer-check text-[var(--font-footnote)]">
                                     <input type="checkbox" checked={col.pk} onChange={(e) => patch(index, { pk: e.target.checked })} />
                                     PK
                                 </label>
-                                <label className="flex items-center gap-[var(--s2)] text-[var(--font-footnote)]">
+                                <label className="column-designer-check text-[var(--font-footnote)]">
                                     <input type="checkbox" checked={col.notNull} onChange={(e) => patch(index, { notNull: e.target.checked })} />
                                     NN
                                 </label>

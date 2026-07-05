@@ -67,8 +67,8 @@ export function ConnectionsScreen({ variant = "tab", onOpen }) {
     };
 
     const header = panel ? (
-        <div className="flex items-center gap-[var(--s3)] border-b px-[var(--s4)] py-[var(--s3)]" style={{ borderColor: "var(--muxy-border)" }}>
-            <input type="text" placeholder="Search" className="flex-1 h-[22px]" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <div className="pane-header-row" style={{ borderColor: "var(--muxy-border)" }}>
+            <input type="text" placeholder="Search" className="flex-1" value={query} onChange={(e) => setQuery(e.target.value)} />
             {hasSsh ? (
                 <button className="icon-btn" title="Close all SSH tunnels" onClick={closeAllTunnels}>
                     <Icon name="link" />

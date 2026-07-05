@@ -26,7 +26,7 @@ export function FilterBar({ columns, filters, rawWhere, onApply }) {
             <div className="flex flex-wrap items-center gap-[var(--s3)]">
                 {rows.map((row, index) => (
                     <div key={index} className="flex items-center gap-[var(--s2)]">
-                        <select style={{ height: "24px" }} value={row.column} onChange={(e) => patchRow(index, { column: e.target.value })}>
+                        <select className="select-compact" value={row.column} onChange={(e) => patchRow(index, { column: e.target.value })}>
                             <option value="">column</option>
                             {columns.map((c) => (
                                 <option key={c.name} value={c.name}>
@@ -34,7 +34,7 @@ export function FilterBar({ columns, filters, rawWhere, onApply }) {
                                 </option>
                             ))}
                         </select>
-                        <select style={{ height: "24px" }} value={row.op} onChange={(e) => patchRow(index, { op: e.target.value })}>
+                        <select className="select-compact" value={row.op} onChange={(e) => patchRow(index, { op: e.target.value })}>
                             {FILTER_OPS.map((op) => (
                                 <option key={op.id} value={op.id}>
                                     {op.label}
@@ -43,31 +43,32 @@ export function FilterBar({ columns, filters, rawWhere, onApply }) {
                         </select>
                         <input
                             type="text"
+                            className="control-compact"
                             placeholder="value"
                             value={row.value ?? ""}
-                            style={{ height: "24px", width: "120px", display: isUnary(row.op) ? "none" : "" }}
+                            style={{ width: "120px", display: isUnary(row.op) ? "none" : "" }}
                             onChange={(e) => patchRow(index, { value: e.target.value })}
                         />
-                        <button className="icon-btn" title="Remove filter" onClick={() => removeRow(index)}>
+                        <button className="icon-btn icon-btn-compact" title="Remove filter" onClick={() => removeRow(index)}>
                             <Icon name="x" size={12} />
                         </button>
                     </div>
                 ))}
             </div>
             <div className="flex items-center gap-[var(--s3)]">
-                <button className="icon-btn" title="Add filter" onClick={addRow}>
+                <button className="icon-btn icon-btn-compact" title="Add filter" onClick={addRow}>
                     <Icon name="plus" size={12} />
                 </button>
                 <input
                     type="text"
-                    className="mono"
+                    className="mono control-compact"
                     placeholder="raw WHERE (optional)"
                     value={raw}
-                    style={{ height: "24px", flex: 1, minWidth: "160px" }}
+                    style={{ flex: 1, minWidth: "160px" }}
                     onChange={(e) => setRaw(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter") apply(); }}
                 />
-                <button className="btn" style={{ height: "24px" }} onClick={apply}>
+                <button className="btn control-compact" onClick={apply}>
                     <Icon name="filter" size={12} />
                     Apply
                 </button>

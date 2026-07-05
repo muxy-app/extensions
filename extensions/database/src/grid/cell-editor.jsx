@@ -13,6 +13,7 @@ function BoolEditor({ value, nullable, onCommit, onCancel }) {
     const selected = value === null ? " null" : /^(1|t|true)$/i.test(String(value)) ? "true" : "false";
     return (
         <select
+            className="select-compact"
             autoFocus
             defaultValue={selected}
             onChange={(e) => onCommit(e.target.value === " null" ? null : e.target.value === "true")}
@@ -30,11 +31,10 @@ function TextEditor({ value, nullable, onCommit, onCancel }) {
     const nullBtnRef = useRef(null);
     const [text, setText] = useState(value === null ? "" : String(value));
     return (
-        <div className="flex items-center gap-[2px]">
+        <div className="grid-cell-editor">
             <input
                 type="text"
                 className="mono"
-                style={{ width: "100%", minWidth: "80px", height: "22px", padding: "0 4px" }}
                 autoFocus
                 value={text}
                 onFocus={(e) => e.target.select()}
@@ -56,9 +56,8 @@ function TextEditor({ value, nullable, onCommit, onCancel }) {
             {nullable ? (
                 <button
                     ref={nullBtnRef}
-                    className="icon-btn"
+                    className="icon-btn icon-btn-compact"
                     title="Set NULL"
-                    style={{ width: "20px", height: "20px" }}
                     onClick={() => onCommit(null)}
                 >
                     ∅
