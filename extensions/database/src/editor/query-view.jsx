@@ -139,15 +139,15 @@ export function QueryView({ session, setStatus, queryHooksRef, pendingQueryActio
         <div className="flex min-h-0 flex-1">
             <div className="flex min-w-0 flex-1 flex-col">
                 <QueryTabs tabs={state.tabs} activeId={state.activeId} onSwitch={switchTab} onClose={closeTab} onAdd={addTab} />
-                <div className="flex items-center gap-[var(--s3)] border-b px-[var(--s4)] py-[var(--s2)]" style={{ borderColor: "var(--muxy-border)" }}>
-                    <button className="btn btn-primary" disabled={running} onClick={() => run("cursor")}>
-                        <Icon name="play" size={12} />
+                <div className="toolbar border-b" style={{ borderColor: "var(--muxy-border)" }}>
+                    <button className="btn btn-compact btn-primary" disabled={running} onClick={() => run("cursor")}>
+                        <Icon name="play" />
                         Run
                     </button>
-                    <button className="btn" title="Run every statement in this tab" onClick={() => run("all")}>
+                    <button className="btn btn-compact" title="Run every statement in this tab" onClick={() => run("all")}>
                         Run All
                     </button>
-                    <button className="btn" title="Explain the statement at the cursor" onClick={runExplain}>
+                    <button className="btn btn-compact" title="Explain the statement at the cursor" onClick={runExplain}>
                         Explain
                     </button>
                     <span className="text-[var(--font-footnote)] text-muted-foreground">⌘⏎ statement · ⇧⌘⏎ all</span>
@@ -182,7 +182,7 @@ export function QueryView({ session, setStatus, queryHooksRef, pendingQueryActio
                 <HistoryPanel session={session} refreshToken={historyToken} onPick={(sql) => insertSql(editorRef.current, sql)} />
             ) : null}
             {panel === "saved" ? (
-                <div className="w-72 flex-shrink-0 border-l" style={{ borderColor: "var(--muxy-border)" }}>
+                <div className="w-[var(--side-panel-width)] flex-shrink-0 border-l" style={{ borderColor: "var(--muxy-border)" }}>
                     <SavedPanel
                         session={session}
                         onPick={(sql) => insertSql(editorRef.current, sql)}

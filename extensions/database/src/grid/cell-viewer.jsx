@@ -25,11 +25,11 @@ export function CellViewerModal({ value, onClose }) {
         <Modal
             icon="eye"
             title={`Cell (${kind}, ${raw.length} chars)`}
-            width="560px"
+            size="lg"
             onClose={onClose}
             headerActions={
                 <button className="icon-btn" title="Copy" onClick={copy}>
-                    <Icon name="copy" size={12} />
+                    <Icon name="copy" />
                 </button>
             }
         >

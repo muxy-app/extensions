@@ -38,7 +38,7 @@ export function SqliteFields({ conn, patch }) {
                     onChange={(e) => patch({ sqlite: { ...conn.sqlite, path: e.target.value } })}
                 />
                 <button className="btn" onClick={pick}>
-                    <Icon name="folder" size={12} />
+                    <Icon name="folder" />
                 </button>
             </div>
         </div>

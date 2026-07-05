@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { EmptyState } from "../ui/empty-state.jsx";
 import { Icon } from "../ui/icon.jsx";
 import { toast } from "../ui/toast.js";
 import { ENGINES, listConnections } from "../lib/connections.js";
@@ -67,8 +68,8 @@ export function ConnectionsScreen({ variant = "tab", onOpen }) {
     };
 
     const header = panel ? (
-        <div className="pane-header-row" style={{ borderColor: "var(--muxy-border)" }}>
-            <input type="text" placeholder="Search" className="flex-1" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <div className="search-bar search-bar-compact" style={{ borderColor: "var(--muxy-border)" }}>
+            <input type="text" placeholder="Search" className="search-bar-input" value={query} onChange={(e) => setQuery(e.target.value)} />
             {hasSsh ? (
                 <button className="icon-btn" title="Close all SSH tunnels" onClick={closeAllTunnels}>
                     <Icon name="link" />
@@ -81,25 +82,25 @@ export function ConnectionsScreen({ variant = "tab", onOpen }) {
     ) : (
         <div className="topbar">
             <div className="flex items-center gap-[var(--s3)] text-[var(--font-emphasis)] font-semibold">
-                <Icon name="database" size={14} />
+                <Icon name="database" />
                 Connections
             </div>
             <div className="flex-1" />
             <input type="text" placeholder="Search" className="w-56" value={query} onChange={(e) => setQuery(e.target.value)} />
             {connections.length > 1 ? (
-                <button className="btn btn-sm" title="Quick connect" onClick={() => quickConnect(onOpen)}>
-                    <Icon name="bolt" size={12} />
+                <button className="btn btn-compact" title="Quick connect" onClick={() => quickConnect(onOpen)}>
+                    <Icon name="bolt" />
                     Quick connect
                 </button>
             ) : null}
             {hasSsh ? (
-                <button className="btn btn-sm" title="Close all SSH tunnels" onClick={closeAllTunnels}>
-                    <Icon name="link" size={12} />
+                <button className="btn btn-compact" title="Close all SSH tunnels" onClick={closeAllTunnels}>
+                    <Icon name="link" />
                     Close tunnels
                 </button>
             ) : null}
-            <button className="btn btn-sm btn-primary" onClick={() => setEditing(null)}>
-                <Icon name="plus" size={12} />
+            <button className="btn btn-compact btn-primary" onClick={() => setEditing(null)}>
+                <Icon name="plus" />
                 New Connection
             </button>
         </div>
@@ -108,29 +109,28 @@ export function ConnectionsScreen({ variant = "tab", onOpen }) {
     return (
         <div className="flex h-full flex-col">
             {header}
-            <div className={`flex-1 overflow-y-auto ${panel ? "px-[var(--s3)] py-[var(--s3)]" : "px-[var(--s7)] py-[var(--s6)]"}`}>
+            <div className={`flex-1 overflow-y-auto ${panel ? "" : "px-[var(--s7)] py-[var(--s6)]"}`}>
                 {connections.length === 0 ? (
-                    <div className="flex h-full flex-col items-center justify-center gap-[var(--s5)] px-[var(--s5)] py-[var(--s8)] text-center">
-                        <Icon name="database" size={panel ? 24 : 32} />
-                        <div className="text-[var(--font-emphasis)] font-semibold">No connections yet</div>
-                        <div className={`${panel ? "text-[var(--font-footnote)]" : "max-w-80"} text-muted-foreground`}>
-                            Add a connection to browse and query your databases.
-                        </div>
-                        <button className="btn btn-sm btn-primary" onClick={() => setEditing(null)}>
-                            <Icon name="plus" size={12} />
+                    <EmptyState
+                        icon="database"
+                        title="No connections yet"
+                        description="Add a connection to browse and query your databases."
+                    >
+                        <button className="btn btn-primary" onClick={() => setEditing(null)}>
+                            <Icon name="plus" />
                             New Connection
                         </button>
                         {panel ? null : <ImportRow onImported={load} />}
                         <EngineHints />
-                    </div>
+                    </EmptyState>
                 ) : filtered.length === 0 ? (
                     <div className="py-[var(--s8)] text-center text-muted-foreground">No connections match your search</div>
                 ) : (
                     <>
                         {groupConnections(filtered).map(([group, conns]) => (
                             <div key={group || "__none"}>
-                                {group ? <div className="section-label mb-[var(--s3)] mt-[var(--s5)]">{group}</div> : null}
-                                <div className={`flex flex-col ${panel ? "gap-[var(--s2)]" : "gap-[var(--s3)]"}`}>
+                                {group ? <div className={`section-label mb-[var(--s3)] mt-[var(--s5)] ${panel ? "px-[var(--s5)]" : ""}`}>{group}</div> : null}
+                                <div className={`flex flex-col ${panel ? "" : "gap-[var(--s3)]"}`}>
                                     {conns.map((conn) => (
                                         <ConnectionCard key={conn.id} conn={conn} panel={panel} onOpen={onOpen} onEdit={setEditing} onChanged={load} />
                                     ))}

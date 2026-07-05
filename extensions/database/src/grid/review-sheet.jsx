@@ -3,14 +3,14 @@ import { Icon } from "../ui/icon.jsx";
 
 export function ReviewSheet({ statements, onClose, onApply }) {
     return (
-        <Modal icon="code" title="Review changes" width="640px" onClose={onClose}
+        <Modal icon="code" title="Review changes" size="xl" onClose={onClose}
             footer={
                 <>
                     <button className="btn" onClick={onClose}>
                         Cancel
                     </button>
                     <button className="btn btn-primary" onClick={onApply}>
-                        <Icon name="check" size={12} />
+                        <Icon name="check" />
                         {`Apply ${statements.length} statement${statements.length === 1 ? "" : "s"}`}
                     </button>
                 </>

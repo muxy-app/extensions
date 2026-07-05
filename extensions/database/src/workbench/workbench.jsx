@@ -33,8 +33,8 @@ export function Workbench() {
             return <QueryView session={session} setStatus={setStatus} queryHooksRef={queryHooksRef} pendingQueryActionRef={pendingQueryActionRef} />;
         if (!ref) {
             if (view === "structure")
-                return <EmptyState icon="columns">Select a table to inspect its structure</EmptyState>;
-            return <EmptyState icon="table">Select a table to browse its data</EmptyState>;
+                return <EmptyState icon="columns" description="Select a table to inspect its structure" />;
+            return <EmptyState icon="table" description="Select a table to browse its data" />;
         }
         if (view === "structure")
             return <StructureView key={`${schemaEpoch}:${ref.table}`} session={session} tableRef={ref} setStatus={setStatus} reloadTables={refreshSchema} />;

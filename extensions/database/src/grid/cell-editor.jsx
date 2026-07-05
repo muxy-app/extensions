@@ -13,7 +13,6 @@ function BoolEditor({ value, nullable, onCommit, onCancel }) {
     const selected = value === null ? " null" : /^(1|t|true)$/i.test(String(value)) ? "true" : "false";
     return (
         <select
-            className="select-compact"
             autoFocus
             defaultValue={selected}
             onChange={(e) => onCommit(e.target.value === " null" ? null : e.target.value === "true")}
@@ -56,7 +55,7 @@ function TextEditor({ value, nullable, onCommit, onCancel }) {
             {nullable ? (
                 <button
                     ref={nullBtnRef}
-                    className="icon-btn icon-btn-compact"
+                    className="icon-btn"
                     title="Set NULL"
                     onClick={() => onCommit(null)}
                 >

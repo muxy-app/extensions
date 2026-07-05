@@ -44,7 +44,7 @@ export function Icon({ name, size = 14 }) {
             height={size}
             fill="none"
             stroke="currentColor"
-            strokeWidth="2"
+            strokeWidth="1.5"
             strokeLinecap="round"
             strokeLinejoin="round"
         >

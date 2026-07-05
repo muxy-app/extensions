@@ -59,7 +59,7 @@ export function ConnectionFormModal({ existing, onSaved, onClose }) {
             footer={
                 <>
                     <button className="btn" onClick={test}>
-                        <Icon name="bolt" size={12} />
+                        <Icon name="bolt" />
                         Test
                     </button>
                     <div className="flex-1" />
@@ -67,7 +67,7 @@ export function ConnectionFormModal({ existing, onSaved, onClose }) {
                         Cancel
                     </button>
                     <button className="btn btn-primary" onClick={save}>
-                        <Icon name="check" size={12} />
+                        <Icon name="check" />
                         Save
                     </button>
                 </>

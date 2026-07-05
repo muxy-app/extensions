@@ -63,7 +63,7 @@ export function TableDesignerModal({ session, onDone, onClose }) {
         <Modal
             icon="table"
             title="New table"
-            width="560px"
+            size="lg"
             onClose={onClose}
             footer={
                 <>
@@ -89,8 +89,8 @@ export function TableDesignerModal({ session, onDone, onClose }) {
                 <div className="field">
                     <div className="flex items-center">
                         <label className="flex-1">Columns</label>
-                        <button className="btn control-compact" onClick={addColumn}>
-                            <Icon name="plus" size={10} />
+                        <button className="btn btn-compact" onClick={addColumn}>
+                            <Icon name="plus" />
                             Column
                         </button>
                     </div>
@@ -118,7 +118,7 @@ export function TableDesignerModal({ session, onDone, onClose }) {
                                     NN
                                 </label>
                                 <button className="icon-btn" title="Remove column" onClick={() => removeColumn(index)}>
-                                    <Icon name="x" size={12} />
+                                    <Icon name="x" />
                                 </button>
                             </div>
                         ))}

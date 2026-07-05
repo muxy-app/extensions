@@ -39,7 +39,7 @@ export function ImportRow({ onImported }) {
                 onKeyDown={(e) => { if (e.key === "Enter") importIt(); }}
             />
             <button className="btn" onClick={importIt}>
-                <Icon name="link" size={12} />
+                <Icon name="link" />
                 Import
             </button>
         </div>

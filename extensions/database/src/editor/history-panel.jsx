@@ -22,13 +22,13 @@ export function HistoryPanel({ session, refreshToken, onPick }) {
     useEffect(() => { load(); }, [load, refreshToken]);
 
     return (
-        <div className="flex w-72 flex-shrink-0 flex-col border-l" style={{ borderColor: "var(--muxy-border)" }}>
+        <div className="flex w-[var(--side-panel-width)] flex-shrink-0 flex-col border-l" style={{ borderColor: "var(--muxy-border)" }}>
             <div className="flex items-center gap-[var(--s3)] border-b px-[var(--s5)] py-[var(--s3)]" style={{ borderColor: "var(--muxy-border)" }}>
                 <Icon name="clock" size={12} />
                 <span className="section-label">History</span>
                 <div className="flex-1" />
                 <button className="icon-btn" title="Clear history" onClick={async () => { await clearHistory(session.conn.id); load(); }}>
-                    <Icon name="trash" size={12} />
+                    <Icon name="trash" />
                 </button>
             </div>
             <div className="flex-1 overflow-y-auto">
@@ -45,7 +45,7 @@ export function HistoryPanel({ session, refreshToken, onPick }) {
                                 <div className="mono truncate" title={entry.sql.slice(0, 500)}>
                                     {entry.sql.replace(/\s+/g, " ").slice(0, 80)}
                                 </div>
-                                <div className="flex items-center gap-[var(--s3)] text-[var(--font-caption)] text-muted-foreground">
+                                <div className="flex items-center gap-[var(--s3)] text-[var(--font-footnote)] text-muted-foreground">
                                     <span style={{ color: `var(${entry.ok ? "--muxy-diff-add" : "--muxy-diff-remove"})` }}>
                                         {entry.ok ? "✓" : "✕"}
                                     </span>

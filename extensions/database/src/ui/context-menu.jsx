@@ -32,14 +32,11 @@ export function ContextMenu({ x, y, items, onClose }) {
     return createPortal(
         <div
             ref={menuRef}
-            className="sheet"
+            className="menu"
             style={{
                 position: "fixed",
                 left: pos.left,
                 top: pos.top,
-                width: "auto",
-                minWidth: "180px",
-                padding: "var(--s2) 0",
                 zIndex: 60,
                 visibility: pos.visible ? "visible" : "hidden",
             }}

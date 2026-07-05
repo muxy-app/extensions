@@ -8,13 +8,13 @@ export function PendingBar({ changes, onReview, onDiscard, onApply }) {
         <div className="pending-bar">
             <span className="text-[var(--font-emphasis)] font-semibold">{`${count} pending change${count === 1 ? "" : "s"}`}</span>
             <div className="flex-1" />
-            <button className="btn" onClick={onReview}>
+            <button className="btn btn-compact" onClick={onReview}>
                 Review
             </button>
-            <button className="btn" onClick={onDiscard}>
+            <button className="btn btn-compact" onClick={onDiscard}>
                 Discard
             </button>
-            <button className="btn btn-primary" onClick={onApply}>
+            <button className="btn btn-compact btn-primary" onClick={onApply}>
                 Apply
             </button>
         </div>

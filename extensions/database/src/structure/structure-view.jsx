@@ -38,7 +38,7 @@ export function StructureView({ session, tableRef, setStatus, reloadTables }) {
     }, [session, tableRef, reloadTick]);
 
     if (!tableRef)
-        return <EmptyState icon="columns">Select a table to inspect its structure</EmptyState>;
+        return <EmptyState icon="columns" description="Select a table to inspect its structure" />;
 
     const scroll = "flex-1 overflow-y-auto p-[var(--s7)]";
     if (state.loading)
@@ -96,14 +96,14 @@ export function StructureView({ session, tableRef, setStatus, reloadTables }) {
                 {tableRef.kind !== "view" ? (
                     <div className="flex items-center gap-[var(--s3)]">
                         <button className="btn" onClick={() => setDesignerOpen(true)}>
-                            <Icon name="plus" size={12} />
+                            <Icon name="plus" />
                             Index
                         </button>
                         <button className="btn btn-danger" onClick={truncate}>
                             Truncate
                         </button>
                         <button className="btn btn-danger" onClick={drop}>
-                            <Icon name="trash" size={12} />
+                            <Icon name="trash" />
                             Drop
                         </button>
                     </div>

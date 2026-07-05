@@ -98,21 +98,21 @@ export function WorkbenchApp() {
         return <div className="flex h-full items-center justify-center text-muted-foreground">This page must run inside Muxy</div>;
 
     if (state.phase === "missing" || state.phase === "idle")
-        return <EmptyState icon="database">Open a database from the Databases panel</EmptyState>;
+        return <EmptyState icon="database" description="Open a database from the Databases panel" />;
 
     if (state.phase === "connecting")
-        return <EmptyState icon="database">{`Connecting to ${state.conn?.name ?? "database"}…`}</EmptyState>;
+        return <EmptyState icon="database" description={`Connecting to ${state.conn?.name ?? "database"}…`} />;
 
     if (state.phase === "error")
         return (
             <div className="flex h-full flex-col items-center justify-center gap-[var(--s5)] p-[var(--s8)]">
-                <Icon name="warning" size={28} />
+                <Icon name="warning" size={24} />
                 <div className="text-[var(--font-title)] font-semibold">{`Could not connect to ${state.conn.name}`}</div>
-                <div className="error-box" style={{ maxWidth: "560px" }}>
+                <div className="error-box" style={{ maxWidth: "var(--sheet-lg)" }}>
                     {state.error.message}
                 </div>
                 <button className="btn" onClick={() => muxy.lifecycle?.close?.()}>
-                    <Icon name="x" size={12} />
+                    <Icon name="x" />
                     Close
                 </button>
             </div>

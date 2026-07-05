@@ -15,7 +15,7 @@ export function Topbar() {
 
     return (
         <div className="topbar">
-            <div className="ml-[var(--s2)] h-3 w-3 flex-shrink-0 rounded-full" style={{ background: conn.color }} />
+            <div className="conn-dot ml-[var(--s2)]" style={{ background: conn.color }} />
             <div className="truncate text-[var(--font-emphasis)] font-semibold">{conn.name}</div>
             <div className="truncate text-[var(--font-footnote)] text-muted-foreground">
                 {`${ENGINES[conn.engine].label}${session.serverVersion ? " " + session.serverVersion : ""}`}
@@ -25,7 +25,7 @@ export function Topbar() {
             <div className="seg">
                 {VIEWS.map((v) => (
                     <button key={v.id} className={view === v.id ? "active" : ""} onClick={() => setView(v.id)}>
-                        <Icon name={v.icon} size={12} />
+                        <Icon name={v.icon} />
                         {v.label}
                     </button>
                 ))}

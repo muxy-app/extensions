@@ -12,7 +12,7 @@ export function Statusbar() {
             <span>{`${ENGINES[conn.engine].label}${session.serverVersion ? " " + session.serverVersion : ""}`}</span>
             {conn.ssh?.enabled ? (
                 <span className="flex items-center gap-[var(--s2)]">
-                    <Icon name="link" size={10} />
+                    <Icon name="link" size={12} />
                     SSH
                 </span>
             ) : null}

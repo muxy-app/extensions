@@ -40,7 +40,7 @@ export function SavedPanel({ session, onPick, getCurrentSql }) {
                 <span className="section-label">Saved</span>
                 <div className="flex-1" />
                 <button className="icon-btn" title="Save current query" onClick={save}>
-                    <Icon name="plus" size={12} />
+                    <Icon name="plus" />
                 </button>
             </div>
             <div className="flex-1 overflow-y-auto">
@@ -55,7 +55,7 @@ export function SavedPanel({ session, onPick, getCurrentSql }) {
                         >
                             <div className="min-w-0 flex-1">
                                 <div className="truncate text-[var(--font-body)] font-semibold">{entry.name}</div>
-                                <div className="mono truncate text-[var(--font-caption)] text-muted-foreground">
+                                <div className="mono truncate text-[var(--font-footnote)] text-muted-foreground">
                                     {entry.sql.replace(/\s+/g, " ").slice(0, 80)}
                                 </div>
                             </div>
@@ -64,7 +64,7 @@ export function SavedPanel({ session, onPick, getCurrentSql }) {
                                 title="Delete saved query"
                                 onClick={(e) => { e.stopPropagation(); remove(entry.id); }}
                             >
-                                <Icon name="trash" size={12} />
+                                <Icon name="trash" />
                             </button>
                         </div>
                     ))

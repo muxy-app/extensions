@@ -12,16 +12,16 @@ export function Sidebar({ onNewTable, onTransfer }) {
     const viewCount = tables.length - tableCount;
 
     return (
-        <div className="flex w-56 flex-shrink-0 flex-col border-r" style={{ borderColor: "var(--muxy-border)" }}>
-            <div className="pane-header-row">
-                <input type="text" placeholder="Filter tables" className="flex-1" value={filter} onChange={(e) => setFilter(e.target.value)} />
+        <div className="flex w-[var(--sidebar-width)] flex-shrink-0 flex-col border-r" style={{ borderColor: "var(--muxy-border)" }}>
+            <div className="search-bar" style={{ borderColor: "var(--muxy-border)" }}>
+                <input type="text" placeholder="Filter tables" className="search-bar-input" value={filter} onChange={(e) => setFilter(e.target.value)} />
                 {onNewTable ? (
-                    <button className="icon-btn icon-btn-bordered" title="New table" onClick={onNewTable}>
+                    <button className="icon-btn" title="New table" onClick={onNewTable}>
                         <Icon name="plus" />
                     </button>
                 ) : null}
                 {onTransfer ? (
-                    <button className="icon-btn icon-btn-bordered" title="Import / Export" onClick={onTransfer}>
+                    <button className="icon-btn" title="Import / Export" onClick={onTransfer}>
                         <Icon name="download" />
                     </button>
                 ) : null}
@@ -40,7 +40,7 @@ export function Sidebar({ onNewTable, onTransfer }) {
                                     selectTable({ table: table.name, kind: table.kind, database: session.ctx.database, schema: session.ctx.schema })
                                 }
                             >
-                                <Icon name={table.kind === "view" ? "eye" : "table"} size={12} />
+                                <Icon name={table.kind === "view" ? "eye" : "table"} />
                                 <span className="truncate">{table.name}</span>
                             </div>
                         );

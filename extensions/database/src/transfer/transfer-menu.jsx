@@ -5,7 +5,7 @@ import { exportTable, importCsv, dumpDatabase } from "./transfer.js";
 function MenuItem({ icon, label, onSelect }) {
     return (
         <button className="tree-row w-full text-left" onClick={onSelect}>
-            <Icon name={icon} size={12} />
+            <Icon name={icon} />
             {label}
         </button>
     );
@@ -17,7 +17,7 @@ export function TransferMenuModal({ session, tableRef, onClose }) {
         fn();
     };
     return (
-        <Modal icon="download" title="Import / Export" width="320px" onClose={onClose}>
+        <Modal icon="download" title="Import / Export" size="sm" onClose={onClose}>
             <div className="py-[var(--s3)]">
                 <MenuItem icon="download" label="Export table as CSV" onSelect={run(() => exportTable(session, tableRef, "csv"))} />
                 <MenuItem icon="download" label="Export table as JSON" onSelect={run(() => exportTable(session, tableRef, "json"))} />

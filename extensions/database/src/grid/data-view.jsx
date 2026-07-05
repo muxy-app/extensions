@@ -140,18 +140,16 @@ export function DataView({ session, tableRef, setStatus }) {
 
     return (
         <div className="flex min-h-0 flex-1 flex-col">
-            <div className="flex flex-col gap-[var(--s2)] border-b px-[var(--s4)] py-[var(--s2)]" style={{ borderColor: "var(--muxy-border)" }}>
-                <FilterBar
-                    key={refKey(tableRef)}
-                    columns={page.info.columns}
-                    filters={gridState.filters}
-                    rawWhere={gridState.rawWhere}
-                    onApply={({ filters, rawWhere }) => commitGrid({ filters, rawWhere, page: 0 })}
-                />
-            </div>
+            <FilterBar
+                key={refKey(tableRef)}
+                columns={page.info.columns}
+                filters={gridState.filters}
+                rawWhere={gridState.rawWhere}
+                onApply={({ filters, rawWhere }) => commitGrid({ filters, rawWhere, page: 0 })}
+            />
             {readOnlyBanner ? (
                 <div
-                    className="flex items-center gap-[var(--s3)] border-b px-[var(--s5)] py-[var(--s2)] text-[var(--font-footnote)] text-muted-foreground"
+                    className="flex h-[var(--statusbar-height)] items-center gap-[var(--s3)] border-b px-[var(--s5)] text-[var(--font-footnote)] text-muted-foreground"
                     style={{ borderColor: "var(--muxy-border)" }}
                 >
                     <Icon name="info" size={12} />
@@ -178,7 +176,7 @@ export function DataView({ session, tableRef, setStatus }) {
                 onDiscard={() => { clearChanges(model); bumpChanges(); }}
                 onApply={() => openReview(true)}
             />
-            <div className="pane-footer-row" style={{ borderColor: "var(--muxy-border)" }}>
+            <div className="toolbar-footer border-t" style={{ borderColor: "var(--muxy-border)" }}>
                 <Pager
                     page={gridState.page}
                     pageSize={session.pageSize}
@@ -191,8 +189,8 @@ export function DataView({ session, tableRef, setStatus }) {
                     }}
                 >
                     {page.editable ? (
-                        <button className="btn control-compact" onClick={addRow}>
-                            <Icon name="plus" size={10} />
+                        <button className="btn btn-compact" onClick={addRow}>
+                            <Icon name="plus" />
                             Row
                         </button>
                     ) : null}
