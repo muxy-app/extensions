@@ -102,7 +102,7 @@ This block is used only for the marketplace listing; the app loader ignores it.
 
 ### Screenshots — at least one required
 
-- **PNG, exactly 1600×1000 (16:10)** — Muxy's window aspect.
+- **PNG, 16:10 or 16:9 aspect ratio**.
 - 1 to 6 screenshots, each ≤ 3 MB.
 
 The icon and screenshots are uploaded to the marketplace alongside your signed

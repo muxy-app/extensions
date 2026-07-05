@@ -172,7 +172,7 @@ function checkListing(report, dir, manifest) {
 
   const screenshots = market.screenshots ?? [];
   if (screenshots.length === 0) {
-    report.error("at least one marketplace.screenshot is required (PNG 1600×1000)");
+    report.error("at least one marketplace.screenshot is required (PNG, 16:10 or 16:9)");
   }
   screenshots.forEach((shot, index) => {
     checkListingAsset(report, dir, shot, `marketplace screenshot #${index + 1}`, inspectScreenshot);
