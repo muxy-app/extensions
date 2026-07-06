@@ -9,6 +9,14 @@ npm run build
 
 The panel entrypoint is `src/main.js`; the editor tab entrypoint is `src/editor/main.js`. Build output is written to `dist/`; reload the extension in Muxy after rebuilding.
 
+## File opener
+
+The editor registers itself as a file opener via `muxy.fileOpeners`, so the
+built-in editor shows up as a target in the Open in IDE control and accepts
+terminal Cmd+click on file paths once it is selected as the default opener
+(Projects settings → Default Opener). Each file opens in its own tab; unsaved
+edits are preserved when a second file is opened from the terminal.
+
 ## Keyboard navigation
 
 The file tree is fully operable from the keyboard. Focus lands in the tree
