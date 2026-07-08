@@ -110,13 +110,16 @@ export function diffStat(added, removed) {
     return h("span", { class: "flex shrink-0 items-center gap-2 font-mono text-[12px] font-semibold tabular-nums" }, added !== null ? h("span", { class: "text-diff-add" }, `+${formatNumber(added)}`) : null, removed !== null ? h("span", { class: "text-diff-remove" }, `-${formatNumber(removed)}`) : null);
 }
 export function fileRow(entry, opts) {
+    const label = opts.name ?? middleTruncate(entry.path);
+    const tree = opts.indent !== undefined;
     const row = h("li", {
-        class: cls("group flex h-[34px] cursor-pointer items-center gap-2 pl-2.5 pr-2.5 hover:bg-accent", opts.active && "bg-accent"),
+        class: cls("group flex cursor-pointer items-center pr-2.5 hover:bg-accent", tree ? "h-[24px] gap-1.5" : "h-[34px] gap-2 pl-2.5", opts.active && "bg-accent"),
+        style: tree ? `padding-left: ${opts.indent}px` : null,
         onclick: () => opts.onOpen(entry.path),
-    }, statusBadge(entry.label), icon("file", 11, cls("shrink-0", FILE_COLOR[entry.label] ?? "text-muted-foreground"), 1.5), h("span", {
+    }, tree ? h("span", { class: "w-1.5 shrink-0" }) : null, statusBadge(entry.label), icon("file", 11, cls("shrink-0", FILE_COLOR[entry.label] ?? "text-muted-foreground"), 1.5), h("span", {
         class: "min-w-0 flex-1 truncate text-left text-[12px] font-medium text-foreground",
         title: entry.path,
-    }, middleTruncate(entry.path)));
+    }, label));
     if (opts.onDiscard) {
         append(row, [
             smallIconButton("Discard changes", "undo", (event) => {

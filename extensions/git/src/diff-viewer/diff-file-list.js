@@ -1,5 +1,6 @@
-import { h } from "@/lib/dom";
+import { h, readPref, writePref } from "@/lib/dom";
 import { fileRow } from "@/ui/shared";
+import { treeIndent, treeRows } from "@/ui/file-tree";
 const STATUS_LABEL = {
     added: "A",
     deleted: "D",
@@ -8,6 +9,8 @@ const STATUS_LABEL = {
     untracked: "U",
     ignored: "I",
 };
+const VIEW_KEY = "muxy.git.diff.filetree";
+const TREE_PREFIX = "muxy.git.diff.tree.";
 export class DiffFileListView {
     host;
     onSelect;
@@ -29,7 +32,27 @@ export class DiffFileListView {
         this.state = { files: [], active: "" };
         this.render();
     }
+    isTree() {
+        return readPref(VIEW_KEY, "tree") !== "list";
+    }
+    toggleView() {
+        writePref(VIEW_KEY, this.isTree() ? "list" : "tree");
+        this.render();
+    }
     render() {
+        if (readPref(VIEW_KEY, "tree") !== "list") {
+            this.host.replaceChildren(h("ul", { class: "divide-y divide-transparent" }, treeRows(this.state.files.map((file) => toEntry(file)), {
+                prefix: TREE_PREFIX,
+                onToggle: () => this.render(),
+                renderLeaf: (file, depth) => fileRow(file, {
+                    active: file.itemId === this.state.active,
+                    indent: treeIndent(depth),
+                    name: file.name,
+                    onOpen: () => this.onSelect(file.itemId),
+                }),
+            })));
+            return;
+        }
         this.host.replaceChildren(h("ul", { class: "divide-y divide-border" }, this.state.files.map((file) => fileRow(toEntry(file), {
             active: file.itemId === this.state.active,
             onOpen: () => this.onSelect(file.itemId),
@@ -39,6 +62,7 @@ export class DiffFileListView {
 function toEntry(file) {
     return {
         path: file.path,
+        itemId: file.itemId,
         label: STATUS_LABEL[file.status],
         added: null,
         removed: null,

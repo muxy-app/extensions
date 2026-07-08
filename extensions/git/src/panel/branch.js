@@ -3,7 +3,17 @@ import { cls, h, readPref, writePref } from "@/lib/dom";
 import { confirmAction, listBranches, openDiff } from "@/lib/git";
 import { icon } from "@/lib/icons";
 import { button, closeFloating, fileRow, menuItem, openFloating, smallIconButton, textarea, } from "@/ui/shared";
+import { treeIndent, treeRows } from "@/ui/file-tree";
 const SECTION_PREFIX = "muxy.git.section.";
+const TREE_PREFIX = "muxy.git.tree.";
+const VIEW_KEY = "muxy.git.changes.view";
+function changesView() {
+    return readPref(VIEW_KEY, "tree") === "list" ? "list" : "tree";
+}
+function toggleChangesView(app) {
+    writePref(VIEW_KEY, changesView() === "tree" ? "list" : "tree");
+    app.render();
+}
 export function renderBranchSwitcher(app, status) {
     return h("button", {
         type: "button",
@@ -155,7 +165,8 @@ function renderSectionHeader(app, opts, open, toggle) {
         onclick: toggle,
     }, h("span", { class: "flex w-4 shrink-0 justify-center" }, icon("chevronDown", 12, cls("transition-transform", !open && "-rotate-90"), 2.2)), h("span", { class: "truncate text-[12px] font-semibold" }, opts.title));
     const count = h("span", { class: "ml-1.5 rounded-full bg-muted-foreground px-1.5 py-px text-[10px] font-bold leading-none text-background" }, String(opts.entries.length));
-    const actions = h("div", { class: "ml-auto flex items-center text-muted-foreground" }, opts.searchable
+    const tree = changesView() === "tree";
+    const actions = h("div", { class: "ml-auto flex items-center text-muted-foreground" }, smallIconButton(tree ? "List view" : "Tree view", tree ? "list" : "listTree", () => toggleChangesView(app), "opacity-0 group-hover:opacity-100"), opts.searchable
         ? smallIconButton(filterOpen ? "Hide search" : "Search files", filterOpen ? "x" : "search", () => app.toggleChangesFilter(), filterOpen ? "text-foreground" : "opacity-0 group-hover:opacity-100")
         : null, h("div", { class: "flex items-center opacity-0 group-hover:opacity-100" }, opts.onBulkDiscard
         ? smallIconButton("Discard all changes", "undo", () => opts.onBulkDiscard?.())
@@ -196,9 +207,23 @@ function renderSearchBar(app) {
         }, "absolute right-3 top-1/2 -translate-y-1/2")
         : null);
 }
-function renderFileList(entries, opts) {
+function renderFileList(app, entries, opts) {
     if (entries.length === 0)
         return h("div", { class: "px-4 py-4 text-center text-[12px] text-muted-foreground" }, "No matching files.");
+    if (changesView() === "tree") {
+        return h("ul", { class: "divide-y divide-transparent" }, treeRows(entries, {
+            prefix: `${TREE_PREFIX}${opts.id}.`,
+            onToggle: () => app.render(),
+            renderLeaf: (file, depth) => fileRow(file, {
+                staged: opts.staged,
+                indent: treeIndent(depth),
+                name: file.name,
+                onAction: opts.onAction,
+                onDiscard: opts.onDiscard,
+                onOpen: openDiff,
+            }),
+        }));
+    }
     return h("ul", { class: "divide-y divide-border" }, entries.map((entry) => fileRow(entry, {
         staged: opts.staged,
         onAction: opts.onAction,
@@ -224,7 +249,7 @@ function renderFileSection(app, opts) {
         app.render();
     };
     const searchOpen = opts.searchable && app.changesFilterOpen;
-    return h("section", { class: "flex shrink-0 flex-col" }, renderSectionHeader(app, opts, open, toggle), open && searchOpen ? renderSearchBar(app) : null, open ? renderFileList(filterEntries(app, opts), opts) : null);
+    return h("section", { class: "flex shrink-0 flex-col" }, renderSectionHeader(app, opts, open, toggle), open && searchOpen ? renderSearchBar(app) : null, open ? renderFileList(app, filterEntries(app, opts), opts) : null);
 }
 async function discardOne(app, path) {
     const ok = await confirmAction({

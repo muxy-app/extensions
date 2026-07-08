@@ -24,6 +24,7 @@ const toggleStyleButton = document.querySelector("#toggle-style");
 const toggleWrapButton = document.querySelector("#toggle-wrap");
 const collapseAllButton = document.querySelector("#collapse-all");
 const expandAllButton = document.querySelector("#expand-all");
+const toggleTreeButton = document.querySelector("#toggle-tree");
 const railResize = document.querySelector("#rail-resize");
 const MAX_RENDER_ROWS = 12000;
 const ZOOM_MIN = 0.7;
@@ -499,6 +500,15 @@ function syncStyleButton() {
     toggleStyleButton.classList.toggle("active", diffStyle === "split");
     toggleStyleButton.title = diffStyle === "split" ? "Switch to unified view" : "Switch to split view";
 }
+function syncTreeButton() {
+    const tree = sidebar.isTree();
+    toggleTreeButton.classList.toggle("active", tree);
+    toggleTreeButton.title = tree ? "List view" : "Tree view";
+}
+function toggleTree() {
+    sidebar.toggleView();
+    syncTreeButton();
+}
 function toggleStyle() {
     diffStyle = diffStyle === "split" ? "unified" : "split";
     writePref("muxy.git.diff.style", diffStyle);
@@ -578,6 +588,7 @@ toggleStyleButton.addEventListener("click", toggleStyle);
 toggleWrapButton.addEventListener("click", toggleWrap);
 collapseAllButton.addEventListener("click", () => setAllCollapsed(true));
 expandAllButton.addEventListener("click", () => setAllCollapsed(false));
+toggleTreeButton.addEventListener("click", toggleTree);
 reloadButton.addEventListener("click", () => void loadGitDiff());
 window.addEventListener("keydown", (event) => {
     if (!(event.metaKey || event.ctrlKey))
@@ -598,5 +609,6 @@ window.addEventListener("keydown", (event) => {
 window.muxy?.onDataChange?.(() => void loadGitDiff());
 applyZoom();
 syncStyleButton();
+syncTreeButton();
 applyWrap();
 void loadGitDiff();
