@@ -162,23 +162,13 @@ textarea {
   user-select: none;
 }
 
-.file-tree-row:hover,
+.file-tree-row:hover {
+  background: color-mix(in srgb, var(--muxy-hover) 45%, transparent);
+}
+
+.file-tree-row-selected,
 .file-tree-row-drop {
   background: var(--muxy-hover);
-}
-
-.file-tree-row-selected {
-  background: var(--muxy-hover);
-}
-
-.file-tree-list:focus .file-tree-row-selected,
-.file-tree-list:focus-within .file-tree-row-selected {
-  background: var(--muxy-accent-soft);
-}
-
-.file-tree-list:focus .file-tree-row-active,
-.file-tree-list:focus-within .file-tree-row-active {
-  box-shadow: inset 0 0 0 1px var(--muxy-accent);
 }
 
 .file-tree-row-ignored {

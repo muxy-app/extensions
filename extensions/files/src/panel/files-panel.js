@@ -484,7 +484,10 @@ export class FilesPanelApp {
       }
     }
     const ordered = Array.from(dirs).sort((a, b) => a.length - b.length);
-    for (const dir of ordered) await this.ensureLoaded(dir);
+    for (const dir of ordered) {
+      await this.ensureLoaded(dir);
+      this.expandedDirs.add(dir);
+    }
   }
 
   isVisibleInFilter(path, directory) {
@@ -561,7 +564,7 @@ export class FilesPanelApp {
     const entry = this.entries.get(path);
     if (!entry) return;
     const directory = entry.kind === "directory";
-    const expanded = directory && (this.dirtyFilter || this.expandedDirs.has(path));
+    const expanded = directory && this.expandedDirs.has(path);
     const renaming = this.renameState?.path === path;
     const gitStatus = this.gitStatus.statusFor(path, directory);
     const selected = this.selectedPaths.has(path);
@@ -970,7 +973,7 @@ export class FilesPanelApp {
     const path = paths[idx];
     const entry = this.entries.get(path);
     if (!entry || entry.kind !== "directory") return;
-    const expanded = this.dirtyFilter || this.expandedDirs.has(path);
+    const expanded = this.expandedDirs.has(path);
     if (!expanded) {
       this.setSelection(path);
       void this.toggleDirectory(path);
@@ -989,8 +992,8 @@ export class FilesPanelApp {
     }
     const path = paths[idx];
     const entry = this.entries.get(path);
-    const expanded = entry?.kind === "directory" && (this.dirtyFilter || this.expandedDirs.has(path));
-    if (expanded && !this.dirtyFilter) {
+    const expanded = entry?.kind === "directory" && this.expandedDirs.has(path);
+    if (expanded) {
       this.setSelection(path);
       void this.toggleDirectory(path);
       return;
