@@ -574,7 +574,6 @@ export class FilesPanelApp {
         class: cls(
           "file-tree-row",
           selected && "file-tree-row-selected",
-          this.selectedPath === path && "file-tree-row-active",
           entry.isIgnored && "file-tree-row-ignored",
           gitStatus && GIT_STATUS_CLASS[gitStatus],
           gitStatus && directory && "file-tree-row-git-folder",
@@ -855,12 +854,9 @@ export class FilesPanelApp {
         selEl.setAttribute("aria-selected", "true");
       }
     }
-    const prevActive = this.selectedPath ? this.rowElements.get(this.selectedPath) : null;
-    if (prevActive) prevActive.classList.remove("file-tree-row-active");
     this.selectedPaths = next;
     this.selectedPath = path;
     const el = this.rowElements.get(path);
-    el.classList.add("file-tree-row-active");
     if (reveal) el.scrollIntoView({ block: "nearest" });
     this.syncActiveDescendant();
     this.persistMemory();
