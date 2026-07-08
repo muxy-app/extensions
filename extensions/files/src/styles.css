@@ -171,10 +171,6 @@ textarea {
   background: var(--muxy-hover);
 }
 
-.file-tree-row-active {
-  box-shadow: inset 2px 0 0 0 var(--muxy-accent);
-}
-
 .file-tree-row-ignored {
   color: var(--muxy-foreground-muted);
 }
