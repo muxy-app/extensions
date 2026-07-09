@@ -30,6 +30,8 @@ const ICONS = {
     search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
     x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
     play: '<polygon points="6 3 20 12 6 21 6 3"/>',
+    pencil: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+    reveal: '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/><path d="m10 15 3-3-3-3"/>',
 };
 export function icon(name, size = 13, className = "", strokeWidth = 2) {
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");

@@ -120,6 +120,22 @@ export function fileRow(entry, opts) {
         class: "min-w-0 flex-1 truncate text-left text-[12px] font-medium text-foreground",
         title: entry.path,
     }, label));
+    if (opts.onOpenEditor) {
+        append(row, [
+            smallIconButton("Open in editor", "pencil", (event) => {
+                event.stopPropagation();
+                opts.onOpenEditor?.(entry.path);
+            }, "hidden group-hover:flex"),
+        ]);
+    }
+    if (opts.onReveal) {
+        append(row, [
+            smallIconButton("Reveal in Finder", "reveal", (event) => {
+                event.stopPropagation();
+                opts.onReveal?.(entry.path);
+            }, "hidden group-hover:flex"),
+        ]);
+    }
     if (opts.onDiscard) {
         append(row, [
             smallIconButton("Discard changes", "undo", (event) => {

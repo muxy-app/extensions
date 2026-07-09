@@ -14,11 +14,23 @@ const TREE_PREFIX = "muxy.git.diff.tree.";
 export class DiffFileListView {
     host;
     onSelect;
+    actions;
     state = { files: [], active: "" };
-    constructor(host, onSelect) {
+    constructor(host, onSelect, actions = {}) {
         this.host = host;
         this.onSelect = onSelect;
+        this.actions = actions;
         this.render();
+    }
+    rowActions(file) {
+        if (file.label === "D")
+            return {};
+        return {
+            onOpenEditor: this.actions.onOpenEditor
+                ? () => this.actions.onOpenEditor(file.path)
+                : undefined,
+            onReveal: this.actions.onReveal ? () => this.actions.onReveal(file.path) : undefined,
+        };
     }
     setFiles(files) {
         this.state = { files, active: this.state.active };
@@ -49,6 +61,7 @@ export class DiffFileListView {
                     indent: treeIndent(depth),
                     name: file.name,
                     onOpen: () => this.onSelect(file.itemId),
+                    ...this.rowActions(file),
                 }),
             })));
             return;
@@ -56,6 +69,7 @@ export class DiffFileListView {
         this.host.replaceChildren(h("ul", { class: "divide-y divide-border" }, this.state.files.map((file) => fileRow(toEntry(file), {
             active: file.itemId === this.state.active,
             onOpen: () => this.onSelect(file.itemId),
+            ...this.rowActions(toEntry(file)),
         }))));
     }
 }

@@ -1,12 +1,27 @@
 import { branchNameFromTitle } from "@/lib/pr";
 import { cls, h, readPref, writePref } from "@/lib/dom";
-import { confirmAction, listBranches, openDiff } from "@/lib/git";
+import { activeWorktreePath, confirmAction, listBranches, openDiff } from "@/lib/git";
+import { openInEditor, revealInFinder } from "@/lib/file-actions";
 import { icon } from "@/lib/icons";
 import { button, closeFloating, fileRow, menuItem, openFloating, smallIconButton, textarea, } from "@/ui/shared";
 import { treeIndent, treeRows } from "@/ui/file-tree";
 const SECTION_PREFIX = "muxy.git.section.";
 const TREE_PREFIX = "muxy.git.tree.";
 const VIEW_KEY = "muxy.git.changes.view";
+async function openFileInEditor(path) {
+    await openInEditor(await activeWorktreePath(), path);
+}
+async function revealFileInFinder(path) {
+    await revealInFinder(await activeWorktreePath(), path);
+}
+function fileActionHandlers(entry) {
+    if (entry.label === "D")
+        return {};
+    return {
+        onOpenEditor: (path) => void openFileInEditor(path),
+        onReveal: (path) => void revealFileInFinder(path),
+    };
+}
 function changesView() {
     return readPref(VIEW_KEY, "tree") === "list" ? "list" : "tree";
 }
@@ -221,6 +236,7 @@ function renderFileList(app, entries, opts) {
                 onAction: opts.onAction,
                 onDiscard: opts.onDiscard,
                 onOpen: openDiff,
+                ...fileActionHandlers(file),
             }),
         }));
     }
@@ -229,6 +245,7 @@ function renderFileList(app, entries, opts) {
         onAction: opts.onAction,
         onDiscard: opts.onDiscard,
         onOpen: openDiff,
+        ...fileActionHandlers(entry),
     })));
 }
 function filterEntries(app, opts) {

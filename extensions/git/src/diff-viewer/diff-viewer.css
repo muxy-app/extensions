@@ -283,6 +283,9 @@ body.resizing {
   height: 100%;
   overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  overflow-anchor: none;
+  background: var(--bg);
 }
 
 .empty-state {
@@ -340,14 +343,37 @@ body.resizing {
 }
 
 .diff-content {
-  padding-bottom: 16px;
+  padding-bottom: 0;
   font-family: var(--mono-font);
   font-size: calc(12px * var(--diff-zoom, 1));
   line-height: calc(19px * var(--diff-zoom, 1));
+  min-height: 100%;
+  overflow: clip;
+  contain: layout paint style;
+  isolation: isolate;
+}
+
+.virtual-spacer {
+  flex: 0 0 auto;
+  width: 100%;
+  background: var(--bg);
+  contain: strict;
+  pointer-events: none;
+}
+
+.row-virtual-spacer {
+  grid-column: 1 / -1;
+  width: 100%;
+  background: var(--bg);
+  contain: strict;
+  pointer-events: none;
 }
 
 .diff-file-section {
+  position: relative;
   border-bottom: 1px solid var(--line);
+  background: var(--bg);
+  contain: layout paint style;
 }
 
 .diff-file-header {
@@ -369,6 +395,17 @@ body.resizing {
 
 .diff-file-header:hover {
   background: var(--hover);
+}
+
+.webkit-host #viewer {
+  contain: strict;
+  will-change: scroll-position;
+  -webkit-overflow-scrolling: auto;
+}
+
+.webkit-host .diff-file-header {
+  position: relative;
+  top: auto;
 }
 
 .file-chevron {
@@ -519,7 +556,7 @@ body.resizing {
   overscroll-behavior-x: none;
 }
 
-.no-wrap .split-pane > .line-no {
+.no-wrap .split-pane .line-no {
   position: sticky;
   left: 0;
   z-index: 1;
