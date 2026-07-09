@@ -25,12 +25,12 @@ const FILE_COLOR = {
     R: "text-primary",
     U: "text-diff-add",
 };
-export function iconButton(title, iconName, onClick, extra = "", disabled = false, tone = "default") {
+export function iconButton(title, iconName, onClick, extra = "", disabled = false, tone = "default", size = "sm") {
     return h("button", {
         type: "button",
         title,
         disabled,
-        class: cls("flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground outline-none transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-40", tone === "danger" ? "hover:text-diff-remove" : "hover:text-foreground", extra),
+        class: cls("flex shrink-0 items-center justify-center rounded text-muted-foreground outline-none transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-40", size === "md" ? "size-7" : "size-6", tone === "danger" ? "hover:text-diff-remove" : "hover:text-foreground", extra),
         onclick: (event) => onClick(event),
     }, icon(iconName, 13, "", 2));
 }

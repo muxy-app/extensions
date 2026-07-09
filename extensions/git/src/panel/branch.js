@@ -3,7 +3,7 @@ import { cls, h, readPref, writePref } from "@/lib/dom";
 import { activeWorktreePath, confirmAction, listBranches, openDiff } from "@/lib/git";
 import { openInEditor, revealInFinder } from "@/lib/file-actions";
 import { icon } from "@/lib/icons";
-import { button, closeFloating, fileRow, menuItem, openFloating, smallIconButton, textarea, } from "@/ui/shared";
+import { button, closeFloating, fileRow, iconButton, menuItem, openFloating, smallIconButton, textarea, } from "@/ui/shared";
 import { treeIndent, treeRows } from "@/ui/file-tree";
 const SECTION_PREFIX = "muxy.git.section.";
 const TREE_PREFIX = "muxy.git.tree.";
@@ -96,18 +96,14 @@ export function renderBranchTab(app, status) {
 }
 function renderCommitBox(app, status) {
     const canCommit = status.staged.length > 0;
-    const isDisabled = () => !canCommit || app.message.trim() === "" || app.commitBusy !== null;
-    const primaryClass = "flex h-7 items-center justify-center gap-1.5 rounded-md px-2.5 text-[11px] font-medium outline-none transition-colors disabled:pointer-events-none disabled:opacity-50 flex-1 rounded-l-md rounded-r-none";
-    const menuClass = "flex h-7 w-6 items-center justify-center rounded-l-none rounded-r-md border-l border-border/40 outline-none transition-colors";
+    const isCommitDisabled = () => !canCommit || app.message.trim() === "" || app.commitBusy !== null;
     let primary;
-    let menu;
     const sync = () => {
-        const disabled = isDisabled();
+        const disabled = isCommitDisabled();
         primary.disabled = disabled;
-        primary.className = cls(primaryClass, disabled
+        primary.className = cls("flex h-7 flex-1 items-center justify-center gap-1.5 rounded-md px-2.5 text-[11px] font-medium outline-none transition-colors disabled:pointer-events-none disabled:opacity-50", disabled
             ? "bg-secondary text-muted-foreground hover:bg-accent hover:text-foreground"
             : "bg-primary text-primary-foreground hover:opacity-95");
-        menu.className = cls(menuClass, disabled ? "bg-secondary text-muted-foreground" : "bg-primary text-primary-foreground");
     };
     const area = textarea(app.message, "Commit message (Cmd+Enter to commit on branch)", 1, (value) => {
         app.setMessage(value);
@@ -119,19 +115,19 @@ function renderCommitBox(app, status) {
             void commit(app);
         }
     });
-    return h("div", { class: "flex flex-col gap-2" }, area, h("div", { class: "flex" }, (primary = button(app.commitBusy === "pull" ? "Pulling..." : app.commitBusy === "push" ? "Pushing..." : "Commit", {
-        iconName: app.commitBusy === "pull" ? "arrowDown" : app.commitBusy === "push" ? "arrowUp" : "check",
+    return h("div", { class: "flex flex-col gap-2" }, area, h("div", { class: "flex items-center gap-1" }, (primary = button("Commit", {
+        iconName: "check",
         loading: app.commitBusy === "commit",
-        variant: isDisabled() ? "secondary" : "default",
-        disabled: isDisabled(),
-        className: "flex-1 rounded-l-md rounded-r-none",
+        variant: isCommitDisabled() ? "secondary" : "default",
+        disabled: isCommitDisabled(),
+        className: "flex-1",
         onClick: () => void commit(app),
-    })), (menu = h("button", {
-        type: "button",
-        title: "Pull / Push",
-        class: cls(menuClass, isDisabled() ? "bg-secondary text-muted-foreground" : "bg-primary text-primary-foreground"),
-        onclick: (event) => openSyncMenu(app, event.currentTarget),
-    }, icon("chevronDown", 12, "", 2.5)))));
+    })), renderSyncButton(app, "pull"), renderSyncButton(app, "push")));
+}
+
+function renderSyncButton(app, op) {
+    const pull = op === "pull";
+    return iconButton(pull ? "Pull" : "Push", pull ? "arrowDown" : "arrowUp", () => void runSync(app, op), "bg-secondary", app.commitBusy !== null, "default", "md");
 }
 async function commit(app) {
     if (app.commitBusy || app.message.trim() === "")
@@ -148,16 +144,6 @@ async function commit(app) {
         app.commitBusy = null;
         app.render();
     }
-}
-function openSyncMenu(app, anchor) {
-    const content = h("div", { class: "p-1" }, menuItem("Pull", "arrowDown", () => {
-        closeFloating();
-        void runSync(app, "pull");
-    }, { loading: app.commitBusy === "pull" }), menuItem("Push", "arrowUp", () => {
-        closeFloating();
-        void runSync(app, "push");
-    }, { loading: app.commitBusy === "push" }));
-    openFloating(anchor, content, { width: 176, align: "end" });
 }
 async function runSync(app, op) {
     if (app.commitBusy)
