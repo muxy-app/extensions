@@ -62,7 +62,7 @@ test("happy path: fixture snapshots compose into status bar text and available r
   const status = statusBarPresentation(preview, "used");
 
   assert.equal(snapshots.length, providerCatalog.length);
-  assert.equal(snapshots[0].id, "amp");
+  assert.equal(snapshots[0].id, "antigravity");
   assert.equal(preview.snapshot.id, "claude");
   assert.equal(status.text, "72%");
   assert.deepEqual(status.icon, { svg: "assets/claude.svg" });

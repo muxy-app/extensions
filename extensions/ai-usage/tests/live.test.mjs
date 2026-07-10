@@ -116,6 +116,33 @@ test("regression: Claude planName extracts tier suffix from rateLimitTier when A
   assert.equal(claude.planName, "Max 5x");
 });
 
+test("regression: Claude uses keychain credentials before a stale credentials file", async () => {
+  const exec = async (argv, options = {}) => {
+    if (argv[0] === "/usr/bin/env") return ok("HOME=/tmp/home\nUSER=me\n");
+    if (argv[0] === "/usr/bin/security" && argv.includes("Claude Code-credentials")) {
+      return ok(JSON.stringify({ claudeAiOauth: { accessToken: "fresh-keychain-token", subscriptionType: "Max" } }));
+    }
+    if (argv[0] === "/bin/cat" && argv[1] === "/tmp/home/.claude/.credentials.json") {
+      return ok(JSON.stringify({ claudeAiOauth: { accessToken: "stale-file-token", subscriptionType: "Pro" } }));
+    }
+    if (argv[0] === "/usr/bin/curl" && options.stdin.includes("api.anthropic.com/api/oauth/usage")) {
+      assert.match(options.stdin, /Authorization: Bearer fresh-keychain-token/);
+      assert.match(options.stdin, /User-Agent: claude-code/);
+      return ok(`${JSON.stringify({
+        five_hour: { utilization: 11, resets_at: "2026-06-04T13:00:00.000Z" },
+      })}\n200`);
+    }
+    return fail();
+  };
+
+  const snapshots = await fetchLiveSnapshots({ exec, providerIDs: ["claude"] });
+  const claude = snapshots.find((snapshot) => snapshot.id === "claude");
+
+  assert.equal(claude.state.kind, "available");
+  assert.equal(claude.rows[0].percent, 11);
+  assert.equal(claude.planName, "Max");
+});
+
 test("regression: live provider fetch reads Factory plain credentials and parses token buckets", async () => {
   const exec = async (argv, options = {}) => {
     if (argv[0] === "/usr/bin/env") return ok("HOME=/tmp/home\n");
@@ -332,6 +359,151 @@ test("regression: live provider fetch parses Z.ai quota limits", async () => {
   assert.equal(zai.planName, "Pro");
 });
 
+test("regression: live provider fetch parses Z.ai GLM Coding Plan quota shape from ZAI_API_KEY", async () => {
+  const exec = async (argv, options = {}) => {
+    if (argv[0] === "/usr/bin/env") return ok("HOME=/tmp/home\nZAI_API_KEY=zai-auth-token\n");
+    if (argv[0] === "/usr/bin/curl" && options.stdin.includes("api.z.ai/api/biz/subscription/list")) {
+      assert.match(options.stdin, /Authorization: Bearer zai-auth-token/);
+      return ok(`${JSON.stringify({ data: [{ productName: "GLM Coding Pro" }] })}\n200`);
+    }
+    if (argv[0] === "/usr/bin/curl" && options.stdin.includes("api.z.ai/api/monitor/usage/quota/limit")) {
+      return ok(`${JSON.stringify({ data: { limits: [
+        { type: "TOKENS_LIMIT", unit: 3, currentValue: 80, usage: 400, nextResetTime: "2026-07-01T05:00:00.000Z" },
+        { type: "TOKENS_LIMIT", unit: 6, currentValue: 300, usage: 2000, nextResetTime: "2026-07-06T00:00:00.000Z" },
+        { type: "TIME_LIMIT", currentValue: 10, usage: 1000 },
+      ] } })}\n200`);
+    }
+    return fail();
+  };
+
+  const snapshots = await fetchLiveSnapshots({ exec, providerIDs: ["zai"] });
+  const zai = snapshots.find((snapshot) => snapshot.id === "zai");
+
+  assert.equal(zai.state.kind, "available");
+  assert.deepEqual(zai.rows.map((row) => row.label), ["Session", "Weekly", "MCP"]);
+  assert.equal(zai.rows[0].percent, 20);
+  assert.equal(zai.rows[1].percent, 15);
+  assert.equal(zai.rows[2].percent, 1);
+  assert.equal(zai.planName, "GLM Coding Pro");
+});
+
+test("regression: live provider fetch asks for ZAI_API_KEY when Z.ai env is missing", async () => {
+  const exec = async (argv) => {
+    if (argv[0] === "/usr/bin/env") return ok("HOME=/tmp/home\n");
+    if (argv[0] === "/bin/zsh") return ok("__MUXY_ZAI_API_KEY__");
+    return fail();
+  };
+
+  const snapshots = await fetchLiveSnapshots({ exec, providerIDs: ["zai"] });
+  const zai = snapshots.find((snapshot) => snapshot.id === "zai");
+
+  assert.equal(zai.state.kind, "unavailable");
+  assert.equal(zai.state.message, "SET ZAI_API_KEY");
+});
+
+test("regression: live provider fetch reads ZAI_API_KEY from the login shell when Muxy env misses it", async () => {
+  const exec = async (argv, options = {}) => {
+    if (argv[0] === "/usr/bin/env") return ok("HOME=/tmp/home\nSHELL=/bin/zsh\n");
+    if (argv[0] === "/bin/zsh" && argv[1] === "-lic") {
+      assert.match(argv[2], /ZAI_API_KEY/);
+      return ok("shell startup noise\n__MUXY_ZAI_API_KEY__shell-zai-token");
+    }
+    if (argv[0] === "/usr/bin/curl" && options.stdin.includes("api.z.ai/api/biz/subscription/list")) {
+      assert.match(options.stdin, /Authorization: Bearer shell-zai-token/);
+      return ok(`${JSON.stringify({ data: [{ productName: "Pro" }] })}\n200`);
+    }
+    if (argv[0] === "/usr/bin/curl" && options.stdin.includes("api.z.ai/api/monitor/usage/quota/limit")) {
+      assert.match(options.stdin, /Authorization: Bearer shell-zai-token/);
+      return ok(`${JSON.stringify({ data: { limits: [{ limitType: "TOKENS_LIMIT", unit: 3, percentage: 31 }] } })}\n200`);
+    }
+    return fail();
+  };
+
+  const snapshots = await fetchLiveSnapshots({ exec, providerIDs: ["zai"] });
+  const zai = snapshots.find((snapshot) => snapshot.id === "zai");
+
+  assert.equal(zai.state.kind, "available");
+  assert.equal(zai.rows[0].percent, 31);
+  assert.equal(zai.planName, "Pro");
+});
+
+test("regression: live provider fetch parses OpenRouter credits and key usage", async () => {
+  const exec = async (argv, options = {}) => {
+    if (argv[0] === "/usr/bin/env") return ok("HOME=/tmp/home\nOPENROUTER_API_KEY=openrouter-token\n");
+    if (argv[0] === "/usr/bin/curl" && options.stdin.includes("openrouter.ai/api/v1/credits")) {
+      assert.match(options.stdin, /Authorization: Bearer openrouter-token/);
+      return ok(`${JSON.stringify({ data: { total_usage: 12.5, total_credits: 50 } })}\n200`);
+    }
+    if (argv[0] === "/usr/bin/curl" && options.stdin.includes("openrouter.ai/api/v1/key")) {
+      return ok(`${JSON.stringify({ data: { is_free_tier: false, usage_daily: 1.25, usage_weekly: 4, usage_monthly: 9, usage: 10, limit: 100 } })}\n200`);
+    }
+    return fail();
+  };
+
+  const snapshots = await fetchLiveSnapshots({ exec, providerIDs: ["openrouter"] });
+  const openrouter = snapshots.find((snapshot) => snapshot.id === "openrouter");
+
+  assert.equal(openrouter.state.kind, "available");
+  assert.deepEqual(openrouter.rows.map((row) => row.label), ["Credits", "Balance", "Today", "This Week", "This Month", "Key Limit"]);
+  assert.equal(openrouter.rows[0].percent, 25);
+  assert.equal(openrouter.rows[1].detail, "$37.5");
+  assert.equal(openrouter.planName, "Pay as you go");
+});
+
+test("regression: live provider fetch parses Devin quota", async () => {
+  const exec = async (argv, options = {}) => {
+    if (argv[0] === "/usr/bin/env") return ok("HOME=/tmp/home\nDEVIN_API_KEY=devin-token\n");
+    if (argv[0] === "/usr/bin/curl" && options.stdin.includes("SeatManagementService/GetUserStatus")) {
+      assert.match(options.stdin, /devin-token/);
+      return ok(`${JSON.stringify({ userStatus: { planStatus: {
+        planInfo: { planName: "Team" },
+        dailyQuotaRemainingPercent: 70,
+        weeklyQuotaRemainingPercent: 40,
+        dailyQuotaResetAtUnix: 1782892800,
+        weeklyQuotaResetAtUnix: 1783292800,
+        overageBalanceMicros: 12500000,
+      } } })}\n200`);
+    }
+    return fail();
+  };
+
+  const snapshots = await fetchLiveSnapshots({ exec, providerIDs: ["devin"] });
+  const devin = snapshots.find((snapshot) => snapshot.id === "devin");
+
+  assert.equal(devin.state.kind, "available");
+  assert.deepEqual(devin.rows.map((row) => row.label), ["Daily quota", "Weekly quota", "Extra usage balance"]);
+  assert.equal(devin.rows[0].percent, 30);
+  assert.equal(devin.rows[1].percent, 60);
+  assert.equal(devin.rows[2].detail, "$12.5");
+  assert.equal(devin.planName, "Team");
+});
+
+test("regression: live provider fetch parses Antigravity quota summary", async () => {
+  const raw = Buffer.from(JSON.stringify({ token: { access_token: "anti-token", expiry: "2099-01-01T00:00:00.000Z" } }), "utf8").toString("base64");
+  const exec = async (argv, options = {}) => {
+    if (argv[0] === "/usr/bin/env") return ok("HOME=/tmp/home\nUSER=me\n");
+    if (argv[0] === "/bin/cat") return fail();
+    if (argv[0] === "/usr/bin/security" && argv.includes("gemini") && argv.includes("antigravity")) return ok(`go-keyring-base64:${raw}`);
+    if (argv[0] === "/usr/bin/curl" && options.stdin.includes("daily-cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary")) {
+      assert.match(options.stdin, /Authorization: Bearer anti-token/);
+      return ok(`${JSON.stringify({ groups: [{ buckets: [
+        { bucketId: "gemini-5h", remainingFraction: 0.75, resetTime: "2026-07-01T05:00:00.000Z" },
+        { bucketId: "gemini-weekly", remainingFraction: 0.9 },
+        { bucketId: "3p-5h", remainingFraction: 0.4 },
+      ] }] })}\n200`);
+    }
+    return fail();
+  };
+
+  const snapshots = await fetchLiveSnapshots({ exec, providerIDs: ["antigravity"] });
+  const antigravity = snapshots.find((snapshot) => snapshot.id === "antigravity");
+
+  assert.equal(antigravity.state.kind, "available");
+  assert.deepEqual(antigravity.rows.map((row) => row.label), ["Session", "Weekly", "Claude"]);
+  assert.equal(antigravity.rows[0].percent, 25);
+  assert.equal(antigravity.rows[2].percent, 60);
+});
+
 test("regression: live provider fetch reads Cursor credentials from SQLite and parses plan usage", async () => {
   const exec = async (argv, options = {}) => {
     if (argv[0] === "/usr/bin/env") return ok("HOME=/tmp/home\n");
@@ -395,8 +567,12 @@ test("regression: live provider fetch reads Grok credentials from auth.json and 
       const stdin = options.stdin || "";
       const urlMatch = stdin.match(/url\s*=\s*"([^"]+)"/);
       const reqUrl = urlMatch ? urlMatch[1] : "";
-      if (reqUrl.includes("billing")) {
-        return ok(`${JSON.stringify({ config: { used: { val: 50 }, monthlyLimit: { val: 200 }, onDemandCap: { val: 100 }, billingPeriodEnd: "2026-07-01T00:00:00.000Z" } })}\n200`);
+      if (reqUrl.includes("billing?format=credits")) {
+        return ok(`${JSON.stringify({ config: {
+          creditUsagePercent: 42,
+          currentPeriod: { type: "USAGE_PERIOD_TYPE_WEEKLY", start: "2026-06-24T00:00:00.000Z", end: "2026-07-01T00:00:00.000Z" },
+          onDemandCap: { val: 100 },
+        } })}\n200`);
       }
       if (reqUrl.includes("settings")) {
         return ok(`${JSON.stringify({ subscription_tier_display: "SuperGrok" })}\n200`);
@@ -409,10 +585,11 @@ test("regression: live provider fetch reads Grok credentials from auth.json and 
   const grok = snapshots.find((snapshot) => snapshot.id === "grok");
 
   assert.equal(grok.state.kind, "available");
-  assert.deepEqual(grok.rows.map((row) => row.label), ["Credits"]);
-  assert.equal(grok.rows[0].percent, 25);
-  assert.equal(grok.rows[0].detail, "50.0 / 200 units");
-  assert.equal(grok.rows[0].periodDuration, 2592000);
+  assert.deepEqual(grok.rows.map((row) => row.label), ["Weekly limit", "Pay as you go"]);
+  assert.equal(grok.rows[0].percent, 58);
+  assert.equal(grok.rows[0].detail, "58.0% used");
+  assert.equal(grok.rows[0].periodDuration, 604800);
+  assert.equal(grok.rows[1].detail, "100 cap");
   assert.equal(grok.planName, "SuperGrok");
 });
 
