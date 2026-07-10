@@ -36,7 +36,9 @@
     "permissions" : [
       "commands:exec",
       "projects:read",
-      "panels:write"
+      "panels:write",
+      "gh:read",
+      "git:read"
     ],
     "marketplace" : {
       "author" : "ryohei",
