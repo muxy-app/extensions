@@ -5,8 +5,12 @@ import { makeResult, fromObjects, parseJsonStream } from "../parse/result.js";
 
 const BIN = "sqlite3";
 
+function databaseUri(path) {
+    return `file:${path.split("/").map(encodeURIComponent).join("/")}?mode=rw`;
+}
+
 function argv(ctx, sql, flags = ["-json"]) {
-    return [BIN, "-batch", "-bail", ...flags, ctx.conn.sqlite.path, sql];
+    return [BIN, "-batch", "-bail", ...flags, databaseUri(ctx.conn.sqlite.path), sql];
 }
 
 async function query(ctx, sql, opts = {}) {

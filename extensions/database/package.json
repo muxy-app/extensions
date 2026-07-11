@@ -1,8 +1,9 @@
 {
   "name": "database",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "scripts": {
     "dev": "vite",
+    "test": "node --test tests/*.test.js",
     "build": "vite build && node -e \"const fs=require('fs');fs.copyFileSync('package.json','dist/package.json');fs.copyFileSync('background.js','dist/background.js')\""
   },
   "private": true,

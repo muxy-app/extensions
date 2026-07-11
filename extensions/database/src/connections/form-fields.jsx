@@ -20,11 +20,24 @@ export function Field({ label, value, type = "text", list, placeholder, autoFocu
 
 export function SqliteFields({ conn, patch }) {
     const pick = async () => {
-        const folder = await muxy.dialog.pickFolder({ title: "Choose database folder" });
-        if (folder) {
-            const name = conn.sqlite.path.split("/").pop() || "database.sqlite";
-            patch({ sqlite: { ...conn.sqlite, path: `${folder}/${name}` } });
-        }
+        const current = conn.sqlite.path.trim();
+        const separator = current.lastIndexOf("/");
+        const folder = await muxy.dialog.pickFolder({
+            title: "Choose database folder",
+            message: "Choose",
+            default: separator > 0 ? current.slice(0, separator) : undefined,
+        });
+        if (!folder)
+            return;
+        const name = await muxy.dialog.prompt({
+            title: "Database filename",
+            message: "Enter the SQLite database filename in this folder.",
+            default: separator >= 0 ? current.slice(separator + 1) : current,
+            placeholder: "database.sqlite",
+            confirm: "Use Database",
+        });
+        if (name?.trim())
+            patch({ sqlite: { ...conn.sqlite, path: `${folder}/${name.trim().split("/").pop()}` } });
     };
     return (
         <div className="field">
