@@ -1,24 +1,23 @@
 name: Security comment
 
-# Uses pull_request_target so the job gets a writable GITHUB_TOKEN even for PRs
-# from forks (a plain `pull_request` token is read-only on forks, which 403s the
-# comment API). pull_request_target runs in the BASE repo's context, so we must
-# treat the PR's content as untrusted DATA only: we check the trusted base repo
-# out first (for the analysis script), then fetch the PR head into a separate
-# directory that we read but never execute. No `npm ci`, no extension build, no
-# fork-supplied script is ever run with this token.
+# Posting a comment on a fork PR requires a writable base-repository token, so
+# this uses pull_request_target. The privileged job checks out trusted tooling
+# only. It lists the PR's changed paths and reads every manifest and blob from
+# GitHub's API at the exact head SHA, applies strict size/path/type limits, and
+# treats every byte as passive data.
 on:
   pull_request_target:
+    branches: [main]
     types: [opened, synchronize, reopened]
     paths:
       - "extensions/**"
-      - "scripts/security-comment.mjs"
+      - "scripts/**"
       - ".github/workflows/security-comment.yml"
 
 permissions:
   contents: read
   issues: write
-  pull-requests: write
+  pull-requests: read
 
 concurrency:
   group: security-comment-${{ github.event.pull_request.number }}
@@ -28,108 +27,22 @@ jobs:
   comment:
     name: Analyse changed extensions
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      # Trusted checkout: the base repo at the target branch. This is the code
-      # we will EXECUTE (scripts/security-comment.mjs).
-      - name: Checkout base repo (trusted)
-        uses: actions/checkout@v4
+      # pull_request_target resolves github.sha to the trusted base branch.
+      # No fork repository or pull request ref is ever checked out.
+      - name: Checkout trusted tooling
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
-          path: base
-
-      # Untrusted checkout: the PR head, including fork changes. This is the
-      # code we only READ as data. It is fetched into ./pr and never executed.
-      - name: Checkout PR head (untrusted, data only)
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.sha }}
-          path: pr
-          fetch-depth: 0
+          ref: ${{ github.sha }}
           persist-credentials: false
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "20"
+          node-version: "24"
 
-      - name: Determine changed extensions
-        id: changed
-        working-directory: pr
+      - name: Generate and post security report
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          set -euo pipefail
-          # The base commit may not exist in a fork clone; fetch it so the diff
-          # has a merge base. Falls back to the recorded base ref name.
-          git fetch --no-tags --depth=1 \
-            "https://github.com/${{ github.repository }}.git" "$BASE_SHA" 2>/dev/null || true
-
-          if git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null; then
-            base="$BASE_SHA"
-          else
-            base="$(git rev-list --max-parents=0 HEAD | tail -n1)"
-          fi
-
-          names="$(git diff --name-only "$base" "$HEAD_SHA" -- extensions/ \
-            | awk -F/ 'NF>1 && $1=="extensions" {print $2}' \
-            | sort -u)"
-
-          valid=""
-          for name in $names; do
-            if ! printf '%s' "$name" | grep -Eq '^[A-Za-z0-9][A-Za-z0-9._-]*$'; then
-              continue
-            fi
-            if [ ! -f "extensions/$name/package.json" ]; then
-              continue
-            fi
-            valid="$valid $name"
-          done
-          valid="$(printf '%s' "$valid" | sed 's/^ *//')"
-          echo "names=$valid" >> "$GITHUB_OUTPUT"
-          echo "Changed extensions: ${valid:-<none>}"
-
-      # Run the TRUSTED base script against the UNTRUSTED PR working tree.
-      # MUXY_EXTENSIONS_DIR points the analysis at the PR checkout's extensions.
-      - name: Generate security report
-        id: report
-        if: steps.changed.outputs.names != ''
-        env:
-          NAMES: ${{ steps.changed.outputs.names }}
-          MUXY_EXTENSIONS_DIR: ${{ github.workspace }}/pr/extensions
-        run: |
-          set -euo pipefail
-          node base/scripts/security-comment.mjs $NAMES > security-report.md
-          {
-            echo "body<<MUXY_EOF"
-            cat security-report.md
-            echo "MUXY_EOF"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Replace previous security comment
-        if: steps.changed.outputs.names != ''
-        uses: actions/github-script@v7
-        env:
-          REPORT_BODY: ${{ steps.report.outputs.body }}
-        with:
-          script: |
-            // Delete our own previous report comment(s), then post a fresh one so
-            // the latest review always lands at the bottom of the PR thread.
-            const marker = "<!-- muxy-extension-security-report -->";
-            const body = process.env.REPORT_BODY;
-            const { owner, repo } = context.repo;
-            const issue_number = context.payload.pull_request.number;
-
-            const comments = await github.paginate(
-              github.rest.issues.listComments,
-              { owner, repo, issue_number, per_page: 100 },
-            );
-            const mine = comments.filter(
-              (c) => c.user?.type === "Bot" && c.body?.includes(marker),
-            );
-            for (const c of mine) {
-              await github.rest.issues.deleteComment({ owner, repo, comment_id: c.id });
-            }
-
-            await github.rest.issues.createComment({ owner, repo, issue_number, body });
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/security-comment-ci.mjs

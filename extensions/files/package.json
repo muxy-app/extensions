@@ -1,6 +1,6 @@
 {
   "name": "files",
-  "version": "1.20.2",
+  "version": "1.20.3",
   "scripts": {
     "dev": "vite",
     "build": "vite build && node scripts/copy-build-assets.mjs",
@@ -121,6 +121,17 @@
         "id": "code-editor",
         "title": "Editor",
         "entry": "panel/editor.html"
+      }
+    ],
+    "fileOpeners": [
+      {
+        "id": "editor",
+        "title": "Editor",
+        "tabType": "code-editor",
+        "patterns": [
+          "*"
+        ],
+        "singleton": true
       }
     ],
     "commands": [
