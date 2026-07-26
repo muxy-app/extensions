@@ -9,6 +9,8 @@ npm run build
 
 The panel entrypoint is `src/main.js`; the editor tab entrypoint is `src/editor/main.js`. Build output is written to `dist/`; reload the extension in Muxy after rebuilding.
 
+Select Files under Muxy Settings → Projects → Open Files With to route terminal file links into the editor tab.
+
 ## Keyboard navigation
 
 The file tree is fully operable from the keyboard. Focus lands in the tree

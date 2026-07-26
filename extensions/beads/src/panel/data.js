@@ -18,11 +18,25 @@ const STATUS_LABELS = {
   hooked: "Hooked",
 };
 
+export const BLOCKING_EDGE = "blocks";
+
 export { BOARD_COLUMNS };
 
-export async function loadBoardData() {
-  const projectName = await loadProjectName();
-  const workspacePath = await getActiveWorkspacePath().catch(() => null);
+export async function loadBoardContext() {
+  const [projectName, workspace] = await Promise.all([
+    loadProjectName(),
+    getActiveWorkspace().catch(() => null),
+  ]);
+
+  return {
+    projectName,
+    workspacePath: workspace?.path ?? null,
+    workspaceKey: workspace?.key ?? null,
+  };
+}
+
+export async function loadBoardData(context = null) {
+  const { projectName, workspacePath, workspaceKey } = context ?? await loadBoardContext();
   const cli = await loadIssuesFromCli();
 
   if (cli.ok) {
@@ -31,6 +45,7 @@ export async function loadBoardData() {
       source: cli.source,
       projectName,
       workspacePath,
+      workspaceKey,
       error: null,
     };
   }
@@ -41,6 +56,7 @@ export async function loadBoardData() {
     source: exported.ok ? exported.source : "none",
     projectName,
     workspacePath,
+    workspaceKey,
     error: exported.ok ? cli.error : exported.error || cli.error,
   };
 }
@@ -209,12 +225,178 @@ function normalizeIssues(rawIssues, readyIDs) {
         issue_type: raw.issue_type || raw.type || "task",
         priority: normalizePriority(raw.priority),
         labels: Array.isArray(raw.labels) ? raw.labels : [],
+        dependencies: normalizeEdges(raw.dependencies),
         dependency_count: raw.dependency_count ?? raw.dependencyCount ?? 0,
         dependent_count: raw.dependent_count ?? raw.dependentCount ?? 0,
         comment_count: raw.comment_count ?? raw.commentCount ?? 0,
       };
     })
     .sort(compareIssues);
+}
+
+function normalizeEdges(edges) {
+  if (!Array.isArray(edges)) return [];
+  return edges
+    .map((edge) => ({
+      depends_on_id: edge.depends_on_id ?? edge.dependsOnId ?? edge.to ?? null,
+      type: edge.type || BLOCKING_EDGE,
+    }))
+    .filter((edge) => edge.depends_on_id);
+}
+
+export function buildIssueIndex(issues) {
+  const byId = new Map(issues.map((issue) => [issue.id, issue]));
+  const dependents = new Map();
+  for (const issue of issues) {
+    for (const edge of issue.dependencies) {
+      if (!byId.has(edge.depends_on_id)) continue;
+      const list = dependents.get(edge.depends_on_id) ?? [];
+      list.push({ issue, type: edge.type });
+      dependents.set(edge.depends_on_id, list);
+    }
+  }
+  return { byId, dependents };
+}
+
+export function getBlockerLinks(issue, index) {
+  return issue.dependencies
+    .map((edge) => ({ issue: index.byId.get(edge.depends_on_id), type: edge.type }))
+    .filter((link) => link.issue);
+}
+
+export function getDependentLinks(issue, index) {
+  return index.dependents.get(issue.id) ?? [];
+}
+
+export function buildDependencyGraph(issues) {
+  const index = buildIssueIndex(issues);
+  const { byId } = index;
+  const edges = [];
+  const blockers = new Map();
+  const dependents = new Map();
+
+  for (const issue of issues) {
+    for (const edge of issue.dependencies) {
+      if (edge.type !== BLOCKING_EDGE || !byId.has(edge.depends_on_id)) continue;
+      edges.push({ from: edge.depends_on_id, to: issue.id });
+      addToSet(blockers, issue.id, edge.depends_on_id);
+      addToSet(dependents, edge.depends_on_id, issue.id);
+    }
+  }
+
+  const nodes = issues;
+
+  const level = new Map();
+  const visiting = new Set();
+  const levelOf = (id) => {
+    if (level.has(id)) return level.get(id);
+    if (visiting.has(id)) return 0;
+    visiting.add(id);
+    let depth = 0;
+    for (const upstream of blockers.get(id) ?? []) depth = Math.max(depth, levelOf(upstream) + 1);
+    visiting.delete(id);
+    level.set(id, depth);
+    return depth;
+  };
+  for (const node of nodes) levelOf(node.id);
+
+  const maxLevel = nodes.reduce((max, node) => Math.max(max, level.get(node.id)), 0);
+  const columns = Array.from({ length: maxLevel + 1 }, () => []);
+  for (const node of nodes) columns[level.get(node.id)].push(node);
+
+  const row = new Map();
+  const barycenter = (node) => {
+    const positions = [...(blockers.get(node.id) ?? [])].map((id) => row.get(id)).filter((value) => value != null);
+    if (!positions.length) return Number.POSITIVE_INFINITY;
+    return positions.reduce((sum, value) => sum + value, 0) / positions.length;
+  };
+  for (const column of columns) {
+    column.sort((a, b) => {
+      const centerA = barycenter(a);
+      const centerB = barycenter(b);
+      if (centerA !== centerB) return centerA - centerB;
+      const priorityA = a.priority ?? 99;
+      const priorityB = b.priority ?? 99;
+      if (priorityA !== priorityB) return priorityA - priorityB;
+      return String(a.id).localeCompare(String(b.id));
+    });
+    column.forEach((node, index) => row.set(node.id, index));
+  }
+
+  const rows = columns.reduce((max, column) => Math.max(max, column.length), 0);
+  return { nodes, edges, level, row, blockers, dependents, columns: maxLevel + 1, rows };
+}
+
+export function buildInsights(issues) {
+  const index = buildIssueIndex(issues);
+  const isClosed = (issue) => issue.status === "closed";
+  const openBlockers = (issue) => getBlockerLinks(issue, index)
+    .filter((link) => link.type === BLOCKING_EDGE && !isClosed(link.issue))
+    .map((link) => link.issue);
+  const openDependents = (issue) => getDependentLinks(issue, index)
+    .filter((link) => link.type === BLOCKING_EDGE && !isClosed(link.issue))
+    .map((link) => link.issue);
+
+  const active = issues.filter((issue) => !isClosed(issue));
+  const closed = issues.filter(isClosed);
+  const ready = active.filter((issue) => issue.ready)
+    .sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99));
+
+  const waiting = active
+    .map((issue) => ({ issue, blockers: openBlockers(issue) }))
+    .filter((entry) => entry.blockers.length > 0)
+    .sort((a, b) => b.blockers.length - a.blockers.length || (a.issue.priority ?? 99) - (b.issue.priority ?? 99));
+
+  const bottlenecks = issues
+    .map((issue) => ({ issue, count: openDependents(issue).length }))
+    .filter((entry) => entry.count > 0)
+    .sort((a, b) => b.count - a.count || (a.issue.priority ?? 99) - (b.issue.priority ?? 99));
+
+  const stale = [...active].sort((a, b) => staleTime(a) - staleTime(b));
+
+  const priorityDist = [0, 1, 2, 3].map((value) => ({
+    label: `P${value}`,
+    value,
+    count: issues.filter((issue) => issue.priority === value).length,
+  }));
+  const highPriority = issues.filter((issue) => Number.isInteger(issue.priority) && issue.priority > 3).length;
+  if (highPriority) priorityDist.push({ label: "P4+", value: 4, count: highPriority });
+  const noPriority = issues.filter((issue) => !Number.isInteger(issue.priority)).length;
+  if (noPriority) priorityDist.push({ label: "—", value: null, count: noPriority });
+
+  const statusCounts = new Map();
+  for (const issue of issues) statusCounts.set(issue.status, (statusCounts.get(issue.status) ?? 0) + 1);
+  const statusDist = [...statusCounts.entries()]
+    .map(([status, count]) => ({ status, count }))
+    .sort((a, b) => b.count - a.count);
+
+  return {
+    metrics: {
+      total: issues.length,
+      active: active.length,
+      ready: ready.length,
+      waiting: waiting.length,
+      closed: closed.length,
+      closedPct: issues.length ? Math.round((closed.length / issues.length) * 100) : 0,
+    },
+    bottlenecks,
+    waiting,
+    ready,
+    stale,
+    priorityDist,
+    statusDist,
+  };
+}
+
+function addToSet(map, key, value) {
+  const set = map.get(key) ?? new Set();
+  set.add(value);
+  map.set(key, set);
+}
+
+function staleTime(issue) {
+  const time = new Date(issue.updated_at || issue.created_at || 0).getTime();
+  return Number.isNaN(time) ? Number.POSITIVE_INFINITY : time;
 }
 
 function normalizeStatus(status) {
@@ -275,12 +457,17 @@ async function loadProjectName() {
   return "Workspace";
 }
 
-async function getActiveWorkspacePath() {
+async function getActiveWorkspace() {
   const projects = await muxy.projects.list();
   const active = projects.find((project) => project.isActive);
   if (!active) return null;
 
   const worktrees = await muxy.worktrees.list(active.id).catch(() => []);
   const activeWorktree = worktrees.find((worktree) => worktree.isActive);
-  return activeWorktree?.path || active.path || null;
+  const path = activeWorktree?.path || active.path || null;
+  const worktreeIdentity = activeWorktree?.id || activeWorktree?.path || active.path || "root";
+  return {
+    path,
+    key: `${active.id}:${worktreeIdentity}`,
+  };
 }

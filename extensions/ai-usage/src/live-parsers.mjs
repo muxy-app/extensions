@@ -51,6 +51,25 @@ export function parseAmpRows(payload) {
   return { rows, planName };
 }
 
+export function parseAntigravityRows(payload) {
+  const groups = payload?.response?.groups || payload?.groups || [];
+  const buckets = groups.flatMap((group) => Array.isArray(group?.buckets) ? group.buckets : []);
+  const specs = [
+    ["gemini-5h", "Session", 18000],
+    ["gemini-weekly", "Weekly", 604800],
+    ["3p-5h", "Claude", 18000],
+    ["3p-weekly", "Claude Weekly", 604800],
+  ];
+  return specs.flatMap(([bucketID, label, duration]) => {
+    const bucket = buckets.find((item) => item?.bucketId === bucketID);
+    if (!bucket) return [];
+    const remaining = numberOrNull(bucket.remainingFraction);
+    if (remaining === null) return [];
+    const used = clamp((1 - remaining) * 100, 0, 100);
+    return [row(label, Math.round(used), firstDate(bucket, ["resetTime", "resetAt", "reset_at"]), `${formatNumber(used)}/100`, duration)];
+  });
+}
+
 export function parseCopilotRows(payload) {
   const planName = payload?.copilot_plan || payload?.plan || payload?.plan_name || payload?.planName || payload?.product?.name || payload?.subscription?.plan || "";
   const quotaResetAt = firstDate(payload, ["quota_reset_date"]);
@@ -93,6 +112,34 @@ export function parseCopilotRows(payload) {
   return { rows: rows.filter((item) => item.percent !== null || item.resetAt || item.detail), planName };
 }
 
+export function parseDevinRows(payload) {
+  const userStatus = payload?.userStatus;
+  const planStatus = userStatus?.planStatus || {};
+  const planInfo = planStatus?.planInfo || {};
+  const planName = nonEmptyString(planInfo.planName) || "Unknown";
+  const hideDailyQuota = Boolean(planInfo.hideDailyQuota);
+  const rows = [];
+
+  const dailyRemaining = numberOrNull(planStatus.dailyQuotaRemainingPercent);
+  if (!hideDailyQuota && dailyRemaining !== null) {
+    const used = clamp(100 - dailyRemaining, 0, 100);
+    rows.push(row("Daily quota", used, unixSecondsDate(planStatus.dailyQuotaResetAtUnix), `${formatNumber(used)}/100`, 86400));
+  }
+
+  const weeklyRemaining = numberOrNull(planStatus.weeklyQuotaRemainingPercent);
+  if (weeklyRemaining !== null) {
+    const used = clamp(100 - weeklyRemaining, 0, 100);
+    rows.push(row("Weekly quota", used, unixSecondsDate(planStatus.weeklyQuotaResetAtUnix), `${formatNumber(used)}/100`, 604800));
+  } else if (hideDailyQuota && dailyRemaining !== null) {
+    const used = clamp(100 - dailyRemaining, 0, 100);
+    rows.push(row("Weekly quota", used, unixSecondsDate(planStatus.weeklyQuotaResetAtUnix), `${formatNumber(used)}/100`, 604800));
+  }
+
+  const overageBalance = numberOrNull(planStatus.overageBalanceMicros);
+  if (overageBalance !== null) rows.push(row("Extra usage balance", null, null, currency(Math.max(0, overageBalance) / 1000000)));
+  return { rows, planName };
+}
+
 export function parseKimiRows(payload) {
   const membershipLevel = payload?.user?.membership?.level;
   const planName = membershipLevel ? String(membershipLevel).replace(/^LEVEL_/, "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) : payload?.plan || payload?.plan_name || payload?.planName || payload?.data?.plan || payload?.data?.plan_name || payload?.data?.planName || payload?.product || payload?.product_name || "";
@@ -116,6 +163,33 @@ export function parseFactoryRows(payload) {
   return { rows: [factoryBucketRow("Standard", usage.standard, endAt, duration), factoryBucketRow("Premium", usage.premium, endAt, duration)].filter(Boolean), planName };
 }
 
+export function parseOpenRouterCreditsRows(payload) {
+  const data = payload?.data || payload || {};
+  const totalUsage = numberOrNull(data.total_usage);
+  if (totalUsage === null) return [];
+  const used = Math.max(0, totalUsage);
+  const totalCredits = Math.max(0, numberOrNull(data.total_credits) ?? 0);
+  const rows = [];
+  if (totalCredits > 0) rows.push(row("Credits", percent(used, totalCredits), null, `${formatNumber(used)}/${formatNumber(totalCredits)}`));
+  rows.push(row("Balance", null, null, currency(Math.max(0, totalCredits - used))));
+  return rows;
+}
+
+export function parseOpenRouterKeyRows(payload) {
+  const data = payload?.data || payload || {};
+  const rows = [];
+  appendCurrencyValue(rows, "Today", data.usage_daily);
+  appendCurrencyValue(rows, "This Week", data.usage_weekly);
+  appendCurrencyValue(rows, "This Month", data.usage_monthly);
+  const limit = numberOrNull(data.limit);
+  if (limit !== null && limit > 0) {
+    const used = Math.max(0, numberOrNull(data.usage) ?? 0);
+    rows.push(row("Key Limit", percent(used, limit), null, `${formatNumber(used)}/${formatNumber(limit)}`));
+  }
+  const planName = typeof data.is_free_tier === "boolean" ? (data.is_free_tier ? "Free tier" : "Pay as you go") : "";
+  return { rows, planName };
+}
+
 export function parseMiniMaxRows(payload) {
   const planName = payload?.data?.plan_name || payload?.data?.planName || payload?.data?.result?.plan_name || payload?.data?.result?.planName || "";
   const candidates = [payload, payload?.data, payload?.data?.result, payload?.result].filter(Boolean);
@@ -134,13 +208,14 @@ export function parseMiniMaxRows(payload) {
 
 export function parseZaiRows(payload, planName) {
   const limits = payload?.data?.limits || payload?.limits || (Array.isArray(payload?.data) ? payload.data : []);
-  const session = limits.find((item) => upperString(item, ["limitType", "type", "name"]) === "TOKENS_LIMIT" && Number(item.unit) === 3);
-  const weekly = limits.find((item) => upperString(item, ["limitType", "type", "name"]) === "TOKENS_LIMIT" && Number(item.unit) === 6);
-  const web = limits.find((item) => upperString(item, ["limitType", "type", "name"]) === "TIME_LIMIT");
+  const tokenLimits = limits.filter((item) => upperString(item, ["limitType", "type", "name"]) === "TOKENS_LIMIT");
+  const session = tokenLimits.find((item) => Number(item.unit) === 3 || windowText(item).includes("5")) || tokenLimits[0];
+  const weekly = tokenLimits.find((item) => Number(item.unit) === 6 || windowText(item).includes("7") || windowText(item).includes("WEEK"));
+  const mcp = limits.find((item) => upperString(item, ["limitType", "type", "name"]) === "TIME_LIMIT");
   return [
-    session && percentOnlyRow("Session", session, 18000),
-    weekly && percentOnlyRow("Weekly", weekly, 604800),
-    web && row("Web", firstNumber(web, ["percentage", "usedPercent", "used_percent"]), firstDate(web, ["nextResetTime", "resetAt", "reset_at"]) || new Date(Date.now() + 2592000000), null, 2592000),
+    session && zaiQuotaRow("Session", session, 18000),
+    weekly && weekly !== session && zaiQuotaRow("Weekly", weekly, 604800),
+    mcp && zaiQuotaRow("MCP", mcp, 2592000),
   ].filter(Boolean);
 }
 
@@ -152,6 +227,25 @@ export function parseZaiPlanName(payload) {
 export function parseGrokRows(payload) {
   const config = payload?.config;
   if (!config || typeof config !== "object") return [];
+
+  const period = config.currentPeriod;
+  if (period && typeof period === "object") {
+    const periodType = nonEmptyString(period.type);
+    const periodStart = firstDate(period, ["start"]);
+    const periodEnd = firstDate(period, ["end"]);
+    if (!periodType || !periodStart || !periodEnd || periodEnd <= periodStart) return [];
+
+    const rows = [];
+    if (periodType === "USAGE_PERIOD_TYPE_WEEKLY") {
+      const remainingPercent = clamp(numberOrNull(config.creditUsagePercent) ?? 100, 0, 100);
+      const usedPercent = 100 - remainingPercent;
+      rows.push(row("Weekly limit", clamp(usedPercent, 0, 100), periodEnd, `${formatNumber(usedPercent)}% used`, (periodEnd.getTime() - periodStart.getTime()) / 1000));
+    }
+
+    const onDemandCap = numberOrNull(config.onDemandCap?.val) ?? 0;
+    rows.push(row("Pay as you go", null, null, onDemandCap > 0 ? `${formatNumber(onDemandCap)} cap` : "Disabled"));
+    return rows;
+  }
 
   const used = numberOrNull(config.used?.val);
   const limit = numberOrNull(config.monthlyLimit?.val);
@@ -320,8 +414,37 @@ function nextRollingReset(rows, nowMs, windowMs) {
   return (oldest === null ? nowMs : oldest) + windowMs;
 }
 
-function percentOnlyRow(label, item, duration) {
-  const value = firstNumber(item, ["percentage", "usedPercent", "used_percent"]);
-  const resetAt = firstDate(item, ["nextResetTime", "resetAt", "reset_at"]) || new Date(Date.now() + duration * 1000);
-  return row(label, value ?? 0, resetAt, `${formatNumber(value ?? 0)}/100`, duration);
+function unixSecondsDate(value) {
+  const seconds = numberOrNull(value);
+  return seconds === null ? null : new Date(seconds * 1000);
+}
+
+function appendCurrencyValue(rows, label, value) {
+  const amount = numberOrNull(value);
+  if (amount !== null) rows.push(row(label, null, null, currency(Math.max(0, amount))));
+}
+
+function zaiQuotaRow(label, item, duration) {
+  const value = zaiQuotaPercent(item);
+  const resetAt = firstDate(item, ["nextResetTime", "resetAt", "reset_at", "next_flush_time", "expireTime", "endTime"]) || new Date(Date.now() + duration * 1000);
+  return row(label, value ?? 0, resetAt, zaiQuotaDetail(item, value), duration);
+}
+
+function zaiQuotaPercent(item) {
+  const direct = firstNumber(item, ["percentage", "usedPercent", "used_percent"]);
+  if (direct !== null) return direct;
+  const used = firstNumber(item, ["used", "current", "currentValue", "currentUsage", "consumed", "spent"]);
+  const total = firstNumber(item, ["limit", "quota", "total", "usage", "totalValue", "max", "entitlement"]);
+  return percent(used, total);
+}
+
+function zaiQuotaDetail(item, value) {
+  const used = firstNumber(item, ["used", "current", "currentValue", "currentUsage", "consumed", "spent"]);
+  const total = firstNumber(item, ["limit", "quota", "total", "usage", "totalValue", "max", "entitlement"]);
+  if (used !== null && total !== null) return detail(used, total);
+  return value === null ? null : `${formatNumber(value ?? 0)}/100`;
+}
+
+function windowText(item) {
+  return String(item?.window || item?.period || item?.duration || item?.label || "").toUpperCase();
 }

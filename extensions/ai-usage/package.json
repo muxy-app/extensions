@@ -1,6 +1,6 @@
 {
   "name": "ai-usage",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -13,7 +13,7 @@
   },
   "muxy": {
     "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
-    "description": "AI usage status bar and popover with live collectors for Claude Code, Codex, Copilot, Amp, Z.ai, MiniMax, Kimi, and Factory.",
+    "description": "AI usage status bar and popover with live collectors for common AI coding providers.",
     "background": "background.js",
     "permissions": ["commands:exec", "panels:write"],
     "popovers": [

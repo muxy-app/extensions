@@ -279,10 +279,17 @@ select {
 .pace-onTrack { background: var(--muxy-accent); color: var(--muxy-accent); }
 .pace-behind { background: var(--muxy-diff-remove); color: var(--muxy-diff-remove); }
 
+.metric-detail,
 .reset-row {
   justify-content: space-between;
   gap: var(--s5);
   color: var(--muted-soft); font-size: var(--font-footnote);
+}
+
+.metric-detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .pin[aria-pressed="true"] {

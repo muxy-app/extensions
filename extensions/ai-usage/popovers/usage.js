@@ -25,13 +25,16 @@ const elements = {
 };
 
 const providerAccents = {
+  antigravity: "#4285f4",
   amp: "#00b894",
   claude: "#d97742",
   codex: "#2f80ed",
   copilot: "#7c3aed",
   cursor: "#f5c542",
+  devin: "#0ea5e9",
   factory: "#00a6a6",
   grok: "#a78bfa",
+  openrouter: "#f97316",
   kimi: "#4f7cff",
   minimax: "#ff6b6b",
   "opencode-go": "#e879f9",
@@ -232,6 +235,12 @@ function metricView(snapshot, row, preferences) {
     fill.style.width = `${display.percent}%`;
     bar.append(fill);
     wrap.append(bar);
+  }
+  if (display.detail) {
+    const detail = document.createElement("div");
+    detail.className = "metric-detail";
+    detail.append(textSpan(display.detail, ""));
+    wrap.append(detail);
   }
   if (row.resetAt) {
     const reset = document.createElement("div");

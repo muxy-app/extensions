@@ -3,8 +3,8 @@ import { rowDisplay, statusBarPresentation, usageIsCritical } from "./format.mjs
 import { computePace } from "./pace.mjs";
 import { canonicalProviderID, defaultPreferences, providerCatalog } from "./providers.mjs";
 
-const primaryPrefixes = ["session", "5h", "premium", "hourly", "primary"];
-const secondaryPrefixes = ["weekly", "week", "7d", "monthly", "month", "daily", "day", "billing"];
+const primaryPrefixes = ["session", "5h", "premium", "hourly", "primary", "claude", "credits", "key limit"];
+const secondaryPrefixes = ["weekly", "week", "7d", "monthly", "month", "daily", "day", "billing", "mcp", "today", "this week", "this month", "balance", "extra usage", "pay as you go"];
 
 export { canonicalProviderID, computePace, defaultPreferences, fixtureFromSearch, parseFixture, providerCatalog, rowDisplay, statusBarPresentation, usageIsCritical };
 
@@ -65,7 +65,6 @@ function isSecondary(row) {
 }
 
 function matchesPrefix(row, prefixes) {
-  if (String(row.detail ?? "").includes("$")) return false;
   const label = String(row.label ?? "").trim().toLowerCase();
   return prefixes.some((prefix) => label.startsWith(prefix));
 }

@@ -18,6 +18,13 @@ export function OpenIcon() {
   ]);
 }
 
+export function TocIcon() {
+  return icon_svg([
+    { d: "M8 6h13M8 12h13M8 18h13" },
+    { d: "M3 6h.01M3 12h.01M3 18h.01" },
+  ]);
+}
+
 export function SettingsIcon() {
   return icon_svg([
     { kind: "circle", attrs: { cx: "12", cy: "12", r: "3" } },

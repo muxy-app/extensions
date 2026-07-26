@@ -2,11 +2,13 @@ import {
   basename,
   canonical_dir,
   copy_path,
+  copy_paths,
   entry_to_rel,
   open_externally,
   open_in_editor,
   parent_dir,
   reveal_in_finder,
+  reveal_paths,
   strip_slash,
 } from "@/lib/files";
 import {
@@ -62,6 +64,15 @@ function panel_id_of(payload) {
   return null;
 }
 
+function focused_tab_id_of(payload) {
+  if (typeof payload === "string") return payload;
+  if (payload && typeof payload === "object") {
+    const id = payload.tabID ?? payload.tabId ?? payload.id ?? payload.tabInstanceID ?? payload.instanceID;
+    return typeof id === "string" && id ? id : null;
+  }
+  return null;
+}
+
 function block_ends_within(dirSegs, pathSegs, maxEnd) {
   if (dirSegs.length === 0) return true;
   for (let start = 0; start + dirSegs.length <= maxEnd; start++) {
@@ -109,10 +120,18 @@ function path_after_rename(sourcePath, newName, isFolder) {
   return isFolder ? canonical_dir(`${parent}${newName}`) : `${parent}${newName}`;
 }
 
-function create_context_menu(item, ops, close) {
-  const isDir = item.kind === "directory";
+function context_menu_actions(item, ops, selection) {
   const path = item.path;
-  const createDir = isDir ? path : parent_dir(path);
+  const multi = selection.length > 1 && selection.includes(path);
+  if (multi) {
+    return [
+      { label: "Reveal in Finder", run: () => void ops.revealPaths(selection) },
+      { label: "Copy Paths", run: () => void ops.copyPaths(selection) },
+      { label: `Delete ${selection.length} items`, run: () => void ops.deletePaths(selection), critical: true },
+    ];
+  }
+
+  const createDir = item.kind === "directory" ? path : parent_dir(path);
   const actions = [
     { label: "New File", run: () => void ops.createFile(createDir) },
     { label: "New Folder", run: () => void ops.createFolder(createDir) },
@@ -131,6 +150,11 @@ function create_context_menu(item, ops, close) {
     actions.push({ label: "Refresh", run: () => void ops.refresh() });
   }
 
+  return actions;
+}
+
+function create_context_menu(item, ops, close, selection = []) {
+  const actions = context_menu_actions(item, ops, selection);
   return h(
     "div",
     { class: "ctx-menu ctx-menu-floating", dataset: { fileTreeContextMenuRoot: "true" } },
@@ -159,9 +183,12 @@ export class FilesPanelApp {
     this.loadedDirs = new Set();
     this.expandedDirs = new Set();
     this.selectedPath = null;
+    this.selectedPaths = new Set();
+    this.anchorPath = null;
     this.worktreeRoot = null;
     this.dropTarget = null;
     this.renameState = null;
+    this.activeRenameInput = null;
     this.pendingDirs = new Set();
     this.reconcileTimer = null;
     this.contextMenu = null;
@@ -186,8 +213,10 @@ export class FilesPanelApp {
       duplicate: (rel) => this.duplicate(rel),
       rename: (rel) => this.startRename(rel),
       reveal: (rel) => reveal_in_finder(rel),
+      revealPaths: (rels) => reveal_paths(rels),
       openExternally: (rel) => open_externally(rel),
       copyPath: (rel) => copy_path(rel),
+      copyPaths: (rels) => this.copyPaths(rels),
       openInEditor: (rel) => this.openFile(rel),
       refresh: () => this.loadRoot(),
     };
@@ -196,6 +225,36 @@ export class FilesPanelApp {
   async openFile(rel) {
     const tabId = await this.openTabs.resolveTabId(rel);
     return open_in_editor(rel, tabId);
+  }
+
+  async revealActiveTab(payload) {
+    const tabId = focused_tab_id_of(payload);
+    if (!tabId) return;
+    const rel = await this.openTabs.resolveFilePath(tabId);
+    if (!rel) return;
+    await this.revealFile(rel);
+  }
+
+  async revealFile(rel) {
+    if (!rel || this.dirtyFilter) return;
+    const ancestors = [];
+    let parent = parent_dir(rel);
+    while (parent !== "") {
+      ancestors.unshift(parent);
+      parent = parent_dir(parent);
+    }
+    for (const dir of ancestors) {
+      await this.ensureLoaded(parent_dir(dir));
+      if (!this.entries.has(dir)) return;
+      this.expandedDirs.add(dir);
+      await this.ensureLoaded(dir);
+    }
+    if (!this.entries.has(rel)) return;
+    this.setSelection(rel);
+    this.render();
+    this.persistMemory();
+    const el = this.rowElements.get(rel);
+    if (el) el.scrollIntoView({ block: "nearest" });
   }
 
   start() {
@@ -213,6 +272,10 @@ export class FilesPanelApp {
       "aria-label": "File tree",
       onKeyDown: (event) => this.onKeyDown(event),
       onFocus: () => this.onListFocus(),
+      onClick: (event) => {
+        if (event.target !== this.list) return;
+        this.clearSelection();
+      },
       onContextMenu: (event) => {
         event.preventDefault();
         this.showContextMenu({ kind: "directory", name: "Root", path: "" }, event.clientX, event.clientY);
@@ -242,6 +305,9 @@ export class FilesPanelApp {
       // navigable immediately without a click.
       muxy.events.subscribe("panel.opened", (payload) => {
         if (panel_id_of(payload) === "files") requestAnimationFrame(() => this.focusList());
+      }),
+      muxy.events.subscribe("tab.focused", (payload) => {
+        void this.revealActiveTab(payload);
       }),
       muxy.events.subscribe("file.changed", (payload) => {
         this.scheduleReconcile(payload);
@@ -308,6 +374,8 @@ export class FilesPanelApp {
     }
     this.entries.delete(path);
     if (this.selectedPath === path) this.selectedPath = null;
+    this.selectedPaths.delete(path);
+    if (this.anchorPath === path) this.anchorPath = null;
   }
 
   async loadRoot() {
@@ -315,7 +383,7 @@ export class FilesPanelApp {
     this.children.clear();
     this.loadedDirs.clear();
     this.expandedDirs.clear();
-    this.selectedPath = null;
+    this.setSelection(null);
     this.closeContextMenu();
     this.worktreeRoot = await this.resolveRoot();
     try {
@@ -335,6 +403,12 @@ export class FilesPanelApp {
     this.render();
     this.maybeInitialFocus();
     void this.gitStatus.refresh();
+    void this.revealActiveOnLoad();
+  }
+
+  async revealActiveOnLoad() {
+    const rel = await this.openTabs.activeFilePath();
+    if (rel) await this.revealFile(rel);
   }
 
   async restoreMemory() {
@@ -348,7 +422,7 @@ export class FilesPanelApp {
       this.expandedDirs.add(dir);
       await this.ensureLoaded(dir);
     }
-    if (selected && this.entries.has(selected)) this.selectedPath = selected;
+    if (selected && this.entries.has(selected)) this.setSelection(selected);
   }
 
   persistMemory() {
@@ -410,7 +484,10 @@ export class FilesPanelApp {
       }
     }
     const ordered = Array.from(dirs).sort((a, b) => a.length - b.length);
-    for (const dir of ordered) await this.ensureLoaded(dir);
+    for (const dir of ordered) {
+      await this.ensureLoaded(dir);
+      this.expandedDirs.add(dir);
+    }
   }
 
   isVisibleInFilter(path, directory) {
@@ -440,6 +517,23 @@ export class FilesPanelApp {
 
   render() {
     if (!this.list) return;
+    const active = this.activeRenameInput;
+    if (active && document.activeElement === active) {
+      this.renameSelection = { start: active.selectionStart, end: active.selectionEnd };
+    } else {
+      this.renameSelection = null;
+    }
+    this.reRendering = true;
+    try {
+      this.renderTree();
+    } finally {
+      this.reRendering = false;
+    }
+    this.focusRenameInput();
+  }
+
+  renderTree() {
+    if (!this.list) return;
     this.renderFilterBar();
     this.list.replaceChildren();
     this.visiblePaths = [];
@@ -459,12 +553,10 @@ export class FilesPanelApp {
         return;
       }
       for (const path of visible) this.renderRow(path, 0);
-      this.focusRenameInput();
       this.syncActiveDescendant();
       return;
     }
     for (const path of rootChildren) this.renderRow(path, 0);
-    this.focusRenameInput();
     this.syncActiveDescendant();
   }
 
@@ -472,48 +564,65 @@ export class FilesPanelApp {
     const entry = this.entries.get(path);
     if (!entry) return;
     const directory = entry.kind === "directory";
-    const expanded = directory && (this.dirtyFilter || this.expandedDirs.has(path));
+    const expanded = directory && this.expandedDirs.has(path);
     const renaming = this.renameState?.path === path;
     const gitStatus = this.gitStatus.statusFor(path, directory);
+    const selected = this.selectedPaths.has(path);
     const row = h(
       "div",
       {
         class: cls(
           "file-tree-row",
-          this.selectedPath === path && "file-tree-row-selected",
+          selected && "file-tree-row-selected",
           entry.isIgnored && "file-tree-row-ignored",
           gitStatus && GIT_STATUS_CLASS[gitStatus],
           gitStatus && directory && "file-tree-row-git-folder",
           this.dropTarget === path && "file-tree-row-drop",
         ),
         role: "treeitem",
-        "aria-selected": this.selectedPath === path,
+        "aria-selected": selected,
         "aria-expanded": directory ? expanded : undefined,
         draggable: !renaming,
         dataset: { path, type: "item", itemType: directory ? "directory" : "file", itemPath: path },
         onClick: (event) => {
           event.stopPropagation();
           if (renaming) return;
+          if (event.metaKey || event.ctrlKey) {
+            this.toggleSelection(path);
+            this.render();
+            this.persistMemory();
+            this.list?.focus({ preventScroll: true });
+            return;
+          }
+          if (event.shiftKey) {
+            this.selectRange(path);
+            this.render();
+            this.persistMemory();
+            this.list?.focus({ preventScroll: true });
+            return;
+          }
           void this.activatePath(path);
           this.list?.focus({ preventScroll: true });
         },
         onContextMenu: (event) => {
           event.preventDefault();
           event.stopPropagation();
+          if (!this.selectedPaths.has(path)) {
+            this.setSelection(path);
+            this.render();
+          }
           this.showContextMenu({ kind: entry.kind, name: basename(path), path }, event.clientX, event.clientY);
         },
         onDragStart: (event) => {
           if (!event.dataTransfer) return;
-          // Internal moves read this relative path back in dropPaths().
-          event.dataTransfer.setData("application/x-muxy-path", path);
-          // External drops (terminal, chat) need an absolute file:// URI —
-          // Muxy's DroppedPathsParser rejects bare relative paths.
-          const abs = this.abs_path(path);
-          if (abs) {
-            event.dataTransfer.setData("text/uri-list", this.file_url(abs));
-            event.dataTransfer.setData("text/plain", abs);
+          const dragging = this.selectedPaths.has(path) && this.selectedPaths.size > 1 ? this.selectionList() : [path];
+          event.dataTransfer.setData("application/x-muxy-path", dragging.join("\n"));
+          const abses = dragging.map((rel) => this.abs_path(rel)).filter(Boolean);
+          if (abses.length === dragging.length) {
+            event.dataTransfer.setData("text/uri-list", abses.map((abs) => this.file_url(abs)).join("\r\n"));
+            event.dataTransfer.setData("text/plain", abses.join("\n"));
           } else {
-            event.dataTransfer.setData("text/plain", path);
+            event.dataTransfer.setData("text/plain", dragging.join("\n"));
           }
         },
         onDragOver: (event) => {
@@ -538,7 +647,7 @@ export class FilesPanelApp {
               "aria-label": expanded ? "Collapse folder" : "Expand folder",
               onClick: (event) => {
                 event.stopPropagation();
-                this.selectedPath = path;
+                this.setSelection(path);
                 void this.toggleDirectory(path);
                 this.list?.focus({ preventScroll: true });
               },
@@ -566,9 +675,17 @@ export class FilesPanelApp {
   }
 
   renderRenameInput(path, directory) {
+    if (this.activeRenameInput && this.renameState?.path === path) {
+      return this.activeRenameInput;
+    }
     const input = h("input", {
       class: "file-tree-rename-input",
+      type: "text",
       value: basename(path),
+      spellcheck: "false",
+      autocapitalize: "off",
+      autocomplete: "off",
+      autocorrect: "off",
       onClick: (event) => event.stopPropagation(),
       onKeyDown: (event) => {
         if (event.key === "Enter") {
@@ -579,24 +696,42 @@ export class FilesPanelApp {
           void this.cancelRename();
         }
       },
-      onBlur: () => void this.commitRename(path, input.value, directory),
+      onBlur: () => {
+        if (this.reRendering) return;
+        void this.commitRename(path, input.value, directory);
+      },
     });
+    this.activeRenameInput = input;
     this.pendingRenameInput = input;
     return input;
   }
 
   focusRenameInput() {
-    const input = this.pendingRenameInput;
+    const fresh = this.pendingRenameInput;
     this.pendingRenameInput = null;
-    if (!input) return;
+    if (fresh) {
+      requestAnimationFrame(() => {
+        fresh.focus();
+        fresh.select();
+      });
+      return;
+    }
+    const restore = this.renameSelection;
+    const input = this.activeRenameInput;
+    this.renameSelection = null;
+    if (!restore || !input) return;
     requestAnimationFrame(() => {
+      if (document.activeElement === input) return;
       input.focus();
-      input.select();
+      const len = input.value.length;
+      const start = restore.start ?? len;
+      const end = restore.end ?? len;
+      input.setSelectionRange(Math.min(start, len), Math.min(end, len));
     });
   }
 
   async activatePath(path) {
-    this.selectedPath = path;
+    this.setSelection(path);
     const entry = this.entries.get(path);
     if (!entry) return;
     if (entry.kind === "directory") {
@@ -621,6 +756,60 @@ export class FilesPanelApp {
     this.persistMemory();
   }
 
+  setSelection(path, { anchor = true } = {}) {
+    this.selectedPath = path;
+    this.selectedPaths = path ? new Set([path]) : new Set();
+    if (anchor) this.anchorPath = path;
+  }
+
+  clearSelection() {
+    if (!this.selectedPath && this.selectedPaths.size === 0) return;
+    this.setSelection(null);
+    this.render();
+    this.persistMemory();
+  }
+
+  toggleSelection(path) {
+    if (!path) return;
+    if (this.selectedPaths.has(path) && this.selectedPaths.size > 1) {
+      this.selectedPaths.delete(path);
+      if (this.selectedPath === path) this.selectedPath = this.lastSelected();
+    } else {
+      this.selectedPaths.add(path);
+      this.selectedPath = path;
+    }
+    this.anchorPath = path;
+  }
+
+  selectRange(path) {
+    const paths = this.visiblePaths;
+    const anchor = this.anchorPath ?? this.selectedPath ?? path;
+    const from = paths.indexOf(anchor);
+    const to = paths.indexOf(path);
+    if (from === -1 || to === -1) {
+      this.setSelection(path);
+      return;
+    }
+    const [lo, hi] = from <= to ? [from, to] : [to, from];
+    this.selectedPaths = new Set(paths.slice(lo, hi + 1));
+    this.selectedPath = path;
+  }
+
+  lastSelected() {
+    for (let i = this.visiblePaths.length - 1; i >= 0; i -= 1) {
+      if (this.selectedPaths.has(this.visiblePaths[i])) return this.visiblePaths[i];
+    }
+    return null;
+  }
+
+  selectionList() {
+    return this.visiblePaths.filter((path) => this.selectedPaths.has(path));
+  }
+
+  async copyPaths(rels) {
+    await copy_paths(rels);
+  }
+
   // ---- Keyboard navigation -------------------------------------------------
 
   syncActiveDescendant() {
@@ -630,22 +819,44 @@ export class FilesPanelApp {
     else this.list.removeAttribute("aria-activedescendant");
   }
 
-  // Move the highlighted row without rebuilding the tree — just swap the
-  // selected classes on the two affected rows and update the aria pointer.
-  moveSelection(path, { reveal = true } = {}) {
+  moveSelection(path, { reveal = true, extend = false } = {}) {
     if (!path || !this.rowElements.has(path)) return;
-    const previous = this.selectedPath;
-    if (previous && previous !== path) {
-      const prevEl = this.rowElements.get(previous);
-      if (prevEl) {
-        prevEl.classList.remove("file-tree-row-selected");
-        prevEl.setAttribute("aria-selected", "false");
+    const previous = this.selectedPaths;
+    let next;
+    if (extend) {
+      const paths = this.visiblePaths;
+      const anchor = this.anchorPath ?? this.selectedPath ?? path;
+      const from = paths.indexOf(anchor);
+      const to = paths.indexOf(path);
+      if (from === -1 || to === -1) {
+        next = new Set([path]);
+        this.anchorPath = path;
+      } else {
+        const [lo, hi] = from <= to ? [from, to] : [to, from];
+        next = new Set(paths.slice(lo, hi + 1));
+      }
+    } else {
+      next = new Set([path]);
+      this.anchorPath = path;
+    }
+    for (const selected of previous) {
+      if (next.has(selected)) continue;
+      const selEl = this.rowElements.get(selected);
+      if (selEl) {
+        selEl.classList.remove("file-tree-row-selected");
+        selEl.setAttribute("aria-selected", "false");
       }
     }
+    for (const selected of next) {
+      const selEl = this.rowElements.get(selected);
+      if (selEl) {
+        selEl.classList.add("file-tree-row-selected");
+        selEl.setAttribute("aria-selected", "true");
+      }
+    }
+    this.selectedPaths = next;
     this.selectedPath = path;
     const el = this.rowElements.get(path);
-    el.classList.add("file-tree-row-selected");
-    el.setAttribute("aria-selected", "true");
     if (reveal) el.scrollIntoView({ block: "nearest" });
     this.syncActiveDescendant();
     this.persistMemory();
@@ -691,15 +902,16 @@ export class FilesPanelApp {
     const paths = this.visiblePaths;
     if (paths.length === 0) return;
     const idx = this.selectedPath ? paths.indexOf(this.selectedPath) : -1;
+    const extend = event.shiftKey;
 
     switch (event.key) {
       case "ArrowDown":
         event.preventDefault();
-        this.moveSelection(paths[idx < 0 ? 0 : Math.min(idx + 1, paths.length - 1)]);
+        this.moveSelection(paths[idx < 0 ? 0 : Math.min(idx + 1, paths.length - 1)], { extend });
         return;
       case "ArrowUp":
         event.preventDefault();
-        this.moveSelection(paths[idx < 0 ? paths.length - 1 : Math.max(idx - 1, 0)]);
+        this.moveSelection(paths[idx < 0 ? paths.length - 1 : Math.max(idx - 1, 0)], { extend });
         return;
       case "ArrowRight":
         event.preventDefault();
@@ -728,7 +940,20 @@ export class FilesPanelApp {
         event.preventDefault();
         this.startRename(paths[idx]);
         return;
+      case "Delete":
+      case "Backspace": {
+        const targets = this.selectionList().filter((path) => path !== "");
+        if (targets.length === 0) return;
+        event.preventDefault();
+        void this.deletePaths(targets);
+        return;
+      }
       case "Escape":
+        if (this.selectedPaths.size > 1) {
+          event.preventDefault();
+          this.setSelection(this.selectedPath);
+          this.render();
+        }
         return;
       default:
         this.handleTypeahead(event);
@@ -744,9 +969,9 @@ export class FilesPanelApp {
     const path = paths[idx];
     const entry = this.entries.get(path);
     if (!entry || entry.kind !== "directory") return;
-    const expanded = this.dirtyFilter || this.expandedDirs.has(path);
+    const expanded = this.expandedDirs.has(path);
     if (!expanded) {
-      this.selectedPath = path;
+      this.setSelection(path);
       void this.toggleDirectory(path);
       return;
     }
@@ -763,9 +988,9 @@ export class FilesPanelApp {
     }
     const path = paths[idx];
     const entry = this.entries.get(path);
-    const expanded = entry?.kind === "directory" && (this.dirtyFilter || this.expandedDirs.has(path));
-    if (expanded && !this.dirtyFilter) {
-      this.selectedPath = path;
+    const expanded = entry?.kind === "directory" && this.expandedDirs.has(path);
+    if (expanded) {
+      this.setSelection(path);
       void this.toggleDirectory(path);
       return;
     }
@@ -834,15 +1059,16 @@ export class FilesPanelApp {
     const dest = await duplicate_op(rel);
     if (!dest) return false;
     await this.reconcileDir(parent_dir(dest));
-    this.selectedPath = dest;
+    this.setSelection(dest);
     this.render();
     return true;
   }
 
   startRename(path, options = {}) {
     if (!this.entries.has(path)) return;
+    this.activeRenameInput = null;
     this.renameState = { path, removeIfCanceled: Boolean(options.removeIfCanceled), committing: false };
-    this.selectedPath = path;
+    this.setSelection(path);
     this.render();
   }
 
@@ -852,6 +1078,7 @@ export class FilesPanelApp {
     const newName = rawName.trim();
     if (!newName || newName === basename(path)) {
       this.renameState = null;
+      this.activeRenameInput = null;
       this.render();
       return;
     }
@@ -859,10 +1086,11 @@ export class FilesPanelApp {
     const dest = path_after_rename(path, newName, directory);
     const ok = await rename_fs(path, dest, directory);
     this.renameState = null;
+    this.activeRenameInput = null;
     if (ok) {
       this.removeSubtree(path);
       await this.reconcileDir(parent_dir(dest));
-      this.selectedPath = dest;
+      this.setSelection(dest);
     }
     this.render();
   }
@@ -871,6 +1099,7 @@ export class FilesPanelApp {
     const state = this.renameState;
     if (!state) return;
     this.renameState = null;
+    this.activeRenameInput = null;
     if (state.removeIfCanceled) {
       await muxy.files.delete([state.path]).catch(() => undefined);
       await this.reconcileDir(parent_dir(state.path));
@@ -903,19 +1132,24 @@ export class FilesPanelApp {
   async dropPaths(event, targetDirRel) {
     event.preventDefault();
     event.stopPropagation();
-    const dragged = event.dataTransfer?.getData("application/x-muxy-path");
+    const raw = event.dataTransfer?.getData("application/x-muxy-path");
     this.dropTarget = null;
-    if (!dragged) return;
+    if (!raw) return;
     const target = canonical_dir(targetDirRel);
-    if (dragged === target || (dragged.endsWith("/") && target.startsWith(dragged))) {
+    const dragged = raw
+      .split("\n")
+      .map((path) => path.trim())
+      .filter(Boolean)
+      .filter((path) => path !== target && parent_dir(path) !== target && !(path.endsWith("/") && target.startsWith(path)));
+    if (dragged.length === 0) {
       this.render();
       return;
     }
-    const sourceParent = parent_dir(dragged);
-    const ok = await move_fs([dragged], target);
+    const sourceParents = new Set(dragged.map((path) => parent_dir(path)));
+    const ok = await move_fs(dragged, target);
     if (ok) {
-      this.removeSubtree(dragged);
-      await this.reconcileDir(sourceParent);
+      for (const path of dragged) this.removeSubtree(path);
+      for (const parent of sourceParents) await this.reconcileDir(parent);
       await this.ensureLoaded(target);
       await this.reconcileDir(target);
     }
@@ -953,7 +1187,7 @@ export class FilesPanelApp {
 
   showContextMenu(item, x, y) {
     this.closeContextMenu();
-    const menu = create_context_menu(item, this.ops, () => this.closeContextMenu());
+    const menu = create_context_menu(item, this.ops, () => this.closeContextMenu(), this.selectionList());
     document.body.appendChild(menu);
     const MARGIN = 8;
     const rect = menu.getBoundingClientRect();

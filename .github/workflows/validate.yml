@@ -6,13 +6,11 @@ on:
     paths:
       - "extensions/**"
       - "scripts/**"
-      - ".github/workflows/validate.yml"
-  # Title rewrite + version-bump gate. Runs as pull_request_target so the token
-  # is writable even for fork PRs (a plain pull_request token is read-only on
-  # forks and would 403 the PR-edit API). pull_request_target runs in the BASE
-  # repo's context, so the PR's content is treated as untrusted DATA only: we
-  # read package.json with jq and never `npm ci`, build, or execute any
-  # fork-supplied code with this token. Same path filter as above.
+      - ".github/workflows/**"
+  # Title rewrite + version-bump gate. This needs a writable token for fork PRs,
+  # so it runs from the trusted base branch via pull_request_target. The job
+  # never checks out the fork: trusted code reads exact-SHA PR data through the
+  # GitHub API, validates it, then performs the narrowly scoped PR updates.
   pull_request_target:
     branches: [main]
     paths:
@@ -21,9 +19,8 @@ on:
 permissions:
   contents: read
 
-# Key by event too: the build job (pull_request) and the title/bump gate
-# (pull_request_target) run from different events on the same PR and must not
-# cancel each other.
+# The build job (pull_request) and metadata gate (pull_request_target) run from
+# different trust contexts and must not cancel each other.
 concurrency:
   group: validate-${{ github.event_name }}-${{ github.event.pull_request.number }}
   cancel-in-progress: true
@@ -31,27 +28,29 @@ concurrency:
 jobs:
   validate:
     name: Validate extensions
-    # The build/validate job installs and builds the PR's code, so it must only
-    # ever run on the read-only `pull_request` event — never pull_request_target.
+    # This job executes the PR's code, so it runs only with the read-only fork
+    # token and no secrets.
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Need the base commit to diff against so we can isolate the
-          # extension(s) this PR actually changed (see "Determine changed
-          # extensions" below).
+          # Need the base commit to isolate extensions changed by this PR.
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "20"
           cache: "npm"
 
       - name: Install tooling
         run: npm ci
+
+      - name: Test trusted tooling
+        run: npm test
 
       - name: Determine changed extensions
         id: changed
@@ -61,9 +60,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Diff against the MERGE BASE, not the base tip, so we count only what
-          # this PR itself changed (not extensions that landed on main after the
-          # PR forked).
+          # Diff against the merge base so changes that landed on main after
+          # this PR forked are not attributed to the PR.
           if mb="$(git merge-base "$BASE_SHA" "$HEAD_SHA" 2>/dev/null)"; then
             diff_base="$mb"
           else
@@ -71,14 +69,12 @@ jobs:
             diff_base="$BASE_SHA"
           fi
 
-          # Top-level extension dir names whose files changed in this PR.
           changed="$(git diff --name-only "$diff_base" "$HEAD_SHA" -- extensions/ \
             | awk -F/ 'NF>1 && $1=="extensions" {print $2}' \
             | sort -u)"
 
-          # Tooling-only PRs (no extensions/** change) build and validate
-          # everything, since a scripts/** or workflow change can affect any
-          # extension. Otherwise, target only the changed extension(s).
+          # Tooling-only PRs build and validate everything because scripts or
+          # workflow changes can affect every extension.
           if [ -z "$changed" ]; then
             echo "No extension changed (tooling-only PR); building and validating all."
             echo "names=" >> "$GITHUB_OUTPUT"
@@ -95,217 +91,32 @@ jobs:
         run: node scripts/validate.mjs ${{ steps.changed.outputs.names }}
 
       - name: Dry-run pack (prove deterministic zip + hash)
-        # Pack only the extension(s) this PR built (same target list as the build
-        # and validate steps). Packing all extensions here would fail on any whose
-        # `dist/` wasn't built in this run. Empty names => tooling-only PR, which
-        # built everything above, so pack everything to match.
         run: node scripts/pack.mjs --dry-run ${{ steps.changed.outputs.names }}
 
   pr-meta:
     name: Enforce version bump and PR title
-    # Runs only via pull_request_target (writable token for forks). Reads the
-    # PR's package.json as data; executes no PR-supplied code.
     if: github.event_name == 'pull_request_target'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
+      issues: write
       pull-requests: write
     steps:
-      # Untrusted checkout: the PR head, including fork changes. Read as DATA
-      # only (jq over package.json). Never executed; credentials not persisted.
-      - name: Checkout PR head (untrusted, data only)
-        uses: actions/checkout@v4
+      # pull_request_target resolves github.sha to the trusted base branch.
+      # Only this trusted tooling is checked out; the fork is accessed by API.
+      - name: Checkout trusted tooling
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.sha }}
-          path: pr
-          fetch-depth: 0
+          ref: ${{ github.sha }}
           persist-credentials: false
 
-      - name: Determine changed extension, verify package.json, enforce bump
-        id: meta
-        working-directory: pr
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          set -euo pipefail
-
-          # The base commit may not exist in a fork clone; fetch enough history
-          # for a real merge base so the diff isolates this PR's own changes.
-          # Falls back to the recorded base ref name.
-          git fetch --no-tags --depth=50 \
-            "https://github.com/${{ github.repository }}.git" "$BASE_SHA" 2>/dev/null || true
-          if git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null; then
-            base="$BASE_SHA"
-          else
-            echo "::warning::base commit $BASE_SHA unavailable; falling back to origin/${{ github.event.pull_request.base.ref }}"
-            base="origin/${{ github.event.pull_request.base.ref }}"
-          fi
-
-          # Diff against the MERGE BASE, not the base tip: a two-dot diff
-          # ("$base" "$HEAD_SHA") would also report extensions that landed on the
-          # base branch after this PR forked, spuriously failing the one-extension
-          # gate. The merge base counts only what this PR itself changed.
-          if mb="$(git merge-base "$base" "$HEAD_SHA" 2>/dev/null)"; then
-            diff_base="$mb"
-          else
-            echo "::warning::no merge base for $base..$HEAD_SHA; comparing against the base tip directly."
-            diff_base="$base"
-          fi
-
-          # Extensions whose files changed in this PR (top-level dir name).
-          changed="$(git diff --name-only "$diff_base" "$HEAD_SHA" -- extensions/ \
-            | awk -F/ 'NF>1 && $1=="extensions" {print $2}' \
-            | sort -u)"
-          count="$(printf '%s' "$changed" | grep -c . || true)"
-
-          if [ "$count" -eq 0 ]; then
-            echo "No extension changed (tooling-only PR); skipping title and bump checks."
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if [ "$count" -gt 1 ]; then
-            echo "::error::This PR changes $count extensions:"
-            printf '::error::  - %s\n' $changed
-            echo "::error::Open one PR per extension. The title must be a single '<name> <version>'."
-            exit 1
-          fi
-
-          name="$changed"
-          pkg="extensions/$name/package.json"
-          if [ ! -f "$pkg" ]; then
-            echo "::error::$pkg not found — cannot read the submission's version. (Removals should not touch a single extension here.)"
-            exit 1
-          fi
-
-          # Read identity from the submission's package.json (data only).
-          if ! pkg_name="$(jq -er '.name' "$pkg" 2>/dev/null)"; then
-            echo "::error::$pkg is not valid JSON or has no top-level \"name\"."
-            exit 1
-          fi
-          if ! version="$(jq -er '.version' "$pkg" 2>/dev/null)"; then
-            echo "::error::$pkg has no top-level \"version\". Add a semver \"version\" (e.g. \"1.0.0\")."
-            exit 1
-          fi
-
-          # Author's GitHub handle for the review ping (data only, optional).
-          # This comes from the PR's own package.json, so it is untrusted: it is
-          # only ever used as an @mention in a comment, never as code or a path.
-          author_gh="$(jq -er '.muxy.marketplace.github // empty' "$pkg" 2>/dev/null | sed 's/^@//' || true)"
-
-          # Directory name must equal the package name (validate.mjs enforces
-          # this too; checked here so the title we set is trustworthy).
-          if [ "$pkg_name" != "$name" ]; then
-            echo "::error::package name '$pkg_name' must equal directory name '$name' (extensions/$name/)."
-            exit 1
-          fi
-
-          # Version must be valid semver MAJOR.MINOR.PATCH, with an optional
-          # -prerelease / +build suffix. Ordering below is decided purely on the
-          # numeric core; the suffix is allowed but does not contribute ordering.
-          semver_re='^[0-9]+\.[0-9]+\.[0-9]+([-+].+)?$'
-          if ! printf '%s' "$version" | grep -Eq "$semver_re"; then
-            echo "::error::version '$version' in $pkg is not valid semver (expected MAJOR.MINOR.PATCH, e.g. 1.0.0)."
-            exit 1
-          fi
-
-          # Base version for this extension (empty if the extension is new).
-          base_version="$(git show "$base:extensions/$name/package.json" 2>/dev/null \
-            | jq -er '.version' 2>/dev/null || true)"
-
-          if [ -z "$base_version" ]; then
-            echo "New extension '$name' at $version — no previous version to compare."
-          else
-            echo "Existing '$name': $base_version (main) -> $version (PR)."
-            # Require the numeric MAJOR.MINOR.PATCH core to strictly increase.
-            # Compare field by field as integers (so 1.10.0 > 1.9.0, which a
-            # lexical compare would get wrong); -prerelease/+build is stripped
-            # first, so it neither raises nor lowers the version for this gate.
-            core() { printf '%s' "$1" | sed -E 's/[-+].*$//'; }
-            IFS=. read -r ba bi bp <<<"$(core "$base_version")"
-            IFS=. read -r na ni np <<<"$(core "$version")"
-            bumped=false
-            if   [ "$na" -gt "$ba" ]; then bumped=true
-            elif [ "$na" -lt "$ba" ]; then bumped=down
-            elif [ "$ni" -gt "$bi" ]; then bumped=true
-            elif [ "$ni" -lt "$bi" ]; then bumped=down
-            elif [ "$np" -gt "$bp" ]; then bumped=true
-            elif [ "$np" -lt "$bp" ]; then bumped=down
-            fi
-            if [ "$bumped" = "down" ]; then
-              echo "::error::version '$version' is lower than main's '$base_version'. Bump \"version\" forward (no downgrades; published versions are immutable)."
-              exit 1
-            fi
-            if [ "$bumped" != "true" ]; then
-              echo "::error::version '$version' does not bump main's '$base_version'. Increase MAJOR.MINOR.PATCH in $pkg for every PR (published versions are immutable)."
-              exit 1
-            fi
-          fi
-
-          title="$name $version"
-          echo "title=$title" >> "$GITHUB_OUTPUT"
-          echo "name=$name" >> "$GITHUB_OUTPUT"
-          echo "author_gh=$author_gh" >> "$GITHUB_OUTPUT"
-          echo "skip=false" >> "$GITHUB_OUTPUT"
-          echo "Resolved PR title: $title (author handle: ${author_gh:-<none>})"
-
-      - name: Force PR title to "<name> <version>"
-        if: steps.meta.outputs.skip == 'false'
-        uses: actions/github-script@v7
-        env:
-          DESIRED_TITLE: ${{ steps.meta.outputs.title }}
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          script: |
-            const desired = process.env.DESIRED_TITLE;
-            const { owner, repo } = context.repo;
-            const pull_number = context.payload.pull_request.number;
-            const current = context.payload.pull_request.title;
-            if (current === desired) {
-              core.info(`PR title already "${desired}"; nothing to do.`);
-              return;
-            }
-            await github.rest.pulls.update({ owner, repo, pull_number, title: desired });
-            core.info(`Forced PR title: "${current}" -> "${desired}". This becomes the squash-merge commit subject.`);
+          node-version: "24"
 
-      - name: Ping extension author for review
-        # When the PR touches an existing extension whose author is someone other
-        # than the PR opener, tag the author to review the change. AUTHOR_GH comes
-        # from the PR's package.json (untrusted) and is used only as an @mention.
-        if: steps.meta.outputs.skip == 'false' && steps.meta.outputs.author_gh != ''
-        uses: actions/github-script@v7
+      - name: Validate metadata and update PR
         env:
-          EXT_NAME: ${{ steps.meta.outputs.name }}
-          AUTHOR_GH: ${{ steps.meta.outputs.author_gh }}
-        with:
-          script: |
-            const { owner, repo } = context.repo;
-            const issue_number = context.payload.pull_request.number;
-            const name = process.env.EXT_NAME;
-            const handle = process.env.AUTHOR_GH.replace(/^@/, "").trim();
-            const opener = (context.payload.pull_request.user?.login || "").toLowerCase();
-            const marker = "<!-- muxy-extension-author-review -->";
-
-            if (!handle || handle.toLowerCase() === opener) {
-              core.info(`No author ping needed (handle '${handle}', opener '${opener}').`);
-              return;
-            }
-
-            // Idempotent: skip if we've already pinged on this PR (re-runs fire on
-            // every synchronize). Match our marker on a bot-authored comment.
-            const comments = await github.paginate(
-              github.rest.issues.listComments,
-              { owner, repo, issue_number, per_page: 100 },
-            );
-            if (comments.some((c) => c.user?.type === "Bot" && c.body?.includes(marker))) {
-              core.info("Author already pinged on this PR; nothing to do.");
-              return;
-            }
-
-            await github.rest.issues.createComment({
-              owner, repo, issue_number,
-              body:
-                `${marker}\n@${handle} — this PR changes the **${name}** extension, ` +
-                `which you're listed as the author of. Could you review it?`,
-            });
-            core.info(`Pinged author @${handle} to review changes to '${name}'.`);
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/pr-meta-ci.mjs

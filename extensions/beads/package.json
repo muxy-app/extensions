@@ -5,7 +5,7 @@
     "vite": "^7.3.5"
   },
   "displayName": "Beads",
-  "description": "Beads issue board panel for active Muxy workspaces",
+  "description": "Beads issue workspace for Muxy panels and tabs",
   "muxy": {
     "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
     "commands": [
@@ -21,6 +21,14 @@
       {
         "id": "refresh-beads-board",
         "title": "Beads: Refresh"
+      },
+      {
+        "action": {
+          "kind": "openTab",
+          "tabType": "beads-workspace"
+        },
+        "id": "open-beads-tab",
+        "title": "Beads: Open Workspace Tab"
       }
     ],
     "events": [
@@ -29,6 +37,9 @@
     ],
     "panels": [
       {
+        "defaultData": {
+          "surface": "panel"
+        },
         "entry": "panel/index.html",
         "headerButtons": [
           {
@@ -51,12 +62,23 @@
     ],
     "permissions": [
       "panels:write",
+      "tabs:write",
       "commands:exec",
       "projects:read",
       "worktrees:read",
       "files:read",
       "storage:read",
       "storage:write"
+    ],
+    "tabTypes": [
+      {
+        "defaultData": {
+          "surface": "tab"
+        },
+        "entry": "panel/index.html",
+        "id": "beads-workspace",
+        "title": "Beads"
+      }
     ],
     "topbarItems": [
       {
@@ -88,5 +110,5 @@
     "dev": "vite"
   },
   "type": "module",
-  "version": "0.1.0"
+  "version": "0.2.1"
 }

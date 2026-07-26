@@ -32,6 +32,16 @@ export function is_svg(path) {
   return extname(path) === ".svg";
 }
 
+export function is_pdf(path) {
+  return extname(path) === ".pdf";
+}
+
+const HTML_EXT = new Set([".html", ".htm"]);
+
+export function is_html(path) {
+  return HTML_EXT.has(extname(path));
+}
+
 const RICH_LANGUAGES = {
   javascript: () => import("@codemirror/lang-javascript").then((m) => m.javascript()),
   jsx: () => import("@codemirror/lang-javascript").then((m) => m.javascript({ jsx: true })),

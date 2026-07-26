@@ -11,12 +11,16 @@ export default defineConfig({
   define: {
     "process.env.NODE_ENV": JSON.stringify("production"),
   },
+  worker: {
+    format: "es",
+  },
   build: {
     outDir: "dist",
     emptyOutDir: true,
     rollupOptions: {
       input: {
         scm: resolve(__dirname, "panel/index.html"),
+        "diff-viewer": resolve(__dirname, "panel/diff-viewer.html"),
       },
     },
   },

@@ -1,20 +1,7 @@
 import { read_image_data_url } from "@/lib/image-data";
 import { error_message } from "@/lib/files";
+import { format_file_size } from "@/lib/file-size";
 import { h } from "@/lib/dom";
-
-function format_size(bytes) {
-  if (!Number.isFinite(bytes) || bytes < 0) return null;
-  if (bytes < 1024) return `${bytes} B`;
-  const units = ["KB", "MB", "GB"];
-  let value = bytes / 1024;
-  let unit = 0;
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024;
-    unit += 1;
-  }
-  const rounded = value >= 100 ? Math.round(value) : Math.round(value * 10) / 10;
-  return `${rounded} ${units[unit]}`;
-}
 
 export class ImageViewer {
   constructor({ parent, filePath, svgSource = null }) {
@@ -100,7 +87,7 @@ export class ImageViewer {
     try {
       const stat = await muxy.files.stat(this.filePath);
       if (this.disposed) return;
-      const label = format_size(stat?.size);
+      const label = format_file_size(stat?.size);
       if (label) slot.textContent = label;
     } catch {
     }

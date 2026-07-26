@@ -1,0 +1,93 @@
+{
+  "name": "git-workspace",
+  "private": true,
+  "scripts": {
+    "build": "vite build && vite build --config vite.diff-viewer.config.js && node -e \"require('fs').copyFileSync('package.json','dist/package.json')\"",
+    "deploy": "npm run build && rsync -a dist/ \"$HOME/.config/muxy/extensions/git-workspace/\"",
+    "build:surfaces": "vite build",
+    "dev": "vite",
+    "update-skill": "node scripts/update-skill.mjs"
+  },
+  "type": "module",
+  "version": "1.0.0",
+  "dependencies": {},
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.0",
+    "tailwindcss": "^4.3.0",
+    "vite": "^7.3.5"
+  },
+  "muxy": {
+    "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
+    "description": "Git for multi-repo workspaces — browse and manage every repository inside a workspace folder",
+    "permissions": [
+      "commands:exec",
+      "panels:write",
+      "tabs:write",
+      "worktrees:read",
+      "worktrees:write",
+      "notifications:write",
+      "files:read",
+      "git:write"
+    ],
+    "events": [
+      "project.switched",
+      "worktree.switched",
+      "file.changed"
+    ],
+    "panels": [
+      {
+        "id": "scm-workspace",
+        "title": "Git Workspace",
+        "entry": "panel/index.html",
+        "position": "right",
+        "mode": "pinned",
+        "hiddenControls": ["icon", "title", "close", "pin", "position"]
+      }
+    ],
+    "tabTypes": [
+      {
+        "id": "diff-viewer",
+        "title": "Diff Viewer",
+        "entry": "panel/diff-viewer.html"
+      }
+    ],
+    "commands": [
+      {
+        "id": "toggle-scm",
+        "title": "Toggle Git Workspace",
+        "defaultShortcut": "cmd+shift+y",
+        "action": {
+          "kind": "togglePanel",
+          "panel": "scm-workspace"
+        }
+      },
+      {
+        "id": "refresh-scm",
+        "title": "Refresh"
+      },
+      {
+        "id": "switch-repo",
+        "title": "Git Workspace: Switch Repository…",
+        "subtitle": "Pick a repository inside the workspace folder"
+      }
+    ],
+    "topbarItems": [
+      {
+        "id": "scm-workspace",
+        "icon": {
+          "symbol": "arrow.triangle.branch"
+        },
+        "tooltip": "Toggle Git Workspace",
+        "command": "toggle-scm"
+      }
+    ],
+    "marketplace": {
+      "author": "Aekawan",
+      "github": "Aekawan",
+      "repository": "https://github.com/muxy-app/extensions",
+      "categories": ["git", "source-control", "workspace"],
+      "icon": "icon.svg",
+      "screenshots": ["screenshots/screenshot-1.png"]
+    }
+  }
+}
