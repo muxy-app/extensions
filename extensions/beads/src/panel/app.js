@@ -252,7 +252,6 @@ export class BeadsBoardPanel {
   }
 
   render() {
-    this.index = buildIssueIndex(this.issues);
     if (!this.shell?.isConnected) this.mountShell();
     this.syncTopbar();
     this.renderContent();
