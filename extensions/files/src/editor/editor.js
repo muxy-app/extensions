@@ -1,9 +1,10 @@
 import { basename, error_message, open_externally, reveal_in_finder, same_file, try_action } from "@/lib/files";
-import { is_html, is_image, is_markdown, is_svg } from "@/lib/languages";
+import { is_html, is_image, is_markdown, is_pdf, is_svg } from "@/lib/languages";
 import { icon_for } from "@/lib/file-icon";
 import { CodeEditor } from "@/editor/code-editor";
 import { MarkdownEditor } from "@/editor/markdown-editor";
 import { ImageViewer } from "@/editor/image-viewer";
+import { PdfViewer } from "@/editor/pdf-viewer";
 import { HtmlViewer } from "@/editor/html-viewer";
 import { SettingsSheet } from "@/editor/settings-sheet";
 import { OpenIcon, RevealIcon, SaveIcon, SettingsIcon, TocIcon } from "@/editor/icons";
@@ -208,6 +209,14 @@ export class EditorApp {
     return this.filePath ? is_image(this.filePath) : false;
   }
 
+  isPdf() {
+    return this.filePath ? is_pdf(this.filePath) : false;
+  }
+
+  isBinaryViewer() {
+    return this.isImage() || this.isPdf();
+  }
+
   isSvg() {
     return this.filePath ? is_svg(this.filePath) : false;
   }
@@ -229,6 +238,7 @@ export class EditorApp {
     this.cancelAutoSave();
     this.conflictPending = false;
     this.lastWritten = null;
+    this.baseline = null;
 
     if (!filePath) {
       this.fileLoadId += 1;
@@ -250,7 +260,7 @@ export class EditorApp {
     this.setDirty(false);
     this.render();
 
-    if (this.isImage()) {
+    if (this.isBinaryViewer()) {
       this.content = "";
       this.error = null;
       this.loading = false;
@@ -318,8 +328,8 @@ export class EditorApp {
     // A conflict prompt for this file is already open — let the user resolve it first.
     if (this.conflictPending) return;
 
-    if (this.isImage()) {
-      // Re-mount the viewer so the <img> re-fetches the changed bytes.
+    if (this.isBinaryViewer()) {
+      // Re-mount binary viewers so they re-fetch the changed bytes.
       this.bodyKey = null;
       this.render();
       return;
@@ -422,7 +432,7 @@ export class EditorApp {
   }
 
   persistDraft() {
-    if (!this.filePath || this.isImage() || this.baseline === null) return;
+    if (!this.filePath || this.isBinaryViewer() || this.baseline === null) return;
     if (typeof this.child?.getValue !== "function") return;
     void write_draft(this.filePath, this.child.getValue(), this.baseline);
   }
@@ -438,7 +448,7 @@ export class EditorApp {
       this.autoSaveTimer = 0;
     }
     if (this.config.autoSave === false) return;
-    if (!this.filePath || this.isImage()) return;
+    if (!this.filePath || this.isBinaryViewer()) return;
     this.autoSaveTimer = window.setTimeout(() => {
       this.autoSaveTimer = 0;
       // Re-check at fire time: the buffer may be clean again, or a save/conflict in flight.
@@ -483,7 +493,7 @@ export class EditorApp {
   }
 
   async confirmClose() {
-    if (!this.dirty || !this.filePath || this.isImage()) return false;
+    if (!this.dirty || !this.filePath || this.isBinaryViewer()) return false;
     this.cancelAutoSave();
     const name = basename(this.filePath);
     const choice = await muxy.dialog.confirm({
@@ -613,6 +623,8 @@ export class EditorApp {
     if (!this.topbar || !this.filePath) return;
     const markdown = this.isMarkdown();
     const image = this.isImage();
+    const pdf = this.isPdf();
+    const binaryViewer = image || pdf;
     const svg = this.isSvg();
     const html = this.isHtml();
     clear(this.topbar);
@@ -730,7 +742,7 @@ export class EditorApp {
       actions.appendChild(h("span", { class: "toolbar-divider" }));
     }
 
-    if (!image) {
+    if (!binaryViewer) {
       actions.append(
         h(
           "button",
@@ -772,7 +784,7 @@ export class EditorApp {
       ),
     );
 
-    if (!image) {
+    if (!binaryViewer) {
       actions.append(
         h("span", { class: "toolbar-divider" }),
         h(
@@ -814,11 +826,13 @@ export class EditorApp {
     }
 
     const image = this.isImage();
+    const pdf = this.isPdf();
     const svgPreview = this.isSvg() && this.svgView;
     const htmlPreview = this.isHtml() && this.htmlView;
     const markdown = this.isMarkdown();
     let key;
     if (image) key = `${this.filePath}:image`;
+    else if (pdf) key = `${this.filePath}:pdf`;
     else if (svgPreview) key = `${this.filePath}:svg-view`;
     else if (htmlPreview) key = `${this.filePath}:html-view`;
     else if (markdown) key = `${this.filePath}:markdown:${this.mdMode}`;
@@ -832,6 +846,10 @@ export class EditorApp {
     this.bodyKey = key;
     if (image) {
       this.child = new ImageViewer({ parent: this.body, filePath: this.filePath });
+      return;
+    }
+    if (pdf) {
+      this.child = new PdfViewer({ parent: this.body, filePath: this.filePath });
       return;
     }
     if (svgPreview) {

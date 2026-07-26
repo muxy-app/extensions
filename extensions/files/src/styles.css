@@ -607,6 +607,216 @@ textarea {
   color: var(--muxy-foreground);
 }
 
+.pdf-viewer {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.pdf-stage {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  align-items: safe center;
+  justify-content: safe center;
+  overflow: auto;
+  padding: var(--s7);
+  background: var(--muxy-surface);
+}
+
+.pdf-stage:focus,
+.pdf-stage:focus-visible {
+  outline: none;
+}
+
+.pdf-page {
+  position: relative;
+  flex: 0 0 auto;
+  border: 1px solid var(--muxy-border);
+  background: white;
+}
+
+.pdf-page-canvas {
+  display: block;
+  max-width: none;
+  max-height: none;
+  background: white;
+}
+
+.pdf-text-layer {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  overflow: clip;
+  color-scheme: only light;
+  forced-color-adjust: none;
+  line-height: 1;
+  letter-spacing: normal;
+  word-spacing: normal;
+  text-align: initial;
+  text-size-adjust: none;
+  transform-origin: 0 0;
+  user-select: text;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+}
+
+.pdf-text-layer :is(span, br) {
+  position: absolute;
+  color: transparent;
+  cursor: text;
+  transform-origin: 0 0;
+  user-select: text;
+  white-space: pre;
+}
+
+.pdf-text-layer > :not(.markedContent),
+.pdf-text-layer .markedContent span:not(.markedContent) {
+  z-index: 1;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  transform: rotate(var(--rotate, 0deg)) scaleX(var(--scale-x, 1)) scale(var(--min-font-size-inv));
+}
+
+.pdf-text-layer .markedContent {
+  display: contents;
+}
+
+.pdf-text-layer ::selection {
+  background: color-mix(in srgb, var(--muxy-accent) 45%, transparent);
+  color: transparent;
+}
+
+.pdf-toolbar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s4);
+  min-width: 0;
+  padding: var(--s2) var(--s5);
+  border-top: 1px solid var(--muxy-border);
+  background: var(--muxy-background);
+  color: var(--muxy-foreground-muted);
+  font-size: var(--font-footnote);
+}
+
+.pdf-toolbar-info,
+.pdf-toolbar-group {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--s2);
+}
+
+.pdf-toolbar-info {
+  gap: var(--s4);
+}
+
+.pdf-zoom-controls {
+  flex: 0 0 auto;
+}
+
+.pdf-icon-button {
+  display: inline-flex;
+  width: var(--control);
+  height: var(--control);
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--muxy-foreground-muted);
+  cursor: pointer;
+}
+
+.pdf-icon-button:hover:not(:disabled) {
+  background: var(--muxy-hover);
+  color: var(--muxy-foreground);
+}
+
+.pdf-icon-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.pdf-page-input {
+  width: calc(var(--control) + var(--s8));
+  height: var(--control);
+  box-sizing: border-box;
+  padding: 0 var(--s2);
+  border: 1px solid var(--muxy-border);
+  border-radius: var(--radius);
+  outline: none;
+  background: var(--muxy-surface);
+  color: var(--muxy-foreground);
+  font: var(--font-footnote) "SF Mono", Menlo, monospace;
+  text-align: center;
+}
+
+.pdf-page-input:focus {
+  border-color: var(--muxy-accent);
+}
+
+.pdf-page-count,
+.pdf-meta-item {
+  font-family: "SF Mono", Menlo, monospace;
+  white-space: nowrap;
+}
+
+.pdf-zoom-value {
+  min-width: calc(var(--control) + var(--s9));
+  height: var(--control);
+  padding: 0 var(--s2);
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--muxy-foreground-muted);
+  font: var(--font-footnote) "SF Mono", Menlo, monospace;
+  cursor: pointer;
+}
+
+.pdf-zoom-value:hover {
+  background: var(--muxy-hover);
+  color: var(--muxy-foreground);
+}
+
+.pdf-zoom-toggle {
+  flex: 0 0 auto;
+  height: var(--control);
+  padding: 0 var(--s5);
+  border: 1px solid var(--muxy-border);
+  border-radius: var(--radius);
+  background: var(--muxy-surface);
+  color: var(--muxy-foreground);
+  font-size: var(--font-footnote);
+  cursor: pointer;
+}
+
+.pdf-zoom-toggle:hover {
+  background: var(--muxy-hover);
+  border-color: var(--muxy-accent);
+}
+
+.pdf-zoom-toggle-active {
+  border-color: var(--muxy-accent);
+  background: var(--muxy-accent-soft);
+  color: var(--muxy-accent);
+}
+
+.pdf-status {
+  padding: var(--s6);
+  color: var(--muxy-foreground-muted);
+  font-size: var(--font-body);
+}
+
+.pdf-status-error {
+  color: var(--muxy-foreground);
+}
+
 .html-viewer {
   display: flex;
   flex: 1;

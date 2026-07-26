@@ -1,9 +1,9 @@
 {
   "name": "files",
-  "version": "1.20.1",
+  "version": "1.20.3",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node -e \"const fs=require('fs');fs.copyFileSync('package.json','dist/package.json');fs.mkdirSync('dist/scripts',{recursive:true});fs.copyFileSync('scripts/quick-open.js','dist/scripts/quick-open.js');fs.copyFileSync('scripts/find-in-files.js','dist/scripts/find-in-files.js')\"",
+    "build": "vite build && node scripts/copy-build-assets.mjs",
     "gen-icons": "node scripts/gen-material-icons.mjs",
     "update-skill": "node scripts/update-skill.mjs"
   },
@@ -36,6 +36,7 @@
     "@lezer/highlight": "^1.2.3",
     "jsonc-parser": "^3.3.1",
     "mermaid": "^11.15.0",
+    "pdfjs-dist": "^6.1.200",
     "web-tree-sitter": "^0.26.9",
     "yaml": "^2.9.0"
   },
@@ -120,6 +121,17 @@
         "id": "code-editor",
         "title": "Editor",
         "entry": "panel/editor.html"
+      }
+    ],
+    "fileOpeners": [
+      {
+        "id": "editor",
+        "title": "Editor",
+        "tabType": "code-editor",
+        "patterns": [
+          "*"
+        ],
+        "singleton": true
       }
     ],
     "commands": [

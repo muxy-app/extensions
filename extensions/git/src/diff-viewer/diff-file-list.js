@@ -37,8 +37,18 @@ export class DiffFileListView {
         this.render();
     }
     setActive(itemId) {
+        if (this.state.active === itemId)
+            return;
         this.state = { files: this.state.files, active: itemId };
-        this.render();
+        this.syncActive();
+    }
+    syncActive() {
+        for (const row of this.host.querySelectorAll("[data-item-id]")) {
+            const active = row.dataset.itemId === this.state.active;
+            row.classList.toggle("bg-accent", active);
+            if (active)
+                row.scrollIntoView({ block: "nearest" });
+        }
     }
     clear() {
         this.state = { files: [], active: "" };
@@ -56,22 +66,26 @@ export class DiffFileListView {
             this.host.replaceChildren(h("ul", { class: "divide-y divide-transparent" }, treeRows(this.state.files.map((file) => toEntry(file)), {
                 prefix: TREE_PREFIX,
                 onToggle: () => this.render(),
-                renderLeaf: (file, depth) => fileRow(file, {
+                renderLeaf: (file, depth) => stampRow(fileRow(file, {
                     active: file.itemId === this.state.active,
                     indent: treeIndent(depth),
                     name: file.name,
                     onOpen: () => this.onSelect(file.itemId),
                     ...this.rowActions(file),
-                }),
+                }), file.itemId),
             })));
             return;
         }
-        this.host.replaceChildren(h("ul", { class: "divide-y divide-border" }, this.state.files.map((file) => fileRow(toEntry(file), {
+        this.host.replaceChildren(h("ul", { class: "divide-y divide-border" }, this.state.files.map((file) => stampRow(fileRow(toEntry(file), {
             active: file.itemId === this.state.active,
             onOpen: () => this.onSelect(file.itemId),
             ...this.rowActions(toEntry(file)),
-        }))));
+        }), file.itemId))));
     }
+}
+function stampRow(row, itemId) {
+    row.dataset.itemId = itemId;
+    return row;
 }
 function toEntry(file) {
     return {

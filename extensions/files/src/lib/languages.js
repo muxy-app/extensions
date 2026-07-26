@@ -32,6 +32,10 @@ export function is_svg(path) {
   return extname(path) === ".svg";
 }
 
+export function is_pdf(path) {
+  return extname(path) === ".pdf";
+}
+
 const HTML_EXT = new Set([".html", ".htm"]);
 
 export function is_html(path) {

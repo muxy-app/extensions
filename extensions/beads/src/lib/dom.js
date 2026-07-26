@@ -34,3 +34,23 @@ export function append(parent, children) {
 export function clear(node) {
   node.replaceChildren();
 }
+
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+export function svg(tag, attrs = null, ...children) {
+  const node = document.createElementNS(SVG_NS, tag);
+  if (attrs) {
+    for (const [key, value] of Object.entries(attrs)) {
+      if (value === null || value === undefined || value === false) continue;
+      if (key === "class") node.setAttribute("class", String(value));
+      else if (key.startsWith("on") && typeof value === "function") {
+        node.addEventListener(key.slice(2).toLowerCase(), value);
+      } else node.setAttribute(key, String(value));
+    }
+  }
+  for (const child of children.flat()) {
+    if (child === null || child === undefined || child === false) continue;
+    node.appendChild(child);
+  }
+  return node;
+}

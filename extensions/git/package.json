@@ -2,14 +2,16 @@
   "name": "git",
   "private": true,
   "scripts": {
-    "build": "vite build && vite build --config vite.diff-viewer.config.js && node -e \"require('fs').copyFileSync('package.json','dist/package.json')\"",
+    "build": "vite build && node -e \"require('fs').copyFileSync('package.json','dist/package.json')\"",
     "build:surfaces": "vite build",
     "dev": "vite",
     "update-skill": "node scripts/update-skill.mjs"
   },
   "type": "module",
-  "version": "1.10.1",
-  "dependencies": {},
+  "version": "1.11.0",
+  "dependencies": {
+    "@pierre/diffs": "^1.2.12"
+  },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.0",
     "tailwindcss": "^4.3.0",
@@ -40,7 +42,13 @@
         "entry": "panel/index.html",
         "position": "right",
         "mode": "pinned",
-        "hiddenControls": ["icon", "title", "close", "pin", "position"]
+        "hiddenControls": [
+          "icon",
+          "title",
+          "close",
+          "pin",
+          "position"
+        ]
       }
     ],
     "tabTypes": [
@@ -79,9 +87,15 @@
       "author": "Saeed Vaziry",
       "github": "saeedvaziry",
       "repository": "https://github.com/muxy-app/extensions",
-      "categories": ["git", "source-control"],
+      "categories": [
+        "git",
+        "source-control"
+      ],
       "icon": "icon.svg",
-      "screenshots": ["screenshots/screenshot-1.png", "screenshots/screenshot-2.png"]
+      "screenshots": [
+        "screenshots/screenshot-1.png",
+        "screenshots/screenshot-2.png"
+      ]
     }
   }
 }
