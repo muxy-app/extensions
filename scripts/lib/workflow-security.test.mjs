@@ -48,6 +48,12 @@ test("these guardrails run on every pull request that edits a workflow", () => {
   assert.match(triggers, /- "\.github\/workflows\/\*\*"/);
 });
 
+test("security comment workflow can write pull request comments", () => {
+  const permissions = securityWorkflow.split("concurrency:")[0];
+  assert.match(permissions, /issues:\s*write/);
+  assert.match(permissions, /pull-requests:\s*write/);
+});
+
 test("privileged jobs do not pass untrusted values through GITHUB_OUTPUT", () => {
   const privilegedValidateJob = validateWorkflow.split("\n  pr-meta:\n")[1];
   assert.ok(privilegedValidateJob);

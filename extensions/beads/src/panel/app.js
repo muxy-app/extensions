@@ -70,12 +70,22 @@ export class BeadsBoardPanel {
     this.draggingColumnID = null;
     this.suppressColumnClickUntil = 0;
     this.graphRenderSequence = 0;
+    this.viewRenderSequence = 0;
+    this.shell = null;
+    this.contentRoot = null;
+    this.projectNameElement = null;
+    this.searchInput = null;
+    this.clearSearchButton = null;
+    this.refreshButton = null;
+    this.refreshSelect = null;
+    this.cacheIndicator = null;
+    this.viewButtons = new Map();
     this.isTab = window.muxy?.data?.surface === "tab";
   }
 
   async start() {
     this.root.classList.add(this.isTab ? "surface-tab" : "surface-panel");
-    muxy.events.subscribe("command.refresh-beads-board", () => this.refresh(true));
+    muxy.events.subscribe("command.refresh-beads-board", () => this.refresh());
     muxy.events.subscribe("project.switched", () => this.delayedRefresh());
     muxy.events.subscribe("worktree.switched", () => this.delayedRefresh());
     muxy.onFocus?.((focused) => {
@@ -84,7 +94,7 @@ export class BeadsBoardPanel {
     this.render();
     await this.loadLayout();
     this.render();
-    this.refresh(true);
+    this.refresh();
     this.applyAutoRefreshTimer();
   }
 
@@ -112,16 +122,17 @@ export class BeadsBoardPanel {
     const generation = this.refreshGeneration;
     this.workspaceRefreshTimer = setTimeout(() => {
       this.workspaceRefreshTimer = null;
-      this.refresh(true, generation);
+      this.refresh(generation);
     }, 300);
   }
 
-  async refresh(force, generation = this.refreshGeneration) {
+  async refresh(generation = this.refreshGeneration) {
     if (this.activeRefreshGeneration === generation) return;
     this.activeRefreshGeneration = generation;
     this.refreshing = true;
     if (!this.hasLoaded) this.loading = true;
-    if (force || !this.hasLoaded) this.render();
+    this.syncTopbar();
+    if (!this.hasLoaded) this.renderContent();
 
     try {
       const context = await loadBoardContext();
@@ -241,75 +252,147 @@ export class BeadsBoardPanel {
   }
 
   render() {
+    if (!this.shell?.isConnected) this.mountShell();
+    this.syncTopbar();
+    this.renderContent();
+  }
+
+  mountShell() {
     clear(this.root);
+    this.contentRoot = h("div", { class: "app-content" });
+    this.shell = h("div", { class: "app-shell" }, this.renderTopbar(), this.contentRoot);
+    this.root.appendChild(this.shell);
+  }
+
+  renderContent() {
+    if (!this.contentRoot) return;
+    const scrollState = this.captureScrollState();
+    const sequence = ++this.viewRenderSequence;
     this.index = buildIssueIndex(this.issues);
-    this.root.appendChild(h("div", { class: "app-shell" },
-      this.renderTopbar(),
-      this.error && (this.source === "none" || this.usingCache) ? this.renderNotice() : null,
-      this.loading && !this.hasLoaded
-        ? this.renderLoading()
-        : this.issues.length === 0 ? this.renderEmpty() : this.renderActiveView(),
-    ));
+    const notice = this.error && (this.source === "none" || this.usingCache) ? this.renderNotice() : null;
+    const view = this.loading && !this.hasLoaded
+      ? this.renderLoading()
+      : this.issues.length === 0 ? this.renderEmpty() : this.renderActiveView();
+    this.contentRoot.replaceChildren(...[notice, view].filter(Boolean));
+    this.restoreScrollState(scrollState);
+    queueMicrotask(() => {
+      if (sequence === this.viewRenderSequence) this.restoreScrollState(scrollState);
+    });
+  }
+
+  captureScrollState() {
+    const state = new Map();
+    this.contentRoot?.querySelectorAll("[data-scroll-key]").forEach((node) => {
+      state.set(node.dataset.scrollKey, { top: node.scrollTop, left: node.scrollLeft });
+    });
+    return state;
+  }
+
+  restoreScrollState(state) {
+    if (!state?.size) return;
+    this.contentRoot?.querySelectorAll("[data-scroll-key]").forEach((node) => {
+      const position = state.get(node.dataset.scrollKey);
+      if (!position) return;
+      node.scrollTop = position.top;
+      node.scrollLeft = position.left;
+    });
   }
 
   renderTopbar() {
+    this.projectNameElement = h("span", { class: "project-name" });
+    this.viewButtons = new Map();
+    const viewSwitcher = h("nav", { class: "view-switcher", "aria-label": "Issue view" }, VIEWS.map((view) => {
+      const button = h("button", {
+        type: "button",
+        class: "view-button",
+        onclick: () => this.setView(view.id),
+      }, view.label);
+      this.viewButtons.set(view.id, button);
+      return button;
+    }));
+    this.searchInput = h("input", {
+      class: "search-input",
+      type: "search",
+      placeholder: "Filter issues…",
+      autocomplete: "off",
+      spellcheck: "false",
+      oninput: (event) => {
+        this.filterText = event.target.value;
+        this.syncTopbar();
+        this.renderContent();
+      },
+      onkeydown: (event) => {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        this.filterText = "";
+        this.syncTopbar();
+        this.renderContent();
+      },
+    });
+    this.clearSearchButton = h("button", {
+      type: "button",
+      class: "clear-search",
+      title: "Clear filter",
+      "aria-label": "Clear filter",
+      onclick: () => {
+        this.filterText = "";
+        this.syncTopbar();
+        this.renderContent();
+        this.searchInput?.focus();
+      },
+    }, icon("x", 12));
+    this.refreshButton = h("button", {
+      type: "button",
+      class: "icon-button",
+      onclick: () => this.refresh(),
+    }, icon("refresh", 13));
+    this.refreshSelect = h("select", {
+      class: "refresh-select",
+      title: "Auto-refresh interval",
+      onchange: (event) => this.setAutoRefresh(Number(event.target.value)),
+    }, AUTO_REFRESH_OPTIONS.map((option) => h("option", {
+      value: option.value,
+    }, option.label)));
+    this.cacheIndicator = h("span", { class: "cache-indicator" }, "Cached");
+
     return h("header", { class: "app-topbar" },
       h("div", { class: "brand" }, h("span", { class: "brand-mark" }), h("strong", {}, "Beads")),
-      h("span", { class: "project-name", title: this.workspacePath || "" }, this.projectName),
-      h("nav", { class: "view-switcher", "aria-label": "Issue view" }, VIEWS.map((view) => h("button", {
-        class: `view-button${this.activeView === view.id ? " is-active" : ""}`,
-        "aria-pressed": this.activeView === view.id,
-        onclick: () => this.setView(view.id),
-      }, view.label))),
+      this.projectNameElement,
+      viewSwitcher,
       h("div", { class: "topbar-spacer" }),
       h("label", { class: "search-control" },
         icon("search", 12),
-        h("input", {
-          class: "search-input",
-          placeholder: "Filter issues…",
-          value: this.filterText,
-          oninput: (event) => {
-            this.filterText = event.target.value;
-            this.render();
-            this.root.querySelector(".search-input")?.focus();
-          },
-          onkeydown: (event) => {
-            if (event.key === "Escape") {
-              this.filterText = "";
-              this.render();
-            }
-          },
-        }),
-        this.filterText ? h("button", {
-          class: "clear-search",
-          title: "Clear filter",
-          onclick: () => {
-            this.filterText = "";
-            this.render();
-          },
-        }, icon("x", 12)) : null,
+        this.searchInput,
+        this.clearSearchButton,
       ),
-      h("button", {
-        class: `icon-button${this.refreshing ? " is-refreshing" : ""}`,
-        title: this.refreshing ? "Refreshing beads" : "Refresh beads",
-        "aria-label": this.refreshing ? "Refreshing beads" : "Refresh beads",
-        "aria-busy": this.refreshing,
-        disabled: this.refreshing,
-        onclick: () => this.refresh(true),
-      }, icon("refresh", 13)),
-      h("select", {
-        class: "refresh-select",
-        title: "Auto-refresh interval",
-        onchange: (event) => this.setAutoRefresh(Number(event.target.value)),
-      }, AUTO_REFRESH_OPTIONS.map((option) => h("option", {
-        value: option.value,
-        selected: option.value === this.autoRefreshMs,
-      }, option.label))),
-      this.usingCache ? h("span", {
-        class: "cache-indicator",
-        title: this.cachedAt ? `Cached ${new Date(this.cachedAt).toLocaleString()}` : "Cached data",
-      }, "Cached") : null,
+      this.refreshButton,
+      this.refreshSelect,
+      this.cacheIndicator,
     );
+  }
+
+  syncTopbar() {
+    if (!this.shell) return;
+    this.projectNameElement.textContent = this.projectName;
+    this.projectNameElement.title = this.workspacePath || "";
+    for (const [view, button] of this.viewButtons) {
+      const active = this.activeView === view;
+      button.classList.toggle("is-active", active);
+      button.setAttribute("aria-pressed", String(active));
+    }
+    if (this.searchInput.value !== this.filterText) this.searchInput.value = this.filterText;
+    this.clearSearchButton.hidden = !this.filterText;
+    const refreshLabel = this.refreshing ? "Refreshing beads" : "Refresh beads";
+    this.refreshButton.classList.toggle("is-refreshing", this.refreshing);
+    this.refreshButton.title = refreshLabel;
+    this.refreshButton.setAttribute("aria-label", refreshLabel);
+    this.refreshButton.setAttribute("aria-busy", String(this.refreshing));
+    this.refreshButton.disabled = this.refreshing;
+    this.refreshSelect.value = String(this.autoRefreshMs);
+    this.cacheIndicator.hidden = !this.usingCache;
+    this.cacheIndicator.title = this.cachedAt
+      ? `Cached ${new Date(this.cachedAt).toLocaleString()}`
+      : "Cached data";
   }
 
   renderActiveView() {
@@ -322,7 +405,7 @@ export class BeadsBoardPanel {
     this.reconcileCollapsedColumns(this.orderBuckets(groupIssuesByColumn(this.issues)));
     const content = h("section", { class: "board-workspace" },
       this.renderSummary(),
-      h("div", { class: "columns" }, this.orderBuckets(groupIssuesByColumn(this.getFilteredIssues()))
+      h("div", { class: "columns", "data-scroll-key": "board-columns" }, this.orderBuckets(groupIssuesByColumn(this.getFilteredIssues()))
         .map((bucket) => this.renderColumn(bucket))),
     );
     return h("main", {
@@ -359,6 +442,7 @@ export class BeadsBoardPanel {
     const isCollapsed = this.collapsedColumns.has(bucket.id);
     const attrs = {
       class: `column column-${bucket.id}${isCollapsed ? " is-collapsed" : ""}`,
+      "data-column-id": bucket.id,
       ondragenter: (event) => this.handleColumnDragEnter(event, bucket.id),
       ondragover: (event) => this.handleColumnDragOver(event, bucket.id),
       ondragleave: (event) => this.handleColumnDragLeave(event, bucket.id),
@@ -385,7 +469,7 @@ export class BeadsBoardPanel {
         ondragstart: (event) => this.handleColumnDragStart(event, bucket.id),
         ondragend: () => this.handleColumnDragEnd(),
       }, h("span", { class: "column-title" }, bucket.title), h("span", { class: "column-count" }, bucket.issues.length)),
-      h("div", { class: "column-body" }, bucket.issues.length === 0
+      h("div", { class: "column-body", "data-scroll-key": `column:${bucket.id}` }, bucket.issues.length === 0
         ? h("div", { class: "column-empty" }, "No issues")
         : bucket.issues.map((issue) => this.renderCard(issue))),
     );
@@ -471,7 +555,7 @@ export class BeadsBoardPanel {
     }, edgeLayer, [...nodeElements.values()]);
     queueMicrotask(() => this.layoutGraphCanvas(canvas, edgeLayer, edgeMask, maskBackground, graph, nodeElements, edgeElements, width));
 
-    return h("div", { class: "graph-scroll" },
+    return h("div", { class: "graph-scroll", "data-scroll-key": "graph" },
       canvas,
     );
   }
@@ -599,7 +683,7 @@ export class BeadsBoardPanel {
       class: `view-layout insights-layout${this.selectedIssue ? " has-selection" : ""}`,
       style: `--inspector-width:${this.inspectorWidth}px`,
     },
-      h("section", { class: "insights-workspace" },
+      h("section", { class: "insights-workspace", "data-scroll-key": "insights" },
         h("div", { class: "view-heading" },
           h("div", {}, h("h1", {}, "Project health"), h("p", {}, "Where work is stuck, and what unblocks the most.")),
           h("span", { class: "result-count" }, `${insights.metrics.total} issues`),
@@ -763,7 +847,7 @@ export class BeadsBoardPanel {
         h("h1", {}, issue.title),
         this.renderBadges(issue),
       ),
-      h("div", { class: "inspector-body" },
+      h("div", { class: "inspector-body", "data-scroll-key": `inspector:${issue.id}` },
         this.renderRelations(issue),
         this.renderField("Description", issue.description),
         this.renderField("Design", issue.design),
@@ -953,7 +1037,7 @@ export class BeadsBoardPanel {
   applyAutoRefreshTimer() {
     this.clearAutoRefreshTimer();
     if (this.autoRefreshMs <= 0) return;
-    this.pollTimer = setInterval(() => this.refresh(false), this.autoRefreshMs);
+    this.pollTimer = setInterval(() => this.refresh(), this.autoRefreshMs);
   }
 
   clearAutoRefreshTimer() {
