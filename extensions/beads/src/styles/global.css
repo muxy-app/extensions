@@ -43,6 +43,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 ::-webkit-scrollbar-thumb { background: var(--muxy-border); border-radius: var(--s1); }
 
 .app-shell { height: 100%; display: flex; min-width: 0; flex-direction: column; background: var(--muxy-background); }
+.app-content { min-height: 0; flex: 1; display: flex; flex-direction: column; }
 .app-topbar {
   box-sizing: content-box;
   min-height: var(--muxy-topbar-height, 36px);
@@ -96,7 +97,21 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 }
 .surface-panel .search-control { flex: 1; min-width: 72px; width: auto; }
 .search-control:focus-within { border-color: var(--muxy-accent); }
-.search-input { flex: 1; min-width: 0; appearance: none; -webkit-appearance: none; border: 0; border-radius: 0; outline: 0; box-shadow: none; background: transparent; color: var(--muxy-foreground); padding: 0; }
+.search-input {
+  height: 100%;
+  flex: 1;
+  min-width: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  border-radius: 0;
+  outline: 0;
+  box-shadow: none;
+  background: var(--muxy-surface);
+  color: var(--muxy-foreground);
+  padding: 0;
+}
+.search-input::-webkit-search-cancel-button { display: none; }
 .search-input::placeholder { color: var(--muxy-foreground-muted); opacity: 1; }
 .clear-search { width: 18px; height: 18px; display: grid; place-items: center; border: 0; background: transparent; color: var(--muxy-foreground-muted); padding: 0; }
 .icon-button {
