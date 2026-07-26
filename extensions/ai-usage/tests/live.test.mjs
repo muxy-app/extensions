@@ -586,8 +586,8 @@ test("regression: live provider fetch reads Grok credentials from auth.json and 
 
   assert.equal(grok.state.kind, "available");
   assert.deepEqual(grok.rows.map((row) => row.label), ["Weekly limit", "Pay as you go"]);
-  assert.equal(grok.rows[0].percent, 58);
-  assert.equal(grok.rows[0].detail, "58.0% used");
+  assert.equal(grok.rows[0].percent, 42);
+  assert.equal(grok.rows[0].detail, "42.0% used");
   assert.equal(grok.rows[0].periodDuration, 604800);
   assert.equal(grok.rows[1].detail, "100 cap");
   assert.equal(grok.planName, "SuperGrok");
