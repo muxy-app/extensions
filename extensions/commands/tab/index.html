@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Commands</title>
+    <script type="module" src="/tab/config.js"></script>
+  </head>
+  <body class="tab">
+    <main class="settings">
+      <header class="settings-head">
+        <div>
+          <h1>Commands</h1>
+          <p class="hint">Pinned commands open in a new terminal from the topbar launcher.</p>
+        </div>
+        <div class="head-actions">
+          <button id="reset" class="btn" type="button">Reset to defaults</button>
+          <button id="add" class="btn primary" type="button">Add command</button>
+        </div>
+      </header>
+      <ul id="rows" class="rows"></ul>
+      <div id="empty" class="empty" hidden>No commands yet. Add one to get started.</div>
+    </main>
+  </body>
+</html>

@@ -1,13 +1,12 @@
-import { execFileSync } from "node:child_process";
 import { copyFileSync } from "node:fs";
+import { buildSync } from "esbuild";
 
-execFileSync("node", [
-  "node_modules/esbuild/bin/esbuild",
-  "src/background.mjs",
-  "--bundle",
-  "--format=iife",
-  "--target=es2020",
-  "--outfile=dist/background.js"
-], { stdio: "inherit" });
+buildSync({
+  entryPoints: ["src/background.mjs"],
+  bundle: true,
+  format: "iife",
+  target: "es2020",
+  outfile: "dist/background.js"
+});
 
 copyFileSync("package.json", "dist/package.json");

@@ -1,0 +1,84 @@
+{
+  "name": "plex-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite build --watch",
+    "build": "vite build"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  },
+  "muxy": {
+    "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
+    "description": "Plex Media Server admin sidebar. See what's playing, stop streams with a message, view essential server stats.",
+    "permissions": [
+      "commands:exec",
+      "panels:write"
+    ],
+    "panels": [
+      {
+        "id": "plex-dashboard",
+        "title": "Plex Dashboard",
+        "icon": { "symbol": "play.rectangle.on.rectangle" },
+        "entry": "panel.html",
+        "position": "right",
+        "mode": "pinned",
+        "hiddenControls": ["pin"],
+        "headerButtons": [
+          {
+            "id": "refresh",
+            "icon": { "symbol": "arrow.clockwise" },
+            "tooltip": "Refresh sessions",
+            "command": "refresh"
+          },
+          {
+            "id": "signout",
+            "icon": { "symbol": "rectangle.portrait.and.arrow.right" },
+            "tooltip": "Sign out of Plex",
+            "command": "signout"
+          }
+        ]
+      }
+    ],
+    "commands": [
+      {
+        "id": "toggle-plex",
+        "title": "Plex Dashboard: Toggle",
+        "subtitle": "Open or close the Plex Dashboard",
+        "action": {
+          "kind": "togglePanel",
+          "panel": "plex-dashboard"
+        }
+      },
+      {
+        "id": "refresh",
+        "title": "Plex Dashboard: Refresh",
+        "subtitle": "Refresh the active sessions list"
+      },
+      {
+        "id": "signout",
+        "title": "Plex Dashboard: Sign out",
+        "subtitle": "Remove the stored Plex auth token and return to sign-in"
+      }
+    ],
+    "statusBarItems": [
+      {
+        "id": "plex-dashboard",
+        "icon": { "symbol": "play.rectangle.on.rectangle" },
+        "text": "Plex",
+        "tooltip": "Plex Dashboard",
+        "side": "right",
+        "command": "toggle-plex"
+      }
+    ],
+    "marketplace": {
+      "author": "Amado Tejada",
+      "github": "amadotejada",
+      "categories": ["productivity", "media"],
+      "icon": "marketplace/icon.svg",
+      "screenshots": ["marketplace/screenshot-1.png"]
+    }
+  }
+}

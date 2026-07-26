@@ -5,8 +5,10 @@ export const ICON_MIN_DIMENSION = 256;
 export const ICON_MAX_SVG_BYTES = 512 * 1024;
 export const ICON_MAX_PNG_BYTES = 1024 * 1024;
 
-export const SCREENSHOT_WIDTH = 1600;
-export const SCREENSHOT_HEIGHT = 1000;
+export const SCREENSHOT_ASPECT_RATIOS = [
+  { width: 16, height: 10, label: "16:10" },
+  { width: 16, height: 9, label: "16:9" },
+];
 export const SCREENSHOT_MAX_BYTES = 3 * 1024 * 1024;
 export const SCREENSHOT_MAX_COUNT = 6;
 
@@ -73,13 +75,27 @@ export function inspectScreenshot(absPath) {
   const dims = pngDimensions(buffer);
   if (!dims) {
     errors.push("is not a valid PNG file");
-  } else if (dims.width !== SCREENSHOT_WIDTH || dims.height !== SCREENSHOT_HEIGHT) {
-    errors.push(`must be ${SCREENSHOT_WIDTH}×${SCREENSHOT_HEIGHT} (16:10), got ${dims.width}×${dims.height}`);
+  } else if (!hasAllowedScreenshotAspectRatio(dims)) {
+    errors.push(
+      `must use a ${formatAspectRatioList(SCREENSHOT_ASPECT_RATIOS)} aspect ratio, got ${dims.width}×${dims.height}`,
+    );
   }
   if (buffer.length > SCREENSHOT_MAX_BYTES) {
     errors.push(`is ${formatBytes(buffer.length)} (max ${formatBytes(SCREENSHOT_MAX_BYTES)})`);
   }
   return { ext, errors };
+}
+
+function hasAllowedScreenshotAspectRatio(dims) {
+  return SCREENSHOT_ASPECT_RATIOS.some(
+    (ratio) => dims.width * ratio.height === dims.height * ratio.width,
+  );
+}
+
+function formatAspectRatioList(ratios) {
+  const labels = ratios.map((ratio) => ratio.label);
+  if (labels.length <= 2) return labels.join(" or ");
+  return `${labels.slice(0, -1).join(", ")} or ${labels.at(-1)}`;
 }
 
 export function formatBytes(bytes) {

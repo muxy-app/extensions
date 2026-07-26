@@ -1,35 +1,37 @@
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { tags as t } from "@lezer/highlight";
 
-const mix = (a, b, pct) => `color-mix(in srgb, ${a} ${pct}%, ${b})`;
-
-const ACCENT = "var(--muxy-accent)";
 const FG = "var(--muxy-foreground)";
 const MUTED = "var(--muxy-foreground-muted)";
+const ACCENT = "var(--muxy-accent)";
 
-const KEYWORD = ACCENT;
-const STRING = mix(ACCENT, FG, 45);
-const NUMBER = mix(ACCENT, FG, 70);
-const COMMENT = MUTED;
-const FUNCTION = mix(ACCENT, FG, 85);
-const TYPE = mix(ACCENT, FG, 60);
-const CONSTANT = mix(ACCENT, FG, 75);
-const PUNCT = MUTED;
+const PALETTE = {
+  keyword: "color-mix(in oklab, var(--muxy-diff-remove) 78%, var(--muxy-foreground))",
+  string: "color-mix(in oklab, var(--muxy-accent) 82%, var(--muxy-foreground))",
+  regexp: "color-mix(in oklab, var(--muxy-diff-add) 80%, var(--muxy-foreground))",
+  escape: "color-mix(in oklab, var(--muxy-accent) 62%, var(--muxy-foreground))",
+  constant: "color-mix(in oklab, var(--muxy-accent) 62%, var(--muxy-foreground))",
+  function: "color-mix(in oklab, var(--muxy-diff-hunk) 78%, var(--muxy-foreground))",
+  type: "color-mix(in oklab, var(--muxy-diff-remove) 50%, var(--muxy-diff-hunk))",
+  property: "color-mix(in oklab, var(--muxy-accent) 70%, var(--muxy-foreground))",
+  tag: "color-mix(in oklab, var(--muxy-diff-add) 80%, var(--muxy-foreground))",
+};
+
+export const syn = (name) => PALETTE[name] ?? FG;
 
 export const SYNTAX_SPEC = [
-  { tag: [t.keyword, t.modifier, t.controlKeyword, t.operatorKeyword], color: KEYWORD },
-  { tag: [t.string, t.special(t.string), t.regexp], color: STRING },
-  { tag: [t.escape, t.character], color: mix(ACCENT, FG, 55) },
-  { tag: [t.number, t.bool, t.integer, t.float], color: NUMBER },
-  { tag: [t.comment, t.lineComment, t.blockComment, t.docComment], color: COMMENT, fontStyle: "italic" },
-  { tag: [t.function(t.variableName), t.function(t.propertyName), t.macroName], color: FUNCTION },
-  { tag: [t.typeName, t.className, t.namespace], color: TYPE },
-  { tag: [t.constant(t.variableName), t.standard(t.name), t.atom], color: CONSTANT },
-  { tag: [t.definitionKeyword, t.self], color: KEYWORD },
-  { tag: [t.propertyName, t.attributeName], color: mix(ACCENT, FG, 80) },
-  { tag: [t.tagName], color: KEYWORD },
-  { tag: [t.attributeValue], color: STRING },
-  { tag: [t.punctuation, t.separator, t.bracket, t.operator], color: PUNCT },
+  { tag: [t.keyword, t.modifier, t.controlKeyword, t.operatorKeyword, t.definitionKeyword], color: syn("keyword") },
+  { tag: [t.string, t.special(t.string), t.attributeValue], color: syn("string") },
+  { tag: [t.regexp], color: syn("regexp") },
+  { tag: [t.escape, t.character], color: syn("escape") },
+  { tag: [t.number, t.bool, t.integer, t.float], color: syn("constant") },
+  { tag: [t.comment, t.lineComment, t.blockComment, t.docComment], color: MUTED, fontStyle: "italic" },
+  { tag: [t.function(t.variableName), t.function(t.propertyName), t.macroName], color: syn("function") },
+  { tag: [t.typeName, t.className, t.namespace], color: syn("type") },
+  { tag: [t.constant(t.variableName), t.standard(t.name), t.atom, t.self], color: syn("constant") },
+  { tag: [t.propertyName, t.attributeName], color: syn("property") },
+  { tag: [t.tagName], color: syn("tag") },
+  { tag: [t.punctuation, t.separator, t.bracket, t.operator], color: MUTED },
   { tag: [t.meta, t.processingInstruction], color: MUTED },
   { tag: [t.link], color: ACCENT, textDecoration: "underline" },
   { tag: [t.heading], color: FG, fontWeight: "bold" },

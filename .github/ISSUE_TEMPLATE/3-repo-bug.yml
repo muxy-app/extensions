@@ -1,0 +1,22 @@
+name: Bug or problem with the repo
+description: A problem with validation, packaging, CI, the schema, or anything else about this repo that isn't tied to one extension.
+title: "[bug] <summary>"
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Commands run and their output.

@@ -1,0 +1,13 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="128" height="128" rx="28" fill="#1E1F26"/>
+  <!-- Left outer arc -->
+  <path d="M38 32 C18 42 18 86 38 96" stroke="#6E8BFF" stroke-width="7" stroke-linecap="round" fill="none"/>
+  <!-- Left inner arc -->
+  <path d="M50 44 C36 52 36 76 50 84" stroke="#6E8BFF" stroke-width="7" stroke-linecap="round" fill="none"/>
+  <!-- Right outer arc -->
+  <path d="M90 32 C110 42 110 86 90 96" stroke="#6E8BFF" stroke-width="7" stroke-linecap="round" fill="none"/>
+  <!-- Right inner arc -->
+  <path d="M78 44 C92 52 92 76 78 84" stroke="#6E8BFF" stroke-width="7" stroke-linecap="round" fill="none"/>
+  <!-- Center dot -->
+  <circle cx="64" cy="64" r="7" fill="#FFC857"/>
+</svg>

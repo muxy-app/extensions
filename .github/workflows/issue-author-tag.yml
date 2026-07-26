@@ -1,0 +1,158 @@
+name: Tag extension author on issues
+
+# When someone opens an "Issue with an extension", figure out which extension it
+# is about, label the issue with that extension's name, and ping the extension's
+# author (read from extensions/<name>/package.json -> muxy.marketplace.github).
+#
+# If the named extension does not exist, the issue is closed automatically with
+# an explanation so invalid reports don't pile up in the triage queue.
+#
+# This runs on the `issues` event in the BASE repo, so GITHUB_TOKEN is writable
+# and there is no fork/untrusted-code concern: we only read tracked files from
+# the repo's own default branch and the issue's own text. The extension name is
+# format-checked before it is used in a filesystem path.
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: issue-author-tag-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  tag-author:
+    name: Tag extension author
+    runs-on: ubuntu-latest
+    # Only the extension-issue template, identified by its "[extension] " title
+    # prefix. Other templates (repo bugs, proposals) are left untouched.
+    if: startsWith(github.event.issue.title, '[extension] ')
+    steps:
+      # Trusted checkout of the default branch: we read extension package.json
+      # files as data to resolve the author. Never executes extension code.
+      - name: Checkout repo (trusted)
+        uses: actions/checkout@v4
+
+      - name: Resolve author and tag the issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require("fs");
+            const path = require("path");
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.issue.number;
+            const issueBody = context.payload.issue.body || "";
+            const reporter = context.payload.issue.user?.login;
+            const marker = "<!-- muxy-issue-author-tag -->";
+
+            const comment = (body) =>
+              github.rest.issues.createComment({
+                owner, repo, issue_number, body: `${marker}\n${body}`,
+              });
+
+            // Issue forms render a field as "### <label>\n\n<value>". Pull the
+            // value under the "Extension" heading and trim it. "_No response_"
+            // is what GitHub writes for an empty optional field.
+            const fieldValue = (label) => {
+              const re = new RegExp(
+                `^###\\s+${label}\\s*$\\n+([\\s\\S]*?)(?=\\n###\\s|$)`,
+                "m",
+              );
+              const m = issueBody.match(re);
+              if (!m) return "";
+              const v = m[1].trim();
+              return v === "_No response_" ? "" : v;
+            };
+
+            const rawName = fieldValue("Extension");
+            const version = fieldValue("Version");
+
+            // Validate the name as a path segment BEFORE touching the filesystem
+            // (same rule the tooling enforces for directory names).
+            const nameOk = /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(rawName);
+            const pkgPath = nameOk
+              ? path.join("extensions", rawName, "package.json")
+              : null;
+            const exists = pkgPath && fs.existsSync(pkgPath);
+
+            if (!nameOk || !exists) {
+              // Bad/missing extension: explain and close so it doesn't linger in
+              // triage. Use "not_planned" so it reads as invalid, not resolved.
+              await comment(
+                `It looks like this issue is about an extension named ` +
+                  "`" + (rawName || "(blank)") + "`" +
+                  `, but there is no \`extensions/${rawName || "<name>"}/\` in this repo.\n\n` +
+                  `Closing this automatically. Please reopen with the **exact** ` +
+                  `directory name of a published extension (see the list under ` +
+                  `[\`extensions/\`](../tree/${context.payload.repository.default_branch}/extensions)), ` +
+                  `or open a *Bug or problem with the repo* issue if this isn't ` +
+                  `about a specific extension.`,
+              );
+              await github.rest.issues.update({
+                owner, repo, issue_number, state: "closed", state_reason: "not_planned",
+              });
+              core.info(`Closed #${issue_number}: extension '${rawName}' not found.`);
+              return;
+            }
+
+            // Apply an "ext:<name>" label so issues can be filtered per extension.
+            // Create the label first if it doesn't exist yet.
+            const labelName = `ext:${rawName}`;
+            try {
+              await github.rest.issues.getLabel({ owner, repo, name: labelName });
+            } catch (e) {
+              if (e.status !== 404) throw e;
+              await github.rest.issues.createLabel({
+                owner, repo, name: labelName, color: "5319e7",
+                description: `Issues about the ${rawName} extension`,
+              });
+              core.info(`Created label '${labelName}'.`);
+            }
+            await github.rest.issues.addLabels({
+              owner, repo, issue_number, labels: [labelName],
+            });
+
+            // Read the author's GitHub handle from the manifest.
+            let manifest = {};
+            try {
+              manifest = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+            } catch (e) {
+              core.warning(`Could not parse ${pkgPath}: ${e.message}`);
+            }
+            const market = manifest?.muxy?.marketplace ?? {};
+            const handle = (market.github || "").replace(/^@/, "").trim();
+            const authorName = market.author || handle || "the author";
+            const verNote = version ? ` (reported version \`${version}\`)` : "";
+
+            if (!handle) {
+              // No handle to ping: leave the template's needs-triage label on and
+              // tell maintainers the author couldn't be resolved.
+              await comment(
+                `Thanks for reporting an issue with **${rawName}**${verNote}.\n\n` +
+                  `This extension has no \`marketplace.github\` handle in its ` +
+                  `\`package.json\`, so its author can't be tagged automatically. ` +
+                  `A maintainer will triage this.`,
+              );
+              core.info(`#${issue_number}: no github handle for '${rawName}'.`);
+              return;
+            }
+
+            if (handle.toLowerCase() === (reporter || "").toLowerCase()) {
+              // Author reported their own extension; no need to ping themselves.
+              await comment(
+                `Thanks for reporting an issue with **${rawName}**${verNote}. ` +
+                  `You're listed as its author, so no extra tag is needed.`,
+              );
+              core.info(`#${issue_number}: reporter is the author '${handle}'.`);
+              return;
+            }
+
+            await comment(
+              `Thanks for reporting an issue with **${rawName}**${verNote}.\n\n` +
+                `@${handle} — you're listed as the author of **${rawName}**. ` +
+                `Could you take a look?`,
+            );
+            core.info(`#${issue_number}: pinged author @${handle} for '${rawName}'.`);

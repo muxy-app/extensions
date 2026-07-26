@@ -8,6 +8,40 @@ export function is_markdown(path) {
   return MARKDOWN_EXT.has(extname(path));
 }
 
+const IMAGE_MIME = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+  ".bmp": "image/bmp",
+  ".ico": "image/x-icon",
+  ".avif": "image/avif",
+  ".apng": "image/apng",
+};
+
+export function is_image(path) {
+  return extname(path) in IMAGE_MIME;
+}
+
+export function image_mime(path) {
+  return IMAGE_MIME[extname(path)] ?? "application/octet-stream";
+}
+
+export function is_svg(path) {
+  return extname(path) === ".svg";
+}
+
+export function is_pdf(path) {
+  return extname(path) === ".pdf";
+}
+
+const HTML_EXT = new Set([".html", ".htm"]);
+
+export function is_html(path) {
+  return HTML_EXT.has(extname(path));
+}
+
 const RICH_LANGUAGES = {
   javascript: () => import("@codemirror/lang-javascript").then((m) => m.javascript()),
   jsx: () => import("@codemirror/lang-javascript").then((m) => m.javascript({ jsx: true })),

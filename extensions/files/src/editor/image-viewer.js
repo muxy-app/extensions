@@ -1,0 +1,118 @@
+import { read_image_data_url } from "@/lib/image-data";
+import { error_message } from "@/lib/files";
+import { format_file_size } from "@/lib/file-size";
+import { h } from "@/lib/dom";
+
+export class ImageViewer {
+  constructor({ parent, filePath, svgSource = null }) {
+    this.parent = parent;
+    this.filePath = filePath;
+    this.svgSource = svgSource;
+    this.actualSize = false;
+    this.disposed = false;
+    this.fitButton = null;
+    this.stage = null;
+    this.img = null;
+
+    this.root = h("div", { class: "image-viewer" });
+    this.stage = h("div", { class: "image-stage" }, h("div", { class: "image-status" }, "Loading…"));
+    this.meta = h("div", { class: "image-meta" });
+    this.root.append(this.stage, this.meta);
+    parent.replaceChildren(this.root);
+
+    void this.load();
+  }
+
+  async load() {
+    let dataUrl;
+    if (this.svgSource !== null) {
+      dataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(this.svgSource)}`;
+    } else {
+      try {
+        dataUrl = await read_image_data_url(this.filePath);
+      } catch (err) {
+        if (this.disposed) return;
+        this.stage.replaceChildren(
+          h("div", { class: "image-status image-status-error" }, error_message(err)),
+        );
+        return;
+      }
+    }
+    if (this.disposed) return;
+
+    const img = h("img", {
+      class: "image-canvas",
+      src: dataUrl,
+      alt: this.filePath,
+      draggable: false,
+    });
+    img.addEventListener("load", () => {
+      if (this.disposed) return;
+      this.renderMeta(img.naturalWidth, img.naturalHeight);
+    });
+    img.addEventListener("error", () => {
+      if (this.disposed) return;
+      this.stage.replaceChildren(
+        h("div", { class: "image-status image-status-error" }, "Could not display this image"),
+      );
+    });
+    this.img = img;
+    this.applyZoom();
+    this.stage.replaceChildren(img);
+  }
+
+  renderMeta(width, height) {
+    const info = h("div", { class: "image-meta-info" });
+    if (width && height) {
+      info.appendChild(h("span", { class: "image-meta-item" }, `${width} × ${height}`));
+    }
+    const sizeSlot = h("span", { class: "image-meta-item" });
+    info.appendChild(sizeSlot);
+    void this.addFileSize(sizeSlot);
+
+    this.fitButton = h(
+      "button",
+      {
+        type: "button",
+        class: "image-zoom-toggle",
+        onClick: () => this.toggleZoom(),
+      },
+      this.actualSize ? "Fit" : "Actual size",
+    );
+
+    this.meta.replaceChildren(info, this.fitButton);
+  }
+
+  async addFileSize(slot) {
+    try {
+      const stat = await muxy.files.stat(this.filePath);
+      if (this.disposed) return;
+      const label = format_file_size(stat?.size);
+      if (label) slot.textContent = label;
+    } catch {
+    }
+  }
+
+  toggleZoom() {
+    this.actualSize = !this.actualSize;
+    if (this.fitButton) this.fitButton.textContent = this.actualSize ? "Fit" : "Actual size";
+    this.applyZoom();
+  }
+
+  applyZoom() {
+    if (!this.img) return;
+    this.img.classList.toggle("image-canvas-actual", this.actualSize);
+    this.stage.classList.toggle("image-stage-scroll", this.actualSize);
+  }
+
+  updateConfig() {}
+
+  focus() {}
+
+  destroy() {
+    this.disposed = true;
+    this.root?.remove();
+    this.root = null;
+    this.img = null;
+  }
+}

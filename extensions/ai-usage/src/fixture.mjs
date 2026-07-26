@@ -33,6 +33,7 @@ function parseFixtureProvider(provider) {
     name: String(provider.name || catalogEntry?.name || id),
     icon: String(catalogEntry?.icon || "sparkles"),
     fetchedAt: parseDate(provider.fetchedAt) ?? new Date(),
+    planName: nonEmptyString(provider.planName) || undefined,
     state,
     rows
   };

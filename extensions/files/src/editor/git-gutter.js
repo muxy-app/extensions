@@ -85,6 +85,7 @@ function marker_for(entry) {
 
 const gitGutter = gutter({
   class: "cm-git-gutter",
+  renderEmptyElements: true,
   lineMarker(view, line) {
     const marks = view.state.field(gitBaselineField).marks;
     if (!marks) return null;

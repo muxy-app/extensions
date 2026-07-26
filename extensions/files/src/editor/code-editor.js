@@ -43,11 +43,14 @@ import { cls, h, icon_svg } from "@/lib/dom";
 import { muxy_cm_theme } from "@/lib/editor-theme";
 import { muxy_highlight_style } from "@/lib/syntax-theme";
 import { language_for } from "@/lib/languages";
+import { tree_sitter_for } from "@/lib/tree-sitter";
+import { tree_sitter_highlight } from "@/editor/tree-sitter-highlight";
 import { linter_for } from "@/lib/linters";
 import { read_cursor_state, write_cursor_state } from "@/lib/cursor-state";
 import { gitGutterExtension, setGitBaseline } from "@/editor/git-gutter";
 import { colorSwatchExtension } from "@/editor/color-swatch";
 import { head_baseline } from "@/lib/git-baseline";
+import { same_file } from "@/lib/files";
 
 const replacePanelMode = new WeakMap();
 
@@ -119,6 +122,10 @@ class FindPanel {
       name: "search",
       form: "",
       "main-field": "true",
+      spellcheck: "false",
+      autocapitalize: "off",
+      autocomplete: "off",
+      autocorrect: "off",
       onInput: () => this.commit(),
       onChange: () => this.commit(),
     });
@@ -150,6 +157,10 @@ class FindPanel {
       class: "cm-textfield",
       name: "replace",
       form: "",
+      spellcheck: "false",
+      autocapitalize: "off",
+      autocomplete: "off",
+      autocorrect: "off",
       onInput: () => this.commit(),
       onChange: () => this.commit(),
     });
@@ -271,7 +282,7 @@ class FindPanel {
 }
 
 export class CodeEditor {
-  constructor({ parent, filePath, value, isDark, config, onDirty, onSave }) {
+  constructor({ parent, filePath, value, isDark, config, initialPosition, onDirty, onSave }) {
     this.parent = parent;
     this.filePath = filePath;
     this.value = value;
@@ -282,6 +293,8 @@ export class CodeEditor {
     this.destroyed = false;
     this.cursorSaveTimer = 0;
     this.languageLoadId = 0;
+    this.baselineLoadId = 0;
+    this.baseline = null;
     this.languageCompartment = new Compartment();
     this.lintCompartment = new Compartment();
     this.configCompartment = new Compartment();
@@ -289,12 +302,14 @@ export class CodeEditor {
     this.container = h("div", { class: "editor-host" });
     this.parent.replaceChildren(this.container);
 
-    const saved = read_cursor_state(filePath);
+    const initialSelection = this.selectionFromPosition(value, initialPosition);
+    const saved = initialSelection ? null : read_cursor_state(filePath);
     const selection =
-      saved && saved.anchor <= value.length && saved.head <= value.length
+      initialSelection ??
+      (saved && saved.anchor <= value.length && saved.head <= value.length
         ? { anchor: saved.anchor, head: saved.head }
-        : undefined;
-    this.savedScrollTop = saved?.scrollTop ?? 0;
+        : undefined);
+    this.savedScrollTop = initialSelection ? 0 : (saved?.scrollTop ?? 0);
 
     this.view = new EditorView({
       parent: this.container,
@@ -302,6 +317,12 @@ export class CodeEditor {
         doc: value,
         selection,
         extensions: [
+          EditorView.contentAttributes.of({
+            spellcheck: "false",
+            autocapitalize: "off",
+            autocorrect: "off",
+            translate: "no",
+          }),
           this.configCompartment.of(this.configExtensions(config, isDark)),
           this.languageCompartment.of([]),
           this.lintCompartment.of([]),
@@ -320,7 +341,8 @@ export class CodeEditor {
       }),
     });
 
-    this.restoreScroll();
+    if (initialSelection) this.revealInitialSelection(initialSelection.anchor);
+    else this.restoreScroll();
 
     this.keyHandler = (event) => {
       if (!(event.metaKey || event.ctrlKey) || event.shiftKey) return;
@@ -337,12 +359,41 @@ export class CodeEditor {
     this.loadLanguage(filePath);
     this.loadLinter();
     this.loadGitBaseline(filePath);
-    this.gitBaselineDisposer = muxy.events.subscribe("file.changed", () => this.loadGitBaseline(filePath));
+    this.gitBaselineDisposer = muxy.events.subscribe("file.changed", (payload) => {
+      const changed = payload && typeof payload === "object" && "path" in payload ? payload.path : undefined;
+      if (typeof changed !== "string" || !same_file(changed, filePath)) return;
+      this.loadGitBaseline(filePath);
+    });
+  }
+
+  selectionFromPosition(value, position) {
+    if (!position) return null;
+    const targetLine = Math.max(1, position.line);
+    const targetColumn = Math.max(1, position.column ?? 1);
+    const lines = value.split("\n");
+    const lineIndex = Math.min(targetLine, lines.length) - 1;
+    let offset = 0;
+    for (let index = 0; index < lineIndex; index += 1) {
+      offset += lines[index].length + 1;
+    }
+    offset += Math.min(targetColumn - 1, lines[lineIndex]?.length ?? 0);
+    return { anchor: Math.min(offset, value.length), head: Math.min(offset, value.length) };
+  }
+
+  revealInitialSelection(pos) {
+    if (!this.view) return;
+    this.view.dispatch({
+      selection: EditorSelection.cursor(pos),
+      effects: EditorView.scrollIntoView(pos, { y: "center" }),
+    });
   }
 
   async loadGitBaseline(filePath) {
+    const loadId = ++this.baselineLoadId;
     const baseline = await head_baseline(filePath);
-    if (this.destroyed || !this.view) return;
+    if (this.destroyed || !this.view || loadId !== this.baselineLoadId) return;
+    if (baseline === this.baseline) return;
+    this.baseline = baseline;
     this.view.dispatch({ effects: setGitBaseline.of(baseline) });
   }
 
@@ -424,7 +475,6 @@ export class CodeEditor {
       indentOnInput(),
       search({ top: true, createPanel: (view) => new FindPanel(view) }),
       muxy_cm_theme(isDark),
-      muxy_highlight_style(),
       EditorView.theme({
         "&": { fontSize: `${config.fontSize}px` },
         ".cm-scroller": { fontSize: `${config.fontSize}px` },
@@ -491,10 +541,15 @@ export class CodeEditor {
 
   async loadLanguage(filePath) {
     const loadId = ++this.languageLoadId;
-    const lang = await language_for(filePath);
+    const [lang, treeSitter] = await Promise.all([
+      language_for(filePath),
+      this.config.treeSitter !== false ? tree_sitter_for(filePath).catch(() => null) : Promise.resolve(null),
+    ]);
     if (this.destroyed || loadId !== this.languageLoadId) return;
+    const extensions = lang ? [lang] : [];
+    extensions.push(treeSitter ? tree_sitter_highlight(treeSitter) : muxy_highlight_style());
     this.view.dispatch({
-      effects: this.languageCompartment.reconfigure(lang ? [lang] : []),
+      effects: this.languageCompartment.reconfigure(extensions),
     });
   }
 
@@ -512,6 +567,7 @@ export class CodeEditor {
   }
 
   updateConfig(config, isDark) {
+    const treeSitterChanged = (this.config.treeSitter !== false) !== (config.treeSitter !== false);
     this.config = config;
     this.isDark = isDark;
     if (!this.view) return;
@@ -521,6 +577,7 @@ export class CodeEditor {
         this.lintCompartment.reconfigure(this.lintExtension()),
       ],
     });
+    if (treeSitterChanged) this.loadLanguage(this.filePath);
   }
 
   getValue() {
@@ -552,6 +609,17 @@ export class CodeEditor {
         input.focus();
         input.select();
       }
+    });
+  }
+
+  gotoLine(lineNumber) {
+    if (!this.view) return;
+    const num = Number(lineNumber);
+    if (!Number.isFinite(num)) return;
+    const line = this.view.state.doc.line(Math.max(1, Math.min(num, this.view.state.doc.lines)));
+    this.view.dispatch({
+      selection: { anchor: line.from },
+      scrollIntoView: true,
     });
   }
 

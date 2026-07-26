@@ -2,15 +2,18 @@ import { CodeEditor } from "@/editor/code-editor";
 import { MarkdownView } from "@/editor/markdown-view";
 
 export class MarkdownEditor {
-  constructor({ parent, filePath, value, isDark, config, mode, onDirty, onSave }) {
+  constructor({ parent, filePath, value, isDark, config, mode, initialPosition, showToc, onDirty, onSave, onToggleTask }) {
     this.parent = parent;
     this.filePath = filePath;
     this.source = value;
     this.isDark = isDark;
     this.config = config;
     this.mode = mode;
+    this.initialPosition = initialPosition;
+    this.showToc = showToc === true;
     this.onDirty = onDirty;
     this.onSave = onSave;
+    this.onToggleTask = onToggleTask;
     this.child = null;
     this.render();
   }
@@ -23,6 +26,11 @@ export class MarkdownEditor {
         fontSize: this.config.fontSize,
         isDark: this.isDark,
         filePath: this.filePath,
+        showToc: this.showToc,
+        onToggleTask: (next) => {
+          this.source = next;
+          this.onToggleTask?.(next);
+        },
       });
       this.parent.replaceChildren(this.child.element);
       return;
@@ -33,9 +41,11 @@ export class MarkdownEditor {
       value: this.source,
       isDark: this.isDark,
       config: this.config,
+      initialPosition: this.initialPosition,
       onDirty: this.onDirty,
       onSave: this.onSave,
     });
+    this.initialPosition = null;
   }
 
   destroyChild() {
@@ -50,6 +60,15 @@ export class MarkdownEditor {
   focus() {
     if (this.mode !== "edit") return;
     this.child?.focus?.();
+  }
+
+  setShowToc(showToc) {
+    this.showToc = showToc;
+    if (this.mode === "preview") this.child?.setShowToc?.(showToc);
+  }
+
+  hasToc() {
+    return this.mode === "preview" && Boolean(this.child?.hasToc?.());
   }
 
   openSearch() {

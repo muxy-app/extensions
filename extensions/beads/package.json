@@ -1,0 +1,114 @@
+{
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.0",
+    "tailwindcss": "^4.3.0",
+    "vite": "^7.3.5"
+  },
+  "displayName": "Beads",
+  "description": "Beads issue workspace for Muxy panels and tabs",
+  "muxy": {
+    "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
+    "commands": [
+      {
+        "action": {
+          "kind": "togglePanel",
+          "panel": "beads-board"
+        },
+        "defaultShortcut": "cmd+shift+b",
+        "id": "toggle-beads-board",
+        "title": "Beads: Toggle Panel"
+      },
+      {
+        "id": "refresh-beads-board",
+        "title": "Beads: Refresh"
+      },
+      {
+        "action": {
+          "kind": "openTab",
+          "tabType": "beads-workspace"
+        },
+        "id": "open-beads-tab",
+        "title": "Beads: Open Workspace Tab"
+      }
+    ],
+    "events": [
+      "project.switched",
+      "worktree.switched"
+    ],
+    "panels": [
+      {
+        "defaultData": {
+          "surface": "panel"
+        },
+        "entry": "panel/index.html",
+        "headerButtons": [
+          {
+            "command": "refresh-beads-board",
+            "icon": {
+              "symbol": "arrow.clockwise"
+            },
+            "id": "refresh",
+            "tooltip": "Refresh Beads"
+          }
+        ],
+        "icon": {
+          "symbol": "rectangle.3.group"
+        },
+        "id": "beads-board",
+        "mode": "pinned",
+        "position": "right",
+        "title": "Beads"
+      }
+    ],
+    "permissions": [
+      "panels:write",
+      "tabs:write",
+      "commands:exec",
+      "projects:read",
+      "worktrees:read",
+      "files:read",
+      "storage:read",
+      "storage:write"
+    ],
+    "tabTypes": [
+      {
+        "defaultData": {
+          "surface": "tab"
+        },
+        "entry": "panel/index.html",
+        "id": "beads-workspace",
+        "title": "Beads"
+      }
+    ],
+    "topbarItems": [
+      {
+        "command": "toggle-beads-board",
+        "icon": {
+          "symbol": "rectangle.3.group"
+        },
+        "id": "beads-board",
+        "tooltip": "Toggle Beads Board"
+      }
+    ],
+    "marketplace": {
+      "author": "Moiz Haider",
+      "github": "RanaMoizHaider",
+      "categories": [
+        "productivity",
+        "project-management"
+      ],
+      "icon": "icon.svg",
+      "screenshots": [
+        "screenshots/screenshot-1.png"
+      ]
+    }
+  },
+  "name": "beads",
+  "private": true,
+  "scripts": {
+    "build": "vite build && node scripts/copy-manifest.mjs",
+    "dev": "vite"
+  },
+  "type": "module",
+  "version": "0.2.1"
+}

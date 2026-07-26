@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Commands</title>
+    <script type="module" src="/popover/popover.js"></script>
+  </head>
+  <body class="popover">
+    <main class="launcher">
+      <input id="filter" class="cmd-filter" type="text" placeholder="Search…" spellcheck="false" autocomplete="off" hidden />
+      <ul id="list" class="cmd-list"></ul>
+      <div id="empty" class="empty" hidden>No commands yet.</div>
+      <div class="manage-sep"></div>
+      <button id="manage" class="manage" type="button">
+        <span class="manage-icon"></span>
+        <span>Manage commands</span>
+      </button>
+    </main>
+  </body>
+</html>

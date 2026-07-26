@@ -7,6 +7,7 @@ import {
   buildOutputDir,
   extensionDir,
   listExtensionNames,
+  packageJSONPath,
   readPackageManifest,
   repoRoot,
 } from "./lib/paths.mjs";
@@ -29,7 +30,7 @@ function collectFiles(dir, prefix, out) {
 
 export function packExtension(name) {
   const dir = extensionDir(name);
-  const { version } = readPackageManifest(dir);
+  const { version, muxy } = readPackageManifest(dir);
   // Ship only the Vite build output — the app runs `dist/`, and listing assets
   // (icon, screenshots) are emitted there too. Source, node_modules,
   // package.json, and the lockfile are not shipped.
@@ -38,7 +39,19 @@ export function packExtension(name) {
     throw new Error(`${name}: '${buildOutputDir}/' not found — run \`node scripts/build.mjs ${name}\` first`);
   }
   const files = [];
-  collectFiles(distDir, `${name}/`, files);
+  // Extensions with a background script nest files under `dist/` because Muxy
+  // resolves background paths relative to `dist/` at runtime (it creates the
+  // directory for logs on first run). Without the nest, reloading the extension
+  // fails with "Background script not found at .../dist/background.js".
+  // Extensions without background keep the flat structure for backward compat.
+  const prefix = muxy.background ? `${name}/dist/` : `${name}/`;
+  collectFiles(distDir, prefix, files);
+  // ExtensionStore discovers extensions by scanning for package.json at the
+  // extension root. When files are nested under dist/, we also put one at root
+  // level so the extension is found before `dist/` exists.
+  if (muxy.background) {
+    files.push({ name: `${name}/package.json`, data: fs.readFileSync(packageJSONPath(dir)) });
+  }
   const zip = buildZip(files);
   const sha256 = crypto.createHash("sha256").update(zip).digest("hex");
   return { name, version, zip, sha256, size: zip.length };

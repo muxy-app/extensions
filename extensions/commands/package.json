@@ -1,0 +1,73 @@
+{
+  "name": "commands",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && node -e \"require('fs').copyFileSync('package.json','dist/package.json')\""
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "vite": "^7.3.5"
+  },
+  "muxy": {
+    "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
+    "description": "Pinned command launcher — run claude, codex and your own commands in a new terminal from the topbar.",
+    "permissions": ["tabs:write", "panels:write"],
+    "popovers": [
+      {
+        "id": "launcher",
+        "title": "Commands",
+        "entry": "popover/index.html",
+        "width": 220,
+        "height": 280
+      }
+    ],
+    "tabTypes": [
+      {
+        "id": "settings",
+        "title": "Commands",
+        "entry": "tab/index.html"
+      }
+    ],
+    "commands": [
+      {
+        "id": "open",
+        "title": "Commands: Open Launcher",
+        "subtitle": "Run a pinned command in a new terminal",
+        "action": {
+          "kind": "openPopover",
+          "popover": "launcher"
+        }
+      },
+      {
+        "id": "open-settings",
+        "title": "Commands: Manage Commands",
+        "subtitle": "Add, edit, or remove pinned commands",
+        "action": {
+          "kind": "openTab",
+          "tabType": "settings"
+        }
+      }
+    ],
+    "topbarItems": [
+      {
+        "id": "launcher",
+        "icon": {
+          "symbol": "bolt.fill"
+        },
+        "tooltip": "Commands",
+        "command": "open"
+      }
+    ],
+    "marketplace": {
+      "author": "long2ice",
+      "github": "long2ice",
+      "repository": "https://github.com/muxy-app/extensions",
+      "categories": ["productivity", "terminal"],
+      "icon": "icon.svg",
+      "screenshots": ["screenshot-1.png"]
+    }
+  }
+}

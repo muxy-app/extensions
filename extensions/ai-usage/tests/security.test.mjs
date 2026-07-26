@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import vm from "node:vm";
 
 test("security: popover exec commands use absolute binaries", async () => {
   const source = await readFile(new URL("../popovers/usage.js", import.meta.url), "utf8");
@@ -18,13 +19,54 @@ test("security: popover exec commands use absolute binaries", async () => {
 test("regression: background restores the cached status bar text on activation", async () => {
   const manifest = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
   const background = await readFile(new URL("../src/background.mjs", import.meta.url), "utf8");
+  const cacheSource = await readFile(new URL("../src/status-cache.mjs", import.meta.url), "utf8");
+  const cacheCode = `${background}\n${cacheSource}`;
 
   assert.equal(manifest.muxy.background, "background.js");
-  assert.match(background, /status-cache\.json/);
+  assert.match(background, /muxy\.events\.subscribe\("extension\.ai-usage\.keepalive"/);
+  assert.match(cacheCode, /status-cache\.json/);
   assert.match(background, /muxy\.statusbar\.set/);
+  assert.match(background, /typeof setInterval === "function"/);
+  assert.doesNotMatch(cacheCode, /\.config\/muxy\/extensions\/ai-usage/);
   assert.doesNotMatch(background, /async/);
   assert.doesNotMatch(background, /await/);
-  assert.doesNotMatch(background, /setInterval/);
+  // setInterval은 polling loop에서 의도적으로 사용됨
+  // assert.doesNotMatch(background, /setInterval/);
+});
+
+test("regression: background activation survives runtimes without timers", async () => {
+  const source = await readFile(new URL("../dist/background.js", import.meta.url), "utf8");
+  const calls = [];
+  const context = {
+    muxy: {
+      events: {
+        subscribe: (name, handler) => calls.push(["subscribe", name, typeof handler])
+      },
+      exec: (argv) => {
+        if (argv[0] === "/usr/bin/env") return { exitCode: 0, stdout: "HOME=/tmp/home\n" };
+        return { exitCode: 1, stdout: "", stderr: "missing" };
+      },
+      statusbar: {
+        set: (payload) => calls.push(["statusbar", payload])
+      }
+    },
+    console: {
+      log: () => {},
+      warn: (...args) => calls.push(["warn", args[0]])
+    },
+    Date,
+    JSON,
+    Math,
+    Number,
+    String,
+    Array,
+    Object,
+    Infinity
+  };
+
+  assert.doesNotThrow(() => vm.runInNewContext(source, context));
+  assert.deepEqual(calls[0], ["subscribe", "extension.ai-usage.keepalive", "function"]);
+  assert.equal(calls.some((call) => call[0] === "warn" && call[1] === "ai-usage background polling timer unavailable"), true);
 });
 
 test("regression: popover exposes only useful top controls and keeps fixed host width", async () => {

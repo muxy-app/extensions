@@ -1,7 +1,34 @@
-import { has_dirty_replaceable_editor_for_other_file } from "@/lib/editor-state";
+async function focus_tab(tabId) {
+  if (!tabId) return false;
+  try {
+    await muxy.tabs.switchTo(tabId);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export function strip_slash(path) {
   return path.replace(/\/+$/, "");
+}
+
+function path_segments(path) {
+  return String(path ?? "")
+    .replace(/\/+$/, "")
+    .split("/")
+    .filter(Boolean);
+}
+
+export function same_file(changedPath, filePath) {
+  const want = path_segments(filePath);
+  if (want.length === 0) return false;
+  const got = path_segments(changedPath);
+  if (got.length < want.length) return false;
+  const offset = got.length - want.length;
+  for (let i = 0; i < want.length; i += 1) {
+    if (got[offset + i] !== want[i]) return false;
+  }
+  return true;
 }
 
 export function canonical_dir(rel) {
@@ -87,16 +114,15 @@ export async function try_action(action, error_title) {
   }
 }
 
-export async function open_in_editor(rel) {
+export async function open_in_editor(rel, focusTabId = null) {
   try {
-    const singleton = !has_dirty_replaceable_editor_for_other_file(rel);
+    if (focusTabId && (await focus_tab(focusTabId))) return;
     await muxy.tabs.open({
       kind: "extensionWebView",
       extension: {
         id: muxy.extensionID,
         tabType: "code-editor",
-        singleton,
-        data: { filePath: rel, replaceable: singleton },
+        data: { filePath: rel, replaceable: false },
       },
     });
   } catch (err) {
@@ -123,8 +149,25 @@ export async function open_in_new_tab(rel) {
   }
 }
 
+export async function is_internal_file(rel) {
+  const path = strip_slash(rel);
+  if (!path) return false;
+  try {
+    const stat = await muxy.files.stat(path);
+    return Boolean(stat) && !stat.isDirectory;
+  } catch {
+    return false;
+  }
+}
+
 export async function reveal_in_finder(rel) {
   await muxy.exec(["open", "-R", strip_slash(rel)]).catch(() => undefined);
+}
+
+export async function reveal_paths(rels) {
+  const paths = rels.map((rel) => strip_slash(rel));
+  if (paths.length === 0) return;
+  await muxy.exec(["open", "-R", ...paths]).catch(() => undefined);
 }
 
 export async function open_externally(rel) {
@@ -142,5 +185,17 @@ export async function copy_path(rel) {
     await muxy.toast({ body: "Path copied", variant: "info" }).catch(() => undefined);
   } catch {
     await muxy.toast({ title: "Copy path", body: path, variant: "info" }).catch(() => undefined);
+  }
+}
+
+export async function copy_paths(rels) {
+  const paths = rels.map((rel) => strip_slash(rel));
+  const text = paths.join("\n");
+  const body = paths.length === 1 ? "Path copied" : `${paths.length} paths copied`;
+  try {
+    await navigator.clipboard.writeText(text);
+    await muxy.toast({ body, variant: "info" }).catch(() => undefined);
+  } catch {
+    await muxy.toast({ title: "Copy paths", body: text, variant: "info" }).catch(() => undefined);
   }
 }

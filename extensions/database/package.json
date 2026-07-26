@@ -1,0 +1,132 @@
+{
+  "name": "database",
+  "version": "0.2.1",
+  "scripts": {
+    "dev": "vite",
+    "test": "node --test tests/*.test.js",
+    "build": "vite build && node -e \"const fs=require('fs');fs.copyFileSync('package.json','dist/package.json');fs.copyFileSync('background.js','dist/background.js')\""
+  },
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@codemirror/autocomplete": "^6.18.6",
+    "@codemirror/commands": "^6.10.3",
+    "@codemirror/lang-sql": "^6.10.0",
+    "@codemirror/language": "^6.12.3",
+    "@codemirror/search": "^6.7.0",
+    "@codemirror/state": "^6.6.0",
+    "@codemirror/view": "^6.43.0",
+    "@lezer/highlight": "^1.2.3",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "tailwindcss": "^4.3.0",
+    "vite": "^7.3.5"
+  },
+  "muxy": {
+    "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
+    "description": "SQL database client — SQLite, MySQL, MariaDB, PostgreSQL",
+    "permissions": [
+      "commands:exec",
+      "tabs:read",
+      "tabs:write",
+      "panels:write",
+      "storage:read",
+      "storage:write"
+    ],
+    "background": "background.js",
+    "events": [
+      "tab.created",
+      "tab.closed"
+    ],
+    "panels": [
+      {
+        "id": "connections",
+        "title": "Databases",
+        "entry": "panel/connections.html",
+        "position": "right",
+        "mode": "pinned",
+        "icon": {
+          "symbol": "cylinder.split.1x2"
+        }
+      }
+    ],
+    "tabTypes": [
+      {
+        "id": "workbench",
+        "title": "Database",
+        "entry": "panel/index.html"
+      }
+    ],
+    "commands": [
+      {
+        "id": "open",
+        "title": "Database: Toggle Connections",
+        "subtitle": "Show or hide the databases panel",
+        "action": {
+          "kind": "togglePanel",
+          "panel": "connections"
+        }
+      },
+      {
+        "id": "new-query",
+        "title": "Database: New Query",
+        "subtitle": "Open a new SQL query tab in the active database"
+      },
+      {
+        "id": "run-query",
+        "title": "Database: Run Query",
+        "subtitle": "Run the current SQL statement"
+      }
+    ],
+    "topbarItems": [
+      {
+        "id": "database",
+        "icon": {
+          "symbol": "cylinder.split.1x2"
+        },
+        "tooltip": "Databases",
+        "command": "open"
+      }
+    ],
+    "settings": [
+      {
+        "key": "pageSize",
+        "type": "number",
+        "title": "Rows per page",
+        "description": "Number of rows fetched per page in the data grid",
+        "defaultValue": 200
+      },
+      {
+        "key": "queryTimeoutSeconds",
+        "type": "number",
+        "title": "Query timeout (seconds)",
+        "description": "Maximum time a single query may run before it is aborted",
+        "defaultValue": 60
+      },
+      {
+        "key": "confirmDestructive",
+        "type": "bool",
+        "title": "Confirm destructive statements",
+        "description": "Ask for confirmation before DROP, TRUNCATE and DELETE without WHERE",
+        "defaultValue": true
+      }
+    ],
+    "marketplace": {
+      "author": "Saeed Vaziry",
+      "github": "saeedvaziry",
+      "repository": "https://github.com/muxy-app/extensions",
+      "categories": [
+        "database",
+        "sql"
+      ],
+      "icon": "icon.svg",
+      "screenshots": [
+        "screenshots/screenshot-1.png"
+      ]
+    }
+  }
+}

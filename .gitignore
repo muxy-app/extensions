@@ -9,3 +9,5 @@ minisign.key
 *.log
 extensions/demo-*
 .claude/
+.agents/
+skills-lock.json

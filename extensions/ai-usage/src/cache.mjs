@@ -30,6 +30,7 @@ function hydrateSnapshot(snapshot) {
     name,
     icon,
     fetchedAt: dateValue(snapshot.fetchedAt) || new Date(),
+    planName: stringValue(snapshot?.planName) || undefined,
     state,
     rows: state.kind === "available" ? rows : []
   }];

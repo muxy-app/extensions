@@ -10,11 +10,11 @@ Status bar and popover usage view for common AI coding providers.
 
 ## Network access
 
-Live usage refreshes call provider quota endpoints for Claude Code, Codex, Amp, Copilot, Factory, Kimi, MiniMax, and Z.ai. Requests send only the provider credential already present on the local machine plus the provider-required usage request body. Usage snapshots are cached locally in the extension folder so the status bar can restore immediately after reload.
+Live usage refreshes call provider quota endpoints for Antigravity, Claude Code, Codex, Amp, Copilot, Cursor, Devin, Factory, Grok, OpenRouter, OpenCode Go, Kimi, MiniMax, and Z.ai. Requests send only the provider credential already present on the local machine plus the provider-required usage request body. Usage snapshots are cached locally in the extension folder so the status bar can restore immediately after reload.
 
 ## Providers
 
-The extension reads existing local credentials for Claude Code, Codex, Amp, Copilot, Factory, Kimi, MiniMax, and Z.ai. Cursor is listed in the UI and shows `No usage data` because the removed built-in provider did not include a Cursor usage fetcher.
+The extension reads existing local credentials for Antigravity, Claude Code, Codex, Amp, Copilot, Cursor, Devin, Factory, Grok, OpenRouter, OpenCode Go, Kimi, MiniMax, and Z.ai.
 
 ## Fixture
 
