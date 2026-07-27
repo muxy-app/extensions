@@ -4,7 +4,7 @@ const CHANGE_CHANNEL = 'muxy-launcher:commands';
 
 const DEFAULT_COMMANDS = [
   { id: 'claude', name: 'Claude', command: 'claude', icon: '../icons/claude.svg', cwd: '' },
-  { id: 'codex', name: 'Codex', command: 'codex --dangerously-bypass-approvals-and-sandbox', icon: '../icons/codex.svg', cwd: '' },
+  { id: 'codex', name: 'Codex', command: 'codex', icon: '../icons/codex.svg', cwd: '' },
 ];
 
 function defaults() {

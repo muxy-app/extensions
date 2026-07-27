@@ -118,7 +118,8 @@ function isSupportedImageBlob(blob, url) {
 }
 
 function isSvgBlob(blob, url) {
-  return /^image\/svg\+xml$/i.test(blob.type || '') || /\.svg(?:[?#].*)?$/i.test(url);
+  if (blob.type) return /^image\/svg\+xml$/i.test(blob.type);
+  return /\.svg(?:[?#].*)?$/i.test(url);
 }
 
 async function svgBlobSrc(blob) {
@@ -168,20 +169,28 @@ function loadImage(src) {
   });
 }
 
+let iconCacheMemo = null;
+
+window.addEventListener('storage', (event) => {
+  if (event.key === ICON_CACHE_KEY || event.key === null) iconCacheMemo = null;
+});
+
 function readIconCache() {
+  if (iconCacheMemo) return iconCacheMemo;
   try {
     const parsed = JSON.parse(localStorage.getItem(ICON_CACHE_KEY) || '{}');
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    iconCacheMemo = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
   } catch {
-    return {};
+    iconCacheMemo = {};
   }
+  return iconCacheMemo;
 }
 
 function saveCachedIconSrc(url, src) {
-  const cache = readIconCache();
-  cache[url] = { src, cachedAt: Date.now() };
+  const cache = { ...readIconCache(), [url]: { src, cachedAt: Date.now() } };
   const entries = Object.entries(cache)
     .sort((a, b) => Number(b[1]?.cachedAt || 0) - Number(a[1]?.cachedAt || 0))
     .slice(0, MAX_CACHE_ENTRIES);
-  localStorage.setItem(ICON_CACHE_KEY, JSON.stringify(Object.fromEntries(entries)));
+  iconCacheMemo = Object.fromEntries(entries);
+  localStorage.setItem(ICON_CACHE_KEY, JSON.stringify(iconCacheMemo));
 }

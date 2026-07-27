@@ -13,22 +13,27 @@ function persist() {
   saveCommands(commands);
 }
 
+function persistOrToast() {
+  try {
+    persist();
+    return true;
+  } catch (error) {
+    toast('Could not save command', error?.name === 'QuotaExceededError'
+      ? 'The icon is too large for local storage.'
+      : error?.message || String(error));
+    return false;
+  }
+}
+
 function update(id, patch) {
   const item = commands.find((c) => c.id === id);
   if (!item) return false;
   const before = {};
   Object.keys(patch).forEach((key) => { before[key] = item[key]; });
   Object.assign(item, patch);
-  try {
-    persist();
-    return true;
-  } catch (error) {
-    Object.assign(item, before);
-    toast('Could not save command', error?.name === 'QuotaExceededError'
-      ? 'The icon is too large for local storage.'
-      : error?.message || String(error));
-    return false;
-  }
+  if (persistOrToast()) return true;
+  Object.assign(item, before);
+  return false;
 }
 
 function field(label, value, placeholder, onInput) {
@@ -79,7 +84,7 @@ function iconPicker(cmd) {
         await cacheIconSrc(url);
         if (cmd.icon !== url || version !== cacheVersion) return;
         wrap.dispatchEvent(new Event('icon-change'));
-        persist();
+        persistOrToast();
       } catch (error) {
         if (cmd.icon === url && version === cacheVersion) {
           toast('Could not cache icon', error?.message || String(error));
