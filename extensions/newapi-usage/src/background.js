@@ -1,11 +1,16 @@
-// Background script for NewAPI Usage
-// Polls all configured sites and updates the status bar
+// Background script for API Usage
+// Polls all configured NewAPI/Sub2API sites and updates the status bar.
 // NOTE: muxy.storage in background scripts is SYNCHRONOUS
 
 const STORAGE_KEY = "newapi-sites";
 const STATUS_KEY = "newapi-status";
 const AUTO_REFRESH_KEY = "newapi-refresh";
 const QUOTA_TO_USD = 500_000;
+
+const SITE_TYPES = {
+	NEWAPI: "newapi",
+	SUB2API: "sub2api",
+};
 
 /* ─── Curl Helper ─── */
 function escapeCurl(value) {
@@ -54,31 +59,49 @@ function syncCurl(url, method, headers) {
 	}
 }
 
-/* ─── API Fetch ─── */
-function fetchSite(site) {
+/* ─── Site helpers ─── */
+function siteType(site) {
+	return site?.type === SITE_TYPES.SUB2API
+		? SITE_TYPES.SUB2API
+		: SITE_TYPES.NEWAPI;
+}
+
+function baseResult(site, extra = {}) {
+	return {
+		id: site.id,
+		type: siteType(site),
+		name: site.name,
+		apiUrl: site.apiUrl,
+		...extra,
+	};
+}
+
+function errorResult(site, error) {
+	return baseResult(site, { error });
+}
+
+function defaultNewapiUserHeaderName() {
+	return "New-Api-User";
+}
+
+function resolveNewapiUserHeaderName(site) {
+	const custom = site?.userHeaderName?.trim();
+	return custom || defaultNewapiUserHeaderName();
+}
+
+/* ─── NewAPI Fetch ─── */
+function fetchNewapiSite(site) {
 	const baseUrl = site.apiUrl.replace(/\/+$/, "");
 	const headers = {
 		Accept: "application/json",
 		Authorization: `Bearer ${site.accessToken}`,
-		"New-Api-User": site.userId,
+		[resolveNewapiUserHeaderName(site)]: site.userId,
 	};
 
 	const userResp = syncCurl(`${baseUrl}/api/user/self`, "GET", headers);
-	if (!userResp) {
-		return {
-			id: site.id,
-			name: site.name,
-			apiUrl: site.apiUrl,
-			error: "Failed to connect",
-		};
-	}
+	if (!userResp) return errorResult(site, "Failed to connect");
 	if (!userResp.success || !userResp.data) {
-		return {
-			id: site.id,
-			name: site.name,
-			apiUrl: site.apiUrl,
-			error: userResp.message || "API returned error",
-		};
+		return errorResult(site, userResp.message || "API returned error");
 	}
 
 	const ud = userResp.data;
@@ -104,10 +127,7 @@ function fetchSite(site) {
 		todayUsageUsd = totalQuota / QUOTA_TO_USD;
 	}
 
-	return {
-		id: site.id,
-		name: site.name,
-		apiUrl: site.apiUrl,
+	return baseResult(site, {
 		fetchedAt: new Date().toISOString(),
 		balanceUsd,
 		totalUsedUsd,
@@ -115,35 +135,101 @@ function fetchSite(site) {
 		requestCount: ud.request_count,
 		group: ud.group || null,
 		error: null,
+	});
+}
+
+/* ─── Sub2API Fetch ─── */
+function extractSub2apiUsage(response) {
+	const remaining =
+		response?.remaining ?? response?.quota?.remaining ?? response?.balance;
+	const unit = response?.unit ?? response?.quota?.unit ?? "USD";
+	return {
+		isValid: response?.is_active ?? response?.isValid ?? true,
+		remaining,
+		unit,
 	};
 }
 
+function fetchSub2apiSite(site) {
+	const baseUrl = site.apiUrl.replace(/\/+$/, "");
+	const headers = {
+		Accept: "application/json",
+		Authorization: `Bearer ${site.accessToken}`,
+	};
+
+	const usageResp = syncCurl(`${baseUrl}/v1/usage`, "GET", headers);
+	if (!usageResp) return errorResult(site, "Failed to connect");
+
+	const usage = extractSub2apiUsage(usageResp);
+	return baseResult(site, {
+		fetchedAt: new Date().toISOString(),
+		remaining: usage.remaining,
+		unit: usage.unit,
+		isValid: usage.isValid,
+		error: null,
+	});
+}
+
+function fetchSite(site) {
+	return siteType(site) === SITE_TYPES.SUB2API
+		? fetchSub2apiSite(site)
+		: fetchNewapiSite(site);
+}
+
 /* ─── Status Bar ─── */
+function formatRemaining(value, unit = "USD") {
+	if (value === null || value === undefined || value === "") return null;
+	const numeric = Number(value);
+	if (Number.isFinite(numeric)) {
+		if (unit === "USD") return `$${numeric.toFixed(2)}`;
+		return `${numeric.toFixed(2)} ${unit || ""}`.trim();
+	}
+	return `${value}${unit ? ` ${unit}` : ""}`;
+}
+
+function statusBalance(result) {
+	if (result.type === SITE_TYPES.SUB2API) {
+		const unit = result.unit || "USD";
+		const value = Number(result.remaining);
+		return Number.isFinite(value) ? { value, unit } : null;
+	}
+	const value = Number(result.balanceUsd);
+	return Number.isFinite(value) ? { value, unit: "USD" } : null;
+}
+
 function updateStatusBar(results) {
-	const available = results.filter((r) => !r.error);
-	if (available.length === 0) {
+	const balances = results
+		.filter((r) => !r.error)
+		.map(statusBalance)
+		.filter(Boolean);
+	if (balances.length === 0) {
 		muxy.statusbar.set({
 			id: "newapi-usage",
 			icon: { svg: "assets/icon.svg" },
 		});
 		return;
 	}
-	const totalBalance = available.reduce(
-		(sum, r) => sum + (r.balanceUsd || 0),
-		0,
-	);
+
+	const unit = balances[0].unit;
+	const sameUnit = balances.every((b) => b.unit === unit);
+	const total = balances.reduce((sum, b) => sum + b.value, 0);
 	muxy.statusbar.set({
 		id: "newapi-usage",
 		icon: { svg: "assets/icon.svg" },
-		text: `$${totalBalance.toFixed(2)}`,
+		text: sameUnit ? formatRemaining(total, unit) : `${balances.length} sites`,
 	});
 }
 
 /* ─── Storage helpers (synchronous in background) ─── */
+function normalizeSite(site) {
+	return { ...site, type: siteType(site) };
+}
+
 function readSites() {
 	try {
 		const raw = muxy.storage.get(STORAGE_KEY);
-		return raw ? JSON.parse(raw) : [];
+		const list = raw ? JSON.parse(raw) : [];
+		return Array.isArray(list) ? list.map(normalizeSite) : [];
 	} catch {
 		return [];
 	}
@@ -212,9 +298,7 @@ try {
 	const cached = readStatus();
 	if (cached) {
 		autoRefreshSeconds = cached.autoRefreshSeconds || autoRefreshSeconds;
-		if (Array.isArray(cached.sites)) {
-			updateStatusBar(cached.sites);
-		}
+		if (Array.isArray(cached.sites)) updateStatusBar(cached.sites);
 	}
 
 	muxy.events.subscribe("extension.newapi-usage.keepalive", () => {
