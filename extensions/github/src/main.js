@@ -198,7 +198,7 @@ function renderList(items) {
   listQuery = "";
   const what = mode === "prs" ? "Pull Request" : "Issue";
   const mineBtn = mode === "prs"
-    ? `<button class="toggle${mineOnly ? " is-active" : ""}" id="mine-only" title="Show only my PRs">Mine</button>`
+    ? `<button class="toggle${mineOnly ? " is-active" : ""}" id="mine-only" title="Show only my PRs" aria-pressed="${mineOnly}">Mine</button>`
     : "";
   const toolbar = `
     <div class="listbar">
@@ -220,10 +220,11 @@ function renderList(items) {
     mineBtnEl.addEventListener("click", () => {
       mineOnly = !mineOnly;
       mineBtnEl.classList.toggle("is-active", mineOnly);
+      mineBtnEl.setAttribute("aria-pressed", mineOnly);
       renderRows(filterList());
     });
   }
-  renderRows(items);
+  renderRows(filterList());
 }
 
 function renderRows(items) {
