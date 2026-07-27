@@ -1,5 +1,6 @@
 import "@/styles/global.css";
 import { h, clear, cls } from "@/lib/dom";
+import { icon } from "@/lib/icons";
 
 /* ─── Constants ─── */
 const QUOTA_TO_USD = 500_000;
@@ -327,12 +328,15 @@ function rowMetric(site, st) {
 		return { balance: "—", middle: "—", usage: "—", low: false };
 	}
 	if (type === SITE_TYPES.SUB2API) {
+		const unit = st.unit || "USD";
 		const numericRemaining = Number(st.remaining);
+		const isUsd = String(unit).trim().toUpperCase() === "USD";
 		return {
-			balance: fmtRemaining(st.remaining, st.unit),
-			middle: st.unit || "—",
+			balance: fmtRemaining(st.remaining, unit),
+			middle: unit || "—",
 			usage: st.isValid === false ? "Invalid" : "Valid",
 			low:
+				isUsd &&
 				_balAlert > 0 &&
 				Number.isFinite(numericRemaining) &&
 				numericRemaining < _balAlert,
@@ -397,9 +401,10 @@ function render(root) {
 					type: "button",
 					"aria-label": "Refresh",
 					title: "Refresh All",
+					id: "refresh-all-btn",
 					onclick: () => refreshAll(),
 				},
-				"↻",
+				icon("refresh", 14, "", 1.5),
 			),
 		),
 	);
@@ -528,17 +533,14 @@ function renderContent(content) {
 }
 
 function appendListHeader(list, type) {
-	const isCompact = type === SITE_TYPES.SUB2API;
+	const isSub2api = type === SITE_TYPES.SUB2API;
 	list.appendChild(
 		h(
 			"div",
-			{
-				class:
-					`list-header group-list-header ${isCompact ? "compact-row" : ""}`.trim(),
-			},
+			{ class: "list-header group-list-header" },
 			h("div", { class: "col-name" }, "Name"),
-			isCompact ? null : h("div", { class: "col-consumption" }, "Used"),
-			isCompact ? null : h("div", { class: "col-today" }, "Today"),
+			h("div", { class: "col-consumption" }, isSub2api ? "Status" : "Used"),
+			h("div", { class: "col-today" }, isSub2api ? "Unit" : "Today"),
 			h("div", { class: "col-balance" }, "Balance"),
 			h("div", { class: "col-actions" }, ""),
 		),
@@ -565,11 +567,9 @@ function appendSiteRow(list, site, statusMap) {
 	const hasError = st && st.error;
 	const disabled = site.enabled === false;
 	const metric = rowMetric(site, st);
-	const isCompact = type === SITE_TYPES.SUB2API;
 	const rowClasses = [
 		hasError ? "site-error" : "",
 		disabled ? "site-disabled" : "",
-		isCompact ? "compact-row" : "",
 	]
 		.filter(Boolean)
 		.join(" ");
@@ -644,14 +644,12 @@ function appendSiteRow(list, site, statusMap) {
 					? h("div", { class: "cell-error-inline" }, `⚠ ${st.error}`)
 					: null,
 			),
-			isCompact
-				? null
-				: h(
-						"div",
-						{ class: "col-consumption" + (metric.invalid ? " bal-low" : "") },
-						metric.usage,
-					),
-			isCompact ? null : h("div", { class: "col-today" }, metric.middle),
+			h(
+				"div",
+				{ class: "col-consumption" + (metric.invalid ? " bal-low" : "") },
+				metric.usage,
+			),
+			h("div", { class: "col-today" }, metric.middle),
 			h(
 				"div",
 				{
@@ -683,7 +681,7 @@ function appendSiteRow(list, site, statusMap) {
 							refreshSingleRow(site);
 						},
 					},
-					h("span", { class: "btn-spin" }, "↻"),
+					h("span", { class: "btn-spin" }, icon("refresh", 12, "", 1.5)),
 				),
 			),
 		),
