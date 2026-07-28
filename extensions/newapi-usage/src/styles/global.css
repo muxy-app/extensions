@@ -204,6 +204,25 @@ button:disabled { cursor:default; }
   transition: background 0.1s;
 }
 .list-row:hover { background:var(--muxy-hover); }
+.group-header {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s5) var(--s3) var(--s2);
+  color: var(--muxy-foreground);
+  font-size: var(--font-footnote);
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+.group-header small {
+  margin-left: auto;
+  color: var(--muxy-foreground-muted);
+  font-size: var(--font-caption);
+  font-weight: 500;
+}
+.group-header + .group-list-header {
+  padding-top: var(--s1);
+}
 
 /* Column widths: 1.6 : 1.2 : 1 : 1.2 : 1 */
 .col-name { flex:1.6; min-width:0; }
@@ -211,6 +230,9 @@ button:disabled { cursor:default; }
 .col-today { flex:1; text-align:right; min-width:0; }
 .col-consumption { flex:1.2; text-align:right; min-width:0; }
 .col-actions { flex:1; text-align:right; white-space:nowrap; }
+.compact-row .col-name { flex: 2.2; }
+.compact-row .col-balance { flex: 1.4; }
+.compact-row .col-actions { flex: 0.8; }
 
 .col-name,
 .col-balance,
@@ -241,6 +263,30 @@ button:disabled { cursor:default; }
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.list-row .cell-title-line {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  min-width: 0;
+}
+.site-type-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  border-radius: var(--radius);
+  border: 1px solid var(--muxy-border);
+  background: var(--muxy-accent-soft);
+  color: var(--muxy-accent);
+  font: 700 var(--font-footnote) "SF Mono", Menlo, monospace;
+  line-height: 1;
+}
+.site-type-badge.type-sub2api {
+  background: var(--muxy-surface);
+  color: var(--muxy-foreground-muted);
 }
 .list-row .cell-error-inline {
   font-size: 10px;
@@ -326,6 +372,12 @@ button:disabled { cursor:default; }
   font-weight: 600;
   color: var(--muxy-foreground);
 }
+.form-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s4);
+}
 .form-field { margin-bottom: var(--s5); }
 .form-field label {
   display: block;
@@ -408,6 +460,47 @@ button:disabled { cursor:default; }
 .form-actions .btn-delete:hover {
   background: color-mix(in srgb, var(--muxy-diff-remove) 12%, transparent);
   border-color: var(--muxy-diff-remove);
+}
+
+/* ─── Type Picker ─── */
+.type-picker-panel { width: 360px; }
+.type-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+}
+.type-option {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  width: 100%;
+  padding: var(--s5);
+  border: 1px solid var(--muxy-border);
+  border-radius: var(--radius-card);
+  background: var(--muxy-surface);
+  color: var(--muxy-foreground);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+}
+.type-option:hover {
+  background: var(--muxy-hover);
+  border-color: var(--muxy-accent);
+}
+.type-option-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--s1);
+}
+.type-option-copy strong {
+  font-size: var(--font-emphasis);
+  font-weight: 600;
+}
+.type-option-copy small {
+  color: var(--muxy-foreground-muted);
+  font-size: var(--font-footnote);
+  line-height: 1.35;
 }
 
 /* ─── Status Messages ─── */

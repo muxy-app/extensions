@@ -1,12 +1,34 @@
 import "@/styles/global.css";
 import { h, clear, cls } from "@/lib/dom";
+import { icon } from "@/lib/icons";
 
 /* ─── Constants ─── */
 const QUOTA_TO_USD = 500_000;
+const APP_TITLE = "API Usage";
 const STORAGE_KEY = "newapi-sites";
 const STATUS_KEY = "newapi-status";
 const AUTO_REFRESH_KEY = "newapi-refresh";
 const BAL_ALERT_KEY = "newapi-balalert";
+
+const SITE_TYPES = {
+	NEWAPI: "newapi",
+	SUB2API: "sub2api",
+};
+
+const SITE_TYPE_META = {
+	[SITE_TYPES.NEWAPI]: {
+		label: "NewAPI",
+		short: "N",
+		description: "NewAPI quota, daily usage, and total used",
+		apiPlaceholder: "https://newapi.example.com",
+	},
+	[SITE_TYPES.SUB2API]: {
+		label: "Sub2API",
+		short: "S",
+		description: "Sub2API /v1/usage remaining balance and token status",
+		apiPlaceholder: "https://sub2api.example.com",
+	},
+};
 
 /* ─── App State ─── */
 let _dragSiteId;
@@ -18,18 +40,50 @@ let formOpen = false;
 let isLoading = true;
 let lastRefreshTime = null; // Date
 
+/* ─── Site Helpers ─── */
+function siteType(site) {
+	return site?.type === SITE_TYPES.SUB2API
+		? SITE_TYPES.SUB2API
+		: SITE_TYPES.NEWAPI;
+}
+
+function siteMeta(siteOrType) {
+	const type =
+		typeof siteOrType === "string" ? siteOrType : siteType(siteOrType);
+	return SITE_TYPE_META[type] || SITE_TYPE_META[SITE_TYPES.NEWAPI];
+}
+
+function normalizeSite(site) {
+	return { ...site, type: siteType(site) };
+}
+
+function baseResult(site, extra = {}) {
+	return {
+		id: site.id,
+		type: siteType(site),
+		name: site.name,
+		apiUrl: site.apiUrl,
+		...extra,
+	};
+}
+
+function errorResult(site, error) {
+	return baseResult(site, { error });
+}
+
 /* ─── Storage Helpers (async in webview) ─── */
 async function loadSites() {
 	try {
 		const raw = await muxy.storage.get(STORAGE_KEY);
-		sites = raw ? JSON.parse(raw) : [];
+		const list = raw ? JSON.parse(raw) : [];
+		sites = Array.isArray(list) ? list.map(normalizeSite) : [];
 	} catch {
 		sites = [];
 	}
 }
 
 async function saveSites() {
-	await muxy.storage.set(STORAGE_KEY, JSON.stringify(sites));
+	await muxy.storage.set(STORAGE_KEY, JSON.stringify(sites.map(normalizeSite)));
 }
 
 /* ─── Status cache (shared with background) ─── */
@@ -46,7 +100,7 @@ async function saveStatusCache(payload) {
 	try {
 		await muxy.storage.set(
 			STATUS_KEY,
-			JSON.stringify({ version: 1, ...payload }),
+			JSON.stringify({ version: 1, ...(payload || {}) }),
 		);
 	} catch {
 		/* best-effort */
@@ -104,13 +158,22 @@ async function saveBalAlert(val) {
 	await saveStatusCache(payload);
 }
 
-/* ─── API Helpers ─── */
-async function fetchSiteData(site) {
+function defaultNewapiUserHeaderName() {
+	return "New-Api-User";
+}
+
+function resolveNewapiUserHeaderName(site) {
+	const custom = site?.userHeaderName?.trim();
+	return custom || defaultNewapiUserHeaderName();
+}
+
+/* ─── API Helpers: NewAPI ─── */
+async function fetchNewapiSiteData(site) {
 	const baseUrl = site.apiUrl.replace(/\/+$/, "");
 	const headers = {
 		Accept: "application/json",
 		Authorization: `Bearer ${site.accessToken}`,
-		"New-Api-User": site.userId,
+		[resolveNewapiUserHeaderName(site)]: site.userId,
 	};
 
 	try {
@@ -120,21 +183,11 @@ async function fetchSiteData(site) {
 			timeoutMs: 15000,
 		});
 		if (userResp.status !== 200) {
-			return {
-				id: site.id,
-				name: site.name,
-				apiUrl: site.apiUrl,
-				error: `HTTP ${userResp.status}`,
-			};
+			return errorResult(site, `HTTP ${userResp.status}`);
 		}
 		const userJson = JSON.parse(userResp.body);
 		if (!userJson.success || !userJson.data) {
-			return {
-				id: site.id,
-				name: site.name,
-				apiUrl: site.apiUrl,
-				error: userJson.message || "API error",
-			};
+			return errorResult(site, userJson.message || "API error");
 		}
 		const ud = userJson.data;
 		const balanceUsd = ud.quota / QUOTA_TO_USD;
@@ -169,10 +222,7 @@ async function fetchSiteData(site) {
 			/* optional */
 		}
 
-		return {
-			id: site.id,
-			name: site.name,
-			apiUrl: site.apiUrl,
+		return baseResult(site, {
 			fetchedAt: new Date().toISOString(),
 			balanceUsd,
 			totalUsedUsd,
@@ -180,21 +230,77 @@ async function fetchSiteData(site) {
 			requestCount: ud.request_count,
 			group: ud.group || null,
 			error: null,
-		};
+		});
 	} catch (err) {
-		return {
-			id: site.id,
-			name: site.name,
-			apiUrl: site.apiUrl,
-			error: err.message || "Connection failed",
-		};
+		return errorResult(site, err.message || "Connection failed");
 	}
+}
+
+/* ─── API Helpers: Sub2API ─── */
+function extractSub2apiUsage(response) {
+	const remaining =
+		response?.remaining ?? response?.quota?.remaining ?? response?.balance;
+	const unit = response?.unit ?? response?.quota?.unit ?? "USD";
+	return {
+		isValid: response?.is_active ?? response?.isValid ?? true,
+		remaining,
+		unit,
+	};
+}
+
+async function fetchSub2apiSiteData(site) {
+	const baseUrl = site.apiUrl.replace(/\/+$/, "");
+	const headers = {
+		Accept: "application/json",
+		Authorization: `Bearer ${site.accessToken}`,
+	};
+
+	try {
+		const usageResp = await muxy.http.fetch(`${baseUrl}/v1/usage`, {
+			method: "GET",
+			headers,
+			timeoutMs: 15000,
+		});
+		if (usageResp.status < 200 || usageResp.status >= 300) {
+			return errorResult(site, `HTTP ${usageResp.status}`);
+		}
+
+		const usageJson = JSON.parse(usageResp.body || "{}");
+		const usage = extractSub2apiUsage(usageJson);
+		return baseResult(site, {
+			fetchedAt: new Date().toISOString(),
+			remaining: usage.remaining,
+			unit: usage.unit,
+			isValid: usage.isValid,
+			error: null,
+		});
+	} catch (err) {
+		return errorResult(site, err.message || "Connection failed");
+	}
+}
+
+async function fetchSiteData(site) {
+	const normalized = normalizeSite(site);
+	return siteType(normalized) === SITE_TYPES.SUB2API
+		? fetchSub2apiSiteData(normalized)
+		: fetchNewapiSiteData(normalized);
 }
 
 /* ─── Formatting ─── */
 function fmtUsdShort(val) {
 	if (val === null || val === undefined) return "—";
-	return `$${val.toFixed(2)}`;
+	const numeric = Number(val);
+	return Number.isFinite(numeric) ? `$${numeric.toFixed(2)}` : "—";
+}
+
+function fmtRemaining(val, unit = "USD") {
+	if (val === null || val === undefined || val === "") return "—";
+	const numeric = Number(val);
+	if (Number.isFinite(numeric)) {
+		if (unit === "USD") return `$${numeric.toFixed(2)}`;
+		return `${numeric.toFixed(2)} ${unit || ""}`.trim();
+	}
+	return `${val}${unit ? ` ${unit}` : ""}`;
 }
 
 function fmtRefreshTime(date) {
@@ -211,6 +317,47 @@ function fmtNextTime() {
 	const hh = String(next.getHours()).padStart(2, "0");
 	const mm = String(next.getMinutes()).padStart(2, "0");
 	return `${hh}:${mm}`;
+}
+
+function rowMetric(site, st) {
+	const type = st?.type || siteType(site);
+	if (!st) {
+		return { balance: "...", middle: "...", usage: "...", low: false };
+	}
+	if (st.error) {
+		return { balance: "—", middle: "—", usage: "—", low: false };
+	}
+	if (type === SITE_TYPES.SUB2API) {
+		const unit = st.unit || "USD";
+		const numericRemaining = Number(st.remaining);
+		const isUsd = String(unit).trim().toUpperCase() === "USD";
+		return {
+			balance: fmtRemaining(st.remaining, unit),
+			middle: unit || "—",
+			usage: st.isValid === false ? "Invalid" : "Valid",
+			low:
+				isUsd &&
+				_balAlert > 0 &&
+				Number.isFinite(numericRemaining) &&
+				numericRemaining < _balAlert,
+			invalid: st.isValid === false,
+		};
+	}
+	return {
+		balance: fmtUsdShort(st.balanceUsd),
+		middle:
+			st.todayUsageUsd !== null && st.todayUsageUsd !== undefined
+				? fmtUsdShort(st.todayUsageUsd)
+				: "—",
+		usage: fmtUsdShort(st.totalUsedUsd),
+		low: _balAlert > 0 && st.balanceUsd < _balAlert,
+	};
+}
+
+function toast(body) {
+	try {
+		muxy.toast({ title: APP_TITLE, body });
+	} catch {}
 }
 
 /* ─── Render ─── */
@@ -231,7 +378,7 @@ function render(root) {
 				class: "header-icon",
 				alt: "",
 			}),
-			"NewAPI Usage",
+			APP_TITLE,
 		),
 		h(
 			"div",
@@ -243,7 +390,7 @@ function render(root) {
 					type: "button",
 					"aria-label": "Add Site",
 					title: "Add Site",
-					onclick: () => openForm(root, null),
+					onclick: () => openAddTypePicker(root),
 				},
 				"＋",
 			),
@@ -254,9 +401,10 @@ function render(root) {
 					type: "button",
 					"aria-label": "Refresh",
 					title: "Refresh All",
-					onclick: () => refreshAll(root),
+					id: "refresh-all-btn",
+					onclick: () => refreshAll(),
 				},
-				"↻",
+				icon("refresh", 14, "", 1.5),
 			),
 		),
 	);
@@ -271,9 +419,7 @@ function render(root) {
 				await saveBalAlert(Number(e.target.value));
 				const content = document.querySelector(".content");
 				if (content) renderContent(content);
-				try {
-					muxy.toast({ title: "NewAPI Usage", body: "Balance alert updated" });
-				} catch {}
+				toast("Balance alert updated");
 			},
 		},
 		h("option", { value: "0" }, "Bal"),
@@ -292,12 +438,7 @@ function render(root) {
 				const nextEl = document.getElementById("next-refresh");
 				if (nextEl)
 					nextEl.textContent = lastRefreshTime ? `After ${fmtNextTime()}` : "";
-				try {
-					muxy.toast({
-						title: "NewAPI Usage",
-						body: "Refresh interval updated",
-					});
-				} catch {}
+				toast("Refresh interval updated");
 			},
 		},
 		h("option", { value: "60" }, "1 min"),
@@ -358,7 +499,7 @@ function renderContent(content) {
 				h(
 					"div",
 					{ style: "font-size:11px;color:var(--muxy-foreground-muted)" },
-					'Click "+ Add Site" to get started',
+					'Click "+" and choose NewAPI or Sub2API to get started',
 				),
 			),
 		);
@@ -374,149 +515,177 @@ function renderContent(content) {
 
 	const list = h("div", { class: "site-list" });
 
-	// Header
+	for (const type of Object.values(SITE_TYPES)) {
+		const groupSites = sites
+			.filter((site) => siteType(site) === type)
+			.sort((a, b) => {
+				const ae = a.enabled !== false ? 1 : 0;
+				const be = b.enabled !== false ? 1 : 0;
+				return be - ae;
+			});
+		if (groupSites.length === 0) continue;
+		appendGroupHeader(list, type, groupSites.length);
+		appendListHeader(list, type);
+		for (const site of groupSites) appendSiteRow(list, site, statusMap);
+	}
+
+	content.appendChild(list);
+}
+
+function appendListHeader(list, type) {
+	const isSub2api = type === SITE_TYPES.SUB2API;
 	list.appendChild(
 		h(
 			"div",
-			{ class: "list-header" },
+			{ class: "list-header group-list-header" },
 			h("div", { class: "col-name" }, "Name"),
+			h("div", { class: "col-consumption" }, isSub2api ? "Status" : "Used"),
+			h("div", { class: "col-today" }, isSub2api ? "Unit" : "Today"),
 			h("div", { class: "col-balance" }, "Balance"),
-			h("div", { class: "col-today" }, "Today"),
-			h("div", { class: "col-consumption" }, "Used"),
 			h("div", { class: "col-actions" }, ""),
 		),
 	);
+}
 
-	const sorted = [...sites].sort((a, b) => {
-		const ae = a.enabled !== false ? 1 : 0;
-		const be = b.enabled !== false ? 1 : 0;
-		return be - ae;
-	});
+function appendGroupHeader(list, type, count) {
+	const meta = siteMeta(type);
+	list.appendChild(
+		h(
+			"div",
+			{ class: "group-header" },
+			h("span", { class: `site-type-badge type-${type}` }, meta.short),
+			h("span", null, meta.label),
+			h("small", null, `${count} site${count > 1 ? "s" : ""}`),
+		),
+	);
+}
 
-	for (const site of sorted) {
-		const st = statusMap[site.id];
-		const hasError = st && st.error;
-		const disabled = site.enabled === false;
-		const rowClasses = [
-			hasError ? "site-error" : "",
-			disabled ? "site-disabled" : "",
-		]
-			.filter(Boolean)
-			.join(" ");
+function appendSiteRow(list, site, statusMap) {
+	const type = siteType(site);
+	const meta = siteMeta(type);
+	const st = statusMap[site.id] ? { type, ...statusMap[site.id] } : null;
+	const hasError = st && st.error;
+	const disabled = site.enabled === false;
+	const metric = rowMetric(site, st);
+	const rowClasses = [
+		hasError ? "site-error" : "",
+		disabled ? "site-disabled" : "",
+	]
+		.filter(Boolean)
+		.join(" ");
 
-		let todayText;
-		if (hasError) todayText = "—";
-		else if (st && st.todayUsageUsd !== null && st.todayUsageUsd !== undefined)
-			todayText = fmtUsdShort(st.todayUsageUsd);
-		else if (st) todayText = "—";
-		else todayText = "...";
+	list.appendChild(
+		h(
+			"div",
+			{
+				class: `list-row ${rowClasses}`.trim(),
+				"data-site-id": site.id,
+				draggable: "true",
+				ondragstart: (e) => {
+					_dragSiteId = site.id;
+					e.dataTransfer.effectAllowed = "move";
+					e.dataTransfer.setData("text/plain", site.id);
+					list
+						.querySelectorAll(".list-row")
+						.forEach((r) => r.classList.remove("drag-over"));
+				},
+				ondragover: (e) => {
+					e.preventDefault();
+					e.dataTransfer.dropEffect = "move";
+				},
+				ondrop: (e) => {
+					e.preventDefault();
+					const fromId = _dragSiteId || e.dataTransfer.getData("text/plain");
+					if (!fromId || fromId === site.id) return;
 
-		list.appendChild(
+					const fromIdx = sites.findIndex((s) => s.id === fromId);
+					if (fromIdx < 0) return;
+
+					// Insert dragged site right after the drop target, within persisted order.
+					const toIdx = sites.findIndex((s) => s.id === site.id);
+					if (toIdx < 0) return;
+
+					const [moved] = sites.splice(fromIdx, 1);
+					const newTo = sites.findIndex((s) => s.id === site.id);
+					sites.splice(newTo + 1, 0, moved);
+					saveSites();
+
+					list
+						.querySelectorAll(".list-row")
+						.forEach((r) => r.classList.remove("drag-over"));
+					const r2 = document.getElementById("root");
+					if (r2) renderContent(r2.querySelector(".content"));
+				},
+				ondragleave: (e) => {
+					e.currentTarget.classList.remove("drag-over");
+				},
+				ondragend: () => {
+					const rows = list.querySelectorAll(".list-row");
+					rows.forEach((r) => r.classList.remove("drag-over"));
+				},
+			},
+			h(
+				"div",
+				{ class: "col-name", title: `${meta.label} · ${site.apiUrl}` },
+				h(
+					"div",
+					{ class: "cell-title-line" },
+					h(
+						"span",
+						{
+							class: `site-type-badge type-${type}`,
+							title: meta.label,
+						},
+						meta.short,
+					),
+					h("div", { class: "cell-name" }, site.name),
+				),
+				hasError
+					? h("div", { class: "cell-error-inline" }, `⚠ ${st.error}`)
+					: null,
+			),
+			h(
+				"div",
+				{ class: "col-consumption" + (metric.invalid ? " bal-low" : "") },
+				metric.usage,
+			),
+			h("div", { class: "col-today" }, metric.middle),
 			h(
 				"div",
 				{
-					class: `list-row ${rowClasses}`.trim(),
-					"data-site-id": site.id,
-					draggable: "true",
-					ondragstart: (e) => {
-						_dragSiteId = site.id;
-						e.dataTransfer.effectAllowed = "move";
-						e.dataTransfer.setData("text/plain", site.id);
-						list
-							.querySelectorAll(".list-row")
-							.forEach((r) => r.classList.remove("drag-over"));
-					},
-					ondragover: (e) => {
-						e.preventDefault();
-						e.dataTransfer.dropEffect = "move";
-					},
-					ondrop: (e) => {
-						e.preventDefault();
-						const fromId = _dragSiteId || e.dataTransfer.getData("text/plain");
-						if (!fromId || fromId === site.id) return;
-
-						const fromIdx = sites.findIndex((s) => s.id === fromId);
-						if (fromIdx < 0) return;
-
-						// Insert dragged site right after the drop target
-						const toIdx = sites.findIndex((s) => s.id === site.id);
-						if (toIdx < 0) return;
-
-						const [moved] = sites.splice(fromIdx, 1);
-						const newTo = sites.findIndex((s) => s.id === site.id);
-						sites.splice(newTo + 1, 0, moved);
-						saveSites();
-
-						list
-							.querySelectorAll(".list-row")
-							.forEach((r) => r.classList.remove("drag-over"));
-						const r2 = document.getElementById("root");
-						if (r2) renderContent(r2.querySelector(".content"));
-					},
-					ondragleave: (e) => {
-						e.currentTarget.classList.remove("drag-over");
-					},
-					ondragend: () => {
-						const rows = list.querySelectorAll(".list-row");
-						rows.forEach((r) => r.classList.remove("drag-over"));
-					},
+					class: "col-balance" + (metric.low ? " bal-low" : ""),
 				},
+				metric.balance,
+			),
+			h(
+				"div",
+				{ class: "col-actions" },
 				h(
-					"div",
-					{ class: "col-name", title: site.apiUrl },
-					h("div", { class: "cell-name" }, site.name),
-					hasError
-						? h("div", { class: "cell-error-inline" }, `⚠ ${st.error}`)
-						: null,
-				),
-				h(
-					"div",
+					"button",
 					{
-						class:
-							"col-balance" +
-							(_balAlert > 0 && st && !hasError && st.balanceUsd < _balAlert
-								? " bal-low"
-								: ""),
+						class: "action-btn",
+						type: "button",
+						title: "Edit",
+						onclick: () => openForm(document.getElementById("root"), site),
 					},
-					hasError ? "—" : st ? fmtUsdShort(st.balanceUsd) : "...",
-				),
-				h("div", { class: "col-today" }, todayText),
-				h(
-					"div",
-					{ class: "col-consumption" },
-					hasError ? "—" : st ? fmtUsdShort(st.totalUsedUsd) : "...",
+					"✎",
 				),
 				h(
-					"div",
-					{ class: "col-actions" },
-					h(
-						"button",
-						{
-							class: "action-btn",
-							type: "button",
-							title: "Edit",
-							onclick: () => openForm(document.getElementById("root"), site),
+					"button",
+					{
+						class: "action-btn",
+						type: "button",
+						title: "Refresh",
+						onclick: (e) => {
+							e.stopPropagation();
+							refreshSingleRow(site);
 						},
-						"✎",
-					),
-					h(
-						"button",
-						{
-							class: "action-btn",
-							type: "button",
-							title: "Refresh",
-							onclick: (e) => {
-								e.stopPropagation();
-								refreshSingleRow(site);
-							},
-						},
-						h("span", { class: "btn-spin" }, "↻"),
-					),
+					},
+					h("span", { class: "btn-spin" }, icon("refresh", 12, "", 1.5)),
 				),
 			),
-		);
-	}
-	content.appendChild(list);
+		),
+	);
 }
 
 function updateLastRefreshTime() {
@@ -527,11 +696,74 @@ function updateLastRefreshTime() {
 	if (nextEl) nextEl.textContent = `After ${fmtNextTime()}`;
 }
 
+/* ─── Add Type Picker ─── */
+function openAddTypePicker(root) {
+	if (formOpen) return;
+	formOpen = true;
+
+	const triggerClose = () => {
+		formOpen = false;
+		const overlay = root.querySelector(".form-overlay");
+		if (overlay) overlay.remove();
+	};
+
+	const overlay = h("div", {
+		class: "form-overlay",
+		onclick: (e) => {
+			if (e.target === overlay) triggerClose();
+		},
+	});
+	const panel = h("div", { class: "form-panel type-picker-panel" });
+	panel.appendChild(h("h3", null, "Add Site"));
+	panel.appendChild(
+		h(
+			"div",
+			{ class: "type-options" },
+			...Object.values(SITE_TYPES).map((type) => {
+				const meta = siteMeta(type);
+				return h(
+					"button",
+					{
+						class: `type-option type-${type}`,
+						type: "button",
+						onclick: () => {
+							triggerClose();
+							openForm(root, null, type);
+						},
+					},
+					h("span", { class: `site-type-badge type-${type}` }, meta.short),
+					h(
+						"span",
+						{ class: "type-option-copy" },
+						h("strong", null, meta.label),
+						h("small", null, meta.description),
+					),
+				);
+			}),
+		),
+	);
+	panel.appendChild(
+		h(
+			"div",
+			{ class: "form-actions" },
+			h(
+				"button",
+				{ class: "btn-cancel", type: "button", onclick: triggerClose },
+				"Cancel",
+			),
+		),
+	);
+	root.appendChild(overlay);
+	overlay.appendChild(panel);
+}
+
 /* ─── Form Overlay ─── */
-function openForm(root, site) {
+function openForm(root, site, forcedType) {
 	if (formOpen) return;
 	formOpen = true;
 	const isEdit = site !== null;
+	const type = isEdit ? siteType(site) : forcedType || SITE_TYPES.NEWAPI;
+	const meta = siteMeta(type);
 
 	const triggerClose = () => {
 		formOpen = false;
@@ -547,7 +779,14 @@ function openForm(root, site) {
 	});
 
 	const panel = h("div", { class: "form-panel" });
-	panel.appendChild(h("h3", null, isEdit ? "Edit" : "Add"));
+	panel.appendChild(
+		h(
+			"h3",
+			{ class: "form-title" },
+			h("span", null, `${isEdit ? "Edit" : "Add"} ${meta.label}`),
+			h("span", { class: `site-type-badge type-${type}` }, meta.short),
+		),
+	);
 
 	const fields = [
 		{
@@ -559,24 +798,36 @@ function openForm(root, site) {
 		{
 			id: "apiUrl",
 			label: "API URL",
-			placeholder: "https://newapi.example.com",
+			placeholder: meta.apiPlaceholder,
 			value: site?.apiUrl || "",
 			type: "url",
 		},
 		{
 			id: "accessToken",
 			label: "Access Token",
-			placeholder: "Your Personal Security Settings",
+			placeholder: "Your API access token",
 			value: site?.accessToken || "",
 			type: "password",
 		},
-		{
-			id: "userId",
-			label: "User ID",
-			placeholder: "User ID from the site",
-			value: site?.userId || "",
-		},
 	];
+
+	if (type === SITE_TYPES.NEWAPI) {
+		const defaultHeader = defaultNewapiUserHeaderName();
+		fields.push(
+			{
+				id: "userId",
+				label: "User ID",
+				placeholder: "User ID from the NewAPI site",
+				value: site?.userId || "",
+			},
+			{
+				id: "userHeaderName",
+				label: "User Header (optional)",
+				placeholder: `Default: ${defaultHeader}`,
+				value: site?.userHeaderName || "",
+			},
+		);
+	}
 
 	const enabledDefault = site ? site.enabled !== false : true;
 
@@ -612,7 +863,7 @@ function openForm(root, site) {
 	inputs.enabled = enabledCb;
 
 	async function handleSave() {
-		const val = (id) => inputs[id].value.trim();
+		const val = (id) => inputs[id]?.value.trim() || "";
 		if (!val("name")) {
 			showStatus(root, "error", "Name is required");
 			return;
@@ -636,8 +887,8 @@ function openForm(root, site) {
 			showStatus(root, "error", "Access Token is required");
 			return;
 		}
-		if (!val("userId")) {
-			showStatus(root, "error", "User ID is required");
+		if (type === SITE_TYPES.NEWAPI && !val("userId")) {
+			showStatus(root, "error", "User ID is required for NewAPI");
 			return;
 		}
 
@@ -651,14 +902,19 @@ function openForm(root, site) {
 			id: isEdit
 				? site.id
 				: `${now}-${Math.random().toString(36).slice(2, 10)}`,
+			type,
 			name: val("name"),
 			apiUrl: cleanUrl,
 			accessToken: val("accessToken"),
-			userId: val("userId"),
 			enabled,
 			createdAt: isEdit ? site.createdAt : now,
 			updatedAt: now,
 		};
+		if (type === SITE_TYPES.NEWAPI) {
+			newSite.userId = val("userId");
+			const userHeaderName = val("userHeaderName");
+			if (userHeaderName) newSite.userHeaderName = userHeaderName;
+		}
 
 		if (isEdit) {
 			const idx = sites.findIndex((s) => s.id === site.id);
@@ -751,23 +1007,33 @@ function hideRefreshIndicator() {
 	if (btn) btn.classList.remove("refreshing");
 }
 
+function numericParts(text) {
+	const match = String(text).match(/^(.*?)([-+]?\d+(?:\.\d+)?)(.*)$/);
+	if (!match) return null;
+	return { prefix: match[1], value: Number(match[2]), suffix: match[3] };
+}
+
 function animateCell(el, newText, duration) {
 	const oldText = el.textContent;
 	if (oldText === newText) return;
-	const oldNum = parseFloat(oldText.replace(/[^\d.-]/g, ""));
-	const newNum = parseFloat(newText.replace(/[^\d.-]/g, ""));
-	if (isNaN(oldNum) || isNaN(newNum)) {
+	const oldParts = numericParts(oldText);
+	const newParts = numericParts(newText);
+	if (
+		!oldParts ||
+		!newParts ||
+		!Number.isFinite(oldParts.value) ||
+		!Number.isFinite(newParts.value)
+	) {
 		el.textContent = newText;
 		return;
 	}
 
-	const prefix = newText.startsWith("$") ? "$" : "";
 	const start = performance.now();
 	function tick(now) {
 		const t = Math.min((now - start) / duration, 1);
 		const ease = 1 - (1 - t) ** 3;
-		const current = oldNum + (newNum - oldNum) * ease;
-		el.textContent = `${prefix}${current.toFixed(2)}`;
+		const current = oldParts.value + (newParts.value - oldParts.value) * ease;
+		el.textContent = `${newParts.prefix}${current.toFixed(2)}${newParts.suffix}`;
 		if (t < 1) requestAnimationFrame(tick);
 	}
 	requestAnimationFrame(tick);
@@ -778,11 +1044,12 @@ function updateRowValues(siteId, data) {
 	const row = document.querySelector(`[data-site-id="${siteId}"]`);
 	if (!row) return;
 
+	const site = sites.find((s) => s.id === siteId) || data;
 	const nameEl = row.querySelector(".col-name");
 	const balEl = row.querySelector(".col-balance");
 	const conEl = row.querySelector(".col-consumption");
 	const todEl = row.querySelector(".col-today");
-	if (!balEl || !conEl || !todEl) return;
+	if (!balEl || !conEl || !todEl || !nameEl) return;
 
 	const hasError = !!data.error;
 	if (hasError) {
@@ -797,13 +1064,12 @@ function updateRowValues(siteId, data) {
 		errEl.textContent = `⚠ ${data.error}`;
 		row.classList.add("site-error");
 	} else {
-		animateCell(balEl, fmtUsdShort(data.balanceUsd), 1000);
-		animateCell(conEl, fmtUsdShort(data.totalUsedUsd), 1000);
-		animateCell(
-			todEl,
-			data.todayUsageUsd !== null ? fmtUsdShort(data.todayUsageUsd) : "—",
-			1000,
-		);
+		const metric = rowMetric(site, { type: siteType(site), ...data });
+		animateCell(balEl, metric.balance, 1000);
+		animateCell(todEl, metric.middle, 1000);
+		animateCell(conEl, metric.usage, 1000);
+		balEl.classList.toggle("bal-low", !!metric.low);
+		conEl.classList.toggle("bal-low", !!metric.invalid);
 		// Remove inline error
 		const errEl = nameEl.querySelector(".cell-error-inline");
 		if (errEl) errEl.remove();
@@ -817,18 +1083,17 @@ async function refreshSingleRow(site) {
 	const result = await fetchSiteData(site);
 	setRowLoading(site.id, false);
 
-	if (statusData && Array.isArray(statusData.sites)) {
-		const idx = statusData.sites.findIndex((s) => s.id === site.id);
-		if (idx >= 0) statusData.sites[idx] = result;
-		else statusData.sites.push(result);
-	}
+	if (!statusData) statusData = { autoRefreshSeconds, sites: [] };
+	if (!Array.isArray(statusData.sites)) statusData.sites = [];
+	const idx = statusData.sites.findIndex((s) => s.id === site.id);
+	if (idx >= 0) statusData.sites[idx] = result;
+	else statusData.sites.push(result);
 	updateRowValues(site.id, result);
 	updateLastRefreshTime();
+	statusData.autoRefreshSeconds = autoRefreshSeconds;
 	statusData.lastPollAt = lastRefreshTime?.toISOString();
 	await saveStatusCache(statusData);
-	try {
-		muxy.toast({ title: "NewAPI Usage", body: "Updated ✓" });
-	} catch {}
+	toast("Updated ✓");
 }
 
 // Snapshot old display values in numeric cells before re-render
@@ -863,18 +1128,17 @@ function rollValues(root, oldValues) {
 		const newText = cell.textContent;
 		if (oldText === newText) continue;
 
-		const oldNum = parseFloat(oldText.replace(/[^\d.-]/g, ""));
-		const newNum = parseFloat(newText.replace(/[^\d.-]/g, ""));
-		if (isNaN(oldNum) || isNaN(newNum)) continue;
+		const oldParts = numericParts(oldText);
+		const newParts = numericParts(newText);
+		if (!oldParts || !newParts) continue;
 
 		const duration = 500;
 		const start = performance.now();
 		function tick(now) {
 			const t = Math.min((now - start) / duration, 1);
 			const ease = 1 - (1 - t) ** 3; // easeOutCubic
-			const current = oldNum + (newNum - oldNum) * ease;
-			const prefix = newText.startsWith("$") ? "$" : "";
-			cell.textContent = `${prefix}${current.toFixed(2)}`;
+			const current = oldParts.value + (newParts.value - oldParts.value) * ease;
+			cell.textContent = `${newParts.prefix}${current.toFixed(2)}${newParts.suffix}`;
 			if (t < 1) requestAnimationFrame(tick);
 		}
 		requestAnimationFrame(tick);
@@ -907,9 +1171,7 @@ async function refreshSingle(root, site) {
 	const oldVals = snapshotValues(root);
 	renderContent(content);
 	animateRows(root, oldVals);
-	try {
-		muxy.toast({ title: "NewAPI Usage", body: "Updated ✓" });
-	} catch {}
+	toast("Updated ✓");
 	try {
 		muxy.events.emit("extension.newapi-usage.keepalive", {
 			sites: statusData.sites,
@@ -931,7 +1193,7 @@ function setRowLoading(siteId, loading) {
 	}
 }
 
-async function refreshAll(root) {
+async function refreshAll() {
 	if (sites.length === 0) return;
 
 	const enabledSites = sites.filter((s) => s.enabled !== false);
@@ -966,9 +1228,7 @@ async function refreshAll(root) {
 	statusData.lastPollAt = lastRefreshTime?.toISOString();
 	await saveStatusCache(statusData);
 
-	try {
-		muxy.toast({ title: "NewAPI Usage", body: "Updated ✓" });
-	} catch {}
+	toast("Updated ✓");
 	try {
 		muxy.events.emit("extension.newapi-usage.keepalive", {
 			sites: results,
@@ -978,16 +1238,28 @@ async function refreshAll(root) {
 	} catch {}
 }
 
+function scheduleRefreshAll() {
+	if (typeof requestAnimationFrame === "function") {
+		requestAnimationFrame(() => refreshAll());
+		return;
+	}
+	setTimeout(() => refreshAll(), 0);
+}
+
 /* ─── Init ─── */
 async function init() {
 	const root = document.getElementById("root");
 	if (!root) return;
 
-	await loadSites();
-	await loadRefreshInterval();
-	await loadBalAlert();
+	// Paint immediately so first open never shows a blank popover.
+	render(root);
 
-	const cached = await loadStatusCache();
+	const [cached] = await Promise.all([
+		loadStatusCache(),
+		loadSites(),
+		loadRefreshInterval(),
+		loadBalAlert(),
+	]);
 	if (cached && Array.isArray(cached.sites)) {
 		statusData = cached;
 		if (cached.autoRefreshSeconds)
@@ -1003,18 +1275,18 @@ async function init() {
 		muxy.events.emit("extension.newapi-usage.keepalive", {});
 	} catch {}
 
-	// 距上次更新超过刷新周期 → 自动刷新数据
+	// First paint local data/cache, then refresh concurrently on the next frame.
 	if (sites.length > 0) {
 		const now = Date.now();
 		const elapsed = lastRefreshTime
 			? now - lastRefreshTime.getTime()
 			: Infinity;
 		if (elapsed >= autoRefreshSeconds * 1000) {
-			refreshAll(root);
+			scheduleRefreshAll();
 		}
 	}
 
-	// On focus: re-read from storage and check staleness
+	// On focus: re-read from storage, repaint cache first, then refresh if stale.
 	muxy.onFocus((focused) => {
 		if (!focused) return;
 		loadStatusCache().then((c) => {
@@ -1040,14 +1312,14 @@ async function init() {
 				}
 			}
 			renderContent(root.querySelector(".content"));
+
+			const elapsed = lastRefreshTime
+				? Date.now() - lastRefreshTime.getTime()
+				: Infinity;
+			if (elapsed >= autoRefreshSeconds * 1000) {
+				scheduleRefreshAll();
+			}
 		});
-		// 获得焦点时也检查是否超过刷新周期
-		const elapsed = lastRefreshTime
-			? Date.now() - lastRefreshTime.getTime()
-			: Infinity;
-		if (elapsed >= autoRefreshSeconds * 1000) {
-			refreshAll(root);
-		}
 	});
 }
 

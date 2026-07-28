@@ -1,6 +1,6 @@
 {
   "name": "newapi-usage",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -15,13 +15,13 @@
   },
   "muxy": {
     "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
-    "description": "Multi-site NewAPI usage monitor — balance, consumption, and daily usage at a glance",
+    "description": "Multi-site NewAPI and Sub2API usage monitor — balance, consumption, and status at a glance",
     "background": "background.js",
     "permissions": ["commands:exec", "panels:write", "notifications:write", "storage:read", "storage:write"],
     "popovers": [
       {
         "id": "newapi-usage",
-        "title": "NewAPI Usage",
+        "title": "API Usage",
         "entry": "popover/index.html",
         "width": 520,
         "height": 520
@@ -30,7 +30,7 @@
     "commands": [
       {
         "id": "open-newapi-usage",
-        "title": "NewAPI Usage: Show",
+        "title": "API Usage: Show",
         "action": { "kind": "openPopover", "popover": "newapi-usage" }
       }
     ],
@@ -38,7 +38,7 @@
       {
         "id": "newapi-usage",
         "icon": { "symbol": "dollarsign.circle" },
-        "tooltip": "NewAPI Usage",
+        "tooltip": "API Usage",
         "side": "right",
         "command": "open-newapi-usage"
       }
