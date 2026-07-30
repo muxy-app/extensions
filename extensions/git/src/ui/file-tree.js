@@ -37,12 +37,19 @@ function sortedDirs(node) {
     return [...node.dirs.values()].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
 }
 
-function folderRow(dir, depth, expanded, toggle) {
+function folderFiles(node, out = []) {
+    for (const dir of node.dirs.values())
+        folderFiles(dir, out);
+    out.push(...node.files);
+    return out;
+}
+
+function folderRow(dir, depth, expanded, toggle, actions) {
     return h("li", {
         class: "group flex h-[24px] cursor-pointer items-center gap-1.5 pr-2.5 hover:bg-accent",
         style: `padding-left: ${treeIndent(depth)}px`,
         onclick: toggle,
-    }, icon("chevronRight", 12, cls("-mr-1.5 shrink-0 text-muted-foreground transition-transform", expanded && "rotate-90"), 2.2), icon("folder", 12, "shrink-0 text-muted-foreground", 1.8), h("span", { class: "min-w-0 flex-1 truncate text-left text-[12px] font-medium text-foreground", title: dir.path }, dir.name));
+    }, icon("chevronRight", 12, cls("-mr-1.5 shrink-0 text-muted-foreground transition-transform", expanded && "rotate-90"), 2.2), icon("folder", 12, "shrink-0 text-muted-foreground", 1.8), h("span", { class: "min-w-0 flex-1 truncate text-left text-[12px] font-medium text-foreground", title: dir.path }, dir.name), actions);
 }
 
 function renderNode(node, depth, opts) {
@@ -53,7 +60,7 @@ function renderNode(node, depth, opts) {
         rows.push(folderRow(dir, depth, expanded, () => {
             writePref(key, expanded ? "false" : "true");
             opts.onToggle();
-        }));
+        }, opts.folderActions?.(folderFiles(dir))));
         if (expanded)
             rows.push(...renderNode(dir, depth + 1, opts));
     }

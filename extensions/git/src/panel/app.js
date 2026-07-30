@@ -262,18 +262,17 @@ export class GitPanelApp {
         if (withPr && next.kind === "ready")
             void this.resolvePr(cwd, next.status.branch);
     }
-    async stage(path) {
-        this.moveEntry(path, "unstaged", "staged");
-        const ok = await tryAction(() => runPinned((cwd) => cmd.stage(cwd, [path])), "Could not stage file");
-        if (ok)
-            this.reconcile();
-        else
-            await this.loadLocal(false);
-        return ok;
+    async stage(paths) {
+        return this.applyStaging(paths, "unstaged", "staged", (cwd) => cmd.stage(cwd, paths), "stage");
     }
-    async unstage(path) {
-        this.moveEntry(path, "staged", "unstaged");
-        const ok = await tryAction(() => runPinned((cwd) => cmd.unstage(cwd, [path])), "Could not unstage file");
+    async unstage(paths) {
+        return this.applyStaging(paths, "staged", "unstaged", (cwd) => cmd.unstage(cwd, paths), "unstage");
+    }
+    async applyStaging(paths, from, to, exec, verb) {
+        if (paths.length === 0)
+            return false;
+        this.moveEntries(paths, from, to);
+        const ok = await tryAction(() => runPinned(exec), `Could not ${verb} ${paths.length > 1 ? "files" : "file"}`);
         if (ok)
             this.reconcile();
         else
@@ -821,20 +820,23 @@ export class GitPanelApp {
         if (branchChanged && next.kind === "ready")
             void this.resolvePr(cwd, next.status.branch);
     }
-    moveEntry(path, from, to) {
+    moveEntries(paths, from, to) {
         if (this.repo.kind !== "ready")
             return;
+        const moving = new Set(paths);
         const src = this.repo.status[from];
-        const entry = src.find((file) => file.path === path);
-        if (!entry)
+        const entries = src.filter((file) => moving.has(file.path));
+        if (entries.length === 0)
             return;
-        const moved = to === "staged" ? { ...entry, label: entry.label === "?" ? "A" : entry.label } : entry;
+        const moved = to === "staged"
+            ? entries.map((entry) => ({ ...entry, label: entry.label === "?" ? "A" : entry.label }))
+            : entries;
         this.repo = {
             kind: "ready",
             status: {
                 ...this.repo.status,
-                [from]: src.filter((file) => file.path !== path),
-                [to]: [...this.repo.status[to], moved].sort((a, b) => a.path.localeCompare(b.path)),
+                [from]: src.filter((file) => !moving.has(file.path)),
+                [to]: [...this.repo.status[to].filter((file) => !moving.has(file.path)), ...moved].sort((a, b) => a.path.localeCompare(b.path)),
             },
         };
         this.render();
