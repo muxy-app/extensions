@@ -8,7 +8,7 @@
     "update-skill": "node scripts/update-skill.mjs"
   },
   "type": "module",
-  "version": "1.11.0",
+  "version": "1.12.0",
   "dependencies": {
     "@pierre/diffs": "^1.2.12"
   },
