@@ -6,7 +6,7 @@ diff viewer, and pull requests.
 ## Features
 
 - **Source Control panel** (`cmd+y`) — staged/unstaged changes, stage,
-  commit, and discard.
+  commit, and discard. In tree view, stage or unstage a whole folder at once.
 - **Branch switcher** — switch and create branches from the status bar.
 - **Diff viewer** — inline file diffs.
 - **Pull Requests** — browse PRs and view the current PR for the branch.
