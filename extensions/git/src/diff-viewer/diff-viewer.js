@@ -10,6 +10,8 @@ import "./diff-viewer.css";
 
 const viewerRoot = document.querySelector("#viewer");
 const emptyState = document.querySelector("#empty-state");
+const emptyTitle = document.querySelector("#empty-title");
+const emptyDetail = document.querySelector("#empty-detail");
 const loadingState = document.querySelector("#loading-state");
 const loadingLabel = document.querySelector("#loading-label");
 const fileListNode = document.querySelector("#file-list");
@@ -220,10 +222,18 @@ function findFocusId(focusPath) {
   return items.find((item) => matches(item.meta.path) || (item.meta.oldPath ? matches(item.meta.oldPath) : false))?.id ?? "";
 }
 
+function emptyHint() {
+  const data = diffData();
+  if (data.source === "pr") return `Pull request #${data.prNumber} has no changes against its base branch.`;
+  if (data.source === "commit") return "This commit has no file changes.";
+  if (data.source === "incoming") return "The upstream branch has no incoming changes.";
+  return "Nothing to compare against HEAD.";
+}
+
 function renderPatch(patch, focusPath) {
   const trimmed = patch.trim();
   if (!trimmed) {
-    clearDiff("No changes");
+    clearDiff("No changes", emptyHint());
     return;
   }
   items = parseItems(trimmed);
@@ -231,7 +241,7 @@ function renderPatch(patch, focusPath) {
   collapsed = new Set([...collapsed].filter((id) => ids.has(id)));
   versions = new Map([...versions].filter(([id]) => ids.has(id)));
   if (!items.length) {
-    clearDiff("No changes");
+    clearDiff("No changes", emptyHint());
     return;
   }
   const focusId = findFocusId(focusPath);
@@ -310,13 +320,15 @@ function hideLoading() {
   loadingState.classList.add("hidden");
 }
 
-function clearDiff(message) {
+function clearDiff(message, detail = "") {
   hideLoading();
   items = [];
   collapsed.clear();
   activeItemId = "";
   codeView.setItems([]);
   sidebar.clear();
+  emptyTitle.textContent = message;
+  emptyDetail.textContent = detail;
   emptyState.classList.remove("hidden");
   fileCountNode.textContent = "0";
   statFilesNode.textContent = "0";
