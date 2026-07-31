@@ -1,5 +1,5 @@
 import * as forge from "@/lib/forge";
-import { run, tryRun } from "@/lib/forge/exec";
+import { run, runOutput, tryRun } from "@/lib/forge/exec";
 
 const PENDING_OP_PROBE = [
     `[ -f "$(git rev-parse --git-path rebase-merge/head-name)" ] || [ -f "$(git rev-parse --git-path rebase-apply/head-name)" ] && { printf %s rebase; exit; }`,
@@ -33,9 +33,55 @@ function toFile(file) {
     };
 }
 
+async function isUnbornRepo() {
+    const inside = await muxy.exec(["git", "rev-parse", "--is-inside-work-tree"]).catch(() => null);
+    if (inside?.exitCode !== 0 || inside.stdout.trim() !== "true")
+        return false;
+    const head = await muxy.exec(["git", "rev-parse", "--verify", "--quiet", "HEAD"]).catch(() => null);
+    return head?.exitCode !== 0;
+}
+
+async function unbornSnapshot() {
+    const [branch, entries] = await Promise.all([
+        tryRun(["git", "branch", "--show-current"]),
+        tryRun(["git", "status", "--porcelain=1", "-z", "--untracked-files=all"]),
+    ]);
+    const stagedFiles = [];
+    const unstagedFiles = [];
+    for (const entry of entries.split("\0")) {
+        if (entry.length < 4)
+            continue;
+        const path = entry.slice(3);
+        const staged = entry.charAt(0);
+        const unstaged = entry.charAt(1);
+        if (staged !== " " && staged !== "?")
+            stagedFiles.push({ path, status: staged });
+        if (unstaged !== " ")
+            unstagedFiles.push({ path, status: unstaged });
+    }
+    return {
+        branch: branch.trim(),
+        defaultBranch: null,
+        aheadBehind: { ahead: 0, behind: 0 },
+        stagedFiles,
+        unstagedFiles,
+    };
+}
+
+async function localSnapshot(fresh) {
+    try {
+        return await muxy.git.status({ local: true, fresh });
+    }
+    catch (err) {
+        if (await isUnbornRepo())
+            return unbornSnapshot();
+        throw err;
+    }
+}
+
 export async function status({ fresh } = {}) {
     const [snapshot, op] = await Promise.all([
-        muxy.git.status({ local: true, fresh: !!fresh }),
+        localSnapshot(!!fresh),
         pendingOp(),
     ]);
     return {
@@ -66,7 +112,7 @@ async function untrackedDiff() {
     const paths = out.split("\0").filter(Boolean);
     if (paths.length === 0)
         return "";
-    const diffs = await Promise.all(paths.map((path) => tryRun(["git", "diff", "--no-color", "--no-index", "--", "/dev/null", path])));
+    const diffs = await Promise.all(paths.map((path) => runOutput(["git", "diff", "--no-color", "--no-index", "--", "/dev/null", path])));
     return diffs.filter((d) => d.trim()).join("\n");
 }
 

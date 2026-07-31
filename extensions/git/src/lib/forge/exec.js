@@ -13,3 +13,8 @@ export async function tryRun(argv) {
         return "";
     }
 }
+
+export async function runOutput(argv) {
+    const res = await muxy.exec(argv).catch(() => null);
+    return res?.stdout ?? "";
+}

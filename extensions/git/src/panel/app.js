@@ -803,7 +803,7 @@ export class GitPanelApp {
         let next;
         let branchChanged = false;
         try {
-            const status = toViewStatus(await scm.status());
+            const status = toViewStatus(await scm.status({ fresh: true }));
             const prev = scope ? this.statusCache.get(scope) : undefined;
             if (prev?.kind === "ready" && prev.status.branch === status.branch) {
                 status.pullRequest = prev.status.pullRequest;
