@@ -40,29 +40,28 @@ async function teaHosts() {
     return teaHostsPromise;
 }
 
-async function originHost(cwd) {
-    const res = await muxy.exec(["git", "remote", "get-url", "origin"], { cwd }).catch(() => null);
+async function originHost() {
+    const res = await muxy.exec(["git", "remote", "get-url", "origin"]).catch(() => null);
     if (!res || res.exitCode !== 0)
         return "";
     return parseHost(res.stdout);
 }
 
-async function backendFor(cwd) {
-    const host = await originHost(cwd);
+async function backend() {
+    const host = await originHost();
     const hosts = await teaHosts();
     return host && hosts.has(host) ? tea : gh;
 }
 
-export const prList = async (cwd, opts) => (await backendFor(cwd)).prList(cwd, opts);
-export const prInfo = async (cwd) => (await backendFor(cwd)).prInfo(cwd);
-export const statusPr = prInfo;
-export const prCreate = async (cwd, opts) => (await backendFor(cwd)).prCreate(cwd, opts);
-export const prMerge = async (cwd, opts) => (await backendFor(cwd)).prMerge(cwd, opts);
-export const prClose = async (cwd, number) => (await backendFor(cwd)).prClose(cwd, number);
-export const prReady = async (cwd, opts) => (await backendFor(cwd)).prReady(cwd, opts);
-export const prCheckout = async (cwd, number) => (await backendFor(cwd)).prCheckout(cwd, number);
-export const prepareWorktreeBranch = async (cwd, number) => (await backendFor(cwd)).prepareWorktreeBranch(cwd, number);
-export const prDiff = async (cwd, number) => (await backendFor(cwd)).prDiff(cwd, number);
-export const runList = async (cwd, opts) => (await backendFor(cwd)).runList(cwd, opts);
-export const runRerun = async (cwd, id, opts) => (await backendFor(cwd)).runRerun(cwd, id, opts);
-export const runCancel = async (cwd, id) => (await backendFor(cwd)).runCancel(cwd, id);
+export const prList = async (opts) => (await backend()).prList(opts);
+export const prInfo = async () => (await backend()).prInfo();
+export const prCreate = async (opts) => (await backend()).prCreate(opts);
+export const prMerge = async (opts) => (await backend()).prMerge(opts);
+export const prClose = async (number) => (await backend()).prClose(number);
+export const prReady = async (opts) => (await backend()).prReady(opts);
+export const prCheckout = async (number) => (await backend()).prCheckout(number);
+export const prCheckoutWorktree = async (number, path) => (await backend()).prCheckoutWorktree(number, path);
+export const prDiff = async (number) => (await backend()).prDiff(number);
+export const runList = async (opts) => (await backend()).runList(opts);
+export const runRerun = async (id, opts) => (await backend()).runRerun(id, opts);
+export const runCancel = async (id) => (await backend()).runCancel(id);

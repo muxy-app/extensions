@@ -1,66 +1,38 @@
-import * as cmd from "@/lib/cmd";
+import * as repo from "@/lib/repo";
 
-let pinnedCwd;
-let pinnedDepth = 0;
-let invalidationPending = false;
-
-let resolvedCwd = false;
-let cachedCwd;
-let inflightCwd = null;
+let scopePromise = null;
+let scopeValue;
+let scopeResolved = false;
 
 let busyDepth = 0;
 const busyListeners = new Set();
 
-function normalizePath(path) {
-    return path.replace(/\/+$/, "");
+function invalidateScope() {
+    scopeResolved = false;
+    scopePromise = null;
+    scopeValue = undefined;
 }
 
-export function samePath(a, b) {
-    return normalizePath(a) === normalizePath(b);
-}
+muxy.events.subscribe("project.switched", invalidateScope);
+muxy.events.subscribe("worktree.switched", invalidateScope);
 
-async function resolveActiveWorktreePath() {
-    try {
-        const worktrees = await muxy.worktrees.list();
-        const active = worktrees.find((w) => w.isActive) ?? worktrees.find((w) => w.isPrimary);
-        return active?.path ?? worktrees[0]?.path;
-    }
-    catch {
-        return undefined;
-    }
-}
-
-function invalidateCwd() {
-    if (pinnedDepth > 0) {
-        invalidationPending = true;
-        return;
-    }
-    resolvedCwd = false;
-    inflightCwd = null;
-    cachedCwd = undefined;
-}
-
-muxy.events.subscribe("project.switched", invalidateCwd);
-muxy.events.subscribe("worktree.switched", invalidateCwd);
-
-export async function activeWorktreePath() {
-    if (pinnedDepth > 0)
-        return pinnedCwd;
-    if (resolvedCwd)
-        return cachedCwd;
-    if (!inflightCwd) {
-        inflightCwd = resolveActiveWorktreePath().then((value) => {
-            cachedCwd = value;
-            resolvedCwd = true;
-            inflightCwd = null;
+export async function repoScope() {
+    if (scopeResolved)
+        return scopeValue;
+    if (!scopePromise) {
+        scopePromise = repo
+            .repoInfo()
+            .then((info) => info?.root)
+            .catch(() => undefined)
+            .then((value) => {
+            scopeValue = value;
+            scopeResolved = true;
+            scopePromise = null;
             return value;
         });
     }
-    return inflightCwd;
+    return scopePromise;
 }
-
-export const activeProject = activeWorktreePath;
-export const activeGitProjectPath = activeWorktreePath;
 
 export function isBusy() {
     return busyDepth > 0;
@@ -80,38 +52,25 @@ function setBusyDepth(next) {
             fn(now);
 }
 
-export async function runPinned(fn) {
-    const cwd = await activeWorktreePath();
-    if (pinnedDepth === 0)
-        pinnedCwd = cwd;
-    pinnedDepth += 1;
+export async function runBusy(fn) {
     setBusyDepth(busyDepth + 1);
     try {
-        return await fn(pinnedCwd);
+        return await fn();
     }
     finally {
-        pinnedDepth -= 1;
-        if (pinnedDepth === 0) {
-            pinnedCwd = undefined;
-            if (invalidationPending) {
-                invalidationPending = false;
-                invalidateCwd();
-            }
-        }
         setBusyDepth(busyDepth - 1);
     }
 }
 
-export async function openDiff(focusPath) {
+function openDiffTab(data) {
     try {
-        const cwd = await activeWorktreePath();
         void muxy.tabs.open({
             kind: "extensionWebView",
             extension: {
                 id: muxy.extensionID,
                 tabType: "diff-viewer",
                 singleton: true,
-                data: { focusPath, cwd },
+                data,
             },
         });
     }
@@ -120,58 +79,20 @@ export async function openDiff(focusPath) {
     }
 }
 
-export async function openCommitDiff(hash, shortHash) {
-    try {
-        const cwd = await activeWorktreePath();
-        void muxy.tabs.open({
-            kind: "extensionWebView",
-            extension: {
-                id: muxy.extensionID,
-                tabType: "diff-viewer",
-                singleton: true,
-                data: { source: "commit", hash, shortHash, cwd },
-            },
-        });
-    }
-    catch {
-        return;
-    }
+export function openDiff(focusPath) {
+    openDiffTab({ focusPath });
 }
 
-export async function openPrDiff(prNumber) {
-    try {
-        const cwd = await activeWorktreePath();
-        void muxy.tabs.open({
-            kind: "extensionWebView",
-            extension: {
-                id: muxy.extensionID,
-                tabType: "diff-viewer",
-                singleton: true,
-                data: { source: "pr", prNumber, cwd },
-            },
-        });
-    }
-    catch {
-        return;
-    }
+export function openCommitDiff(hash, shortHash) {
+    openDiffTab({ source: "commit", hash, shortHash });
 }
 
-export async function openIncomingDiff() {
-    try {
-        const cwd = await activeWorktreePath();
-        void muxy.tabs.open({
-            kind: "extensionWebView",
-            extension: {
-                id: muxy.extensionID,
-                tabType: "diff-viewer",
-                singleton: true,
-                data: { source: "incoming", cwd },
-            },
-        });
-    }
-    catch {
-        return;
-    }
+export function openPrDiff(prNumber) {
+    openDiffTab({ source: "pr", prNumber });
+}
+
+export function openIncomingDiff() {
+    openDiffTab({ source: "incoming" });
 }
 
 export function openUrl(url) {
@@ -251,18 +172,17 @@ function normalizeLabel(status) {
     return letter || "M";
 }
 
-export async function listBranches() {
-    const cwd = await activeWorktreePath();
-    return cmd.branches(cwd);
+export function listBranches() {
+    return repo.branches();
 }
 
-export async function hasPendingChanges(cwd) {
-    const s = await cmd.status(cwd).catch(() => null);
+export async function hasPendingChanges() {
+    const s = await repo.status().catch(() => null);
     if (!s)
         return false;
     return s.stagedFiles.length > 0 || s.unstagedFiles.length > 0;
 }
 
-export function commitAll(message, cwd) {
-    return tryAction(() => cmd.commit(cwd, { message, stageAll: true }), "Could not commit changes");
+export function commitAll(message) {
+    return tryAction(() => repo.commit({ message, stageAll: true }), "Could not commit changes");
 }

@@ -25,6 +25,15 @@ Install whichever CLI(s) you need and authenticate once (`gh auth login` /
 side by side. Plain source control (status, commit, branch, diff, worktrees)
 uses `git` alone and needs neither CLI.
 
+## Remote workspaces
+
+Source control runs through Muxy's own git integration (`muxy.git`), so the
+panel follows the active project — including projects on remote (SSH) devices.
+GitHub pull requests go through the same integration. The features Muxy's git
+API does not cover — Forgejo/Gitea pull requests, GitHub Actions runs, fetch,
+merge/rebase, and aborting an in-progress operation — shell out to `git`, `gh`,
+or `tea` in the active worktree, so they follow the remote workspace too.
+
 ## Building
 
 ```sh

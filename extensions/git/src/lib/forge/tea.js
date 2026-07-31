@@ -2,12 +2,12 @@ import { run, tryRun } from "@/lib/forge/exec";
 
 const PR_FIELDS = "index,state,title,author,url,mergeable,base,head,ci";
 
-async function currentBranch(cwd) {
-    return (await tryRun(["git", "branch", "--show-current"], cwd)).trim();
+async function currentBranch() {
+    return (await tryRun(["git", "branch", "--show-current"])).trim();
 }
 
-async function localBranchExists(cwd, branch) {
-    const res = await muxy.exec(["git", "show-ref", "--verify", "--quiet", `refs/heads/${branch}`], { cwd });
+async function localBranchExists(branch) {
+    const res = await muxy.exec(["git", "show-ref", "--verify", "--quiet", `refs/heads/${branch}`]);
     return res.exitCode === 0;
 }
 
@@ -93,11 +93,11 @@ function matchesFilter(pr, filter) {
     return true;
 }
 
-export async function prList(cwd, { filter, limit } = {}) {
+export async function prList({ filter, limit } = {}) {
     const argv = ["tea", "pr", "list", "--state", teaQueryState(filter), "--fields", PR_FIELDS, "--output", "json"];
     if (limit)
         argv.push("--limit", String(limit));
-    const out = await tryRun(argv, cwd);
+    const out = await tryRun(argv);
     if (!out.trim())
         return [];
     try {
@@ -110,31 +110,31 @@ export async function prList(cwd, { filter, limit } = {}) {
     }
 }
 
-async function findPrByNumber(cwd, number) {
-    const all = await prList(cwd, { filter: "all", limit: 200 });
+async function findPrByNumber(number) {
+    const all = await prList({ filter: "all", limit: 200 });
     return all.find((p) => String(p.number) === String(number)) ?? null;
 }
 
-async function storedPrNumber(cwd) {
-    const branch = await currentBranch(cwd);
+async function storedPrNumber() {
+    const branch = await currentBranch();
     if (!branch)
         return null;
-    const n = (await tryRun(["git", "config", "--get", `branch.${branch}.muxy-pr-number`], cwd)).trim();
+    const n = (await tryRun(["git", "config", "--get", `branch.${branch}.muxy-pr-number`])).trim();
     return n || null;
 }
 
-export async function prInfo(cwd) {
+export async function prInfo() {
     try {
-        const stored = await storedPrNumber(cwd);
+        const stored = await storedPrNumber();
         if (stored) {
-            const byNumber = await findPrByNumber(cwd, stored);
+            const byNumber = await findPrByNumber(stored);
             if (byNumber)
                 return byNumber;
         }
-        const branch = await currentBranch(cwd);
+        const branch = await currentBranch();
         if (!branch)
             return null;
-        const all = await prList(cwd, { filter: "all", limit: 200 });
+        const all = await prList({ filter: "all", limit: 200 });
         return all.find((p) => p.headBranch === branch || p.headBranch.endsWith(`:${branch}`)) ?? null;
     }
     catch {
@@ -142,54 +142,54 @@ export async function prInfo(cwd) {
     }
 }
 
-export const statusPr = prInfo;
-
-export function prCreate(cwd, { title, body, baseBranch, draft } = {}) {
+export function prCreate({ title, body, baseBranch, draft } = {}) {
     const finalTitle = draft ? `WIP: ${title}` : title;
     const argv = ["tea", "pr", "create", "--title", finalTitle, "--description", body ?? ""];
     if (baseBranch)
         argv.push("--base", baseBranch);
-    return run(argv, cwd);
+    return run(argv);
 }
 
-export function prMerge(cwd, { number, method } = {}) {
+export function prMerge({ number, method } = {}) {
     const style = method === "squash" ? "squash" : method === "rebase" ? "rebase" : "merge";
-    return run(["tea", "pr", "merge", "--style", style, String(number)], cwd);
+    return run(["tea", "pr", "merge", "--style", style, String(number)]);
 }
 
-export function prClose(cwd, number) {
-    return run(["tea", "pr", "close", String(number)], cwd);
+export function prClose(number) {
+    return run(["tea", "pr", "close", String(number)]);
 }
 
-export function prReady(cwd, { number, title } = {}) {
+export function prReady({ number, title } = {}) {
     const original = String(title ?? "");
     const stripped = original.replace(/^\s*(?:wip:|\[wip\])\s*/i, "").trim();
-    return run(["tea", "pr", "edit", "--title", stripped || original, String(number)], cwd);
+    return run(["tea", "pr", "edit", "--title", stripped || original, String(number)]);
 }
 
-async function preparePrBranch(cwd, number) {
+async function preparePrBranch(number) {
     const branch = `pr/${number}`;
     const startPoint = `refs/muxy/pr/${number}`;
-    await run(["git", "fetch", "origin", `+refs/pull/${number}/head:${startPoint}`], cwd);
-    const onBranch = (await currentBranch(cwd)) === branch;
+    await run(["git", "fetch", "origin", `+refs/pull/${number}/head:${startPoint}`]);
+    const onBranch = (await currentBranch()) === branch;
     if (!onBranch) {
-        if (await localBranchExists(cwd, branch))
-            await run(["git", "branch", "-f", branch, startPoint], cwd);
+        if (await localBranchExists(branch))
+            await run(["git", "branch", "-f", branch, startPoint]);
         else
-            await run(["git", "branch", branch, startPoint], cwd);
+            await run(["git", "branch", branch, startPoint]);
     }
-    await run(["git", "config", `branch.${branch}.muxy-pr-number`, String(number)], cwd);
+    await run(["git", "config", `branch.${branch}.muxy-pr-number`, String(number)]);
     return branch;
 }
 
-export async function prCheckout(cwd, number) {
-    const branch = await preparePrBranch(cwd, number);
-    await run(["git", "switch", branch], cwd);
+export async function prCheckout(number) {
+    const branch = await preparePrBranch(number);
+    await run(["git", "switch", branch]);
     return { branch };
 }
 
-export async function prepareWorktreeBranch(cwd, number) {
-    return preparePrBranch(cwd, number);
+export async function prCheckoutWorktree(number, path) {
+    const branch = await preparePrBranch(number);
+    await muxy.git.worktree.add({ path, branch, createBranch: false });
+    return branch;
 }
 
 export async function runList() {
@@ -204,12 +204,12 @@ export async function runCancel() {
     throw new Error("Action runs are only available on GitHub repositories.");
 }
 
-export async function prDiff(cwd, number) {
+export async function prDiff(number) {
     const startPoint = `refs/muxy/pr/${number}`;
-    await run(["git", "fetch", "origin", `+refs/pull/${number}/head:${startPoint}`], cwd);
-    const pr = await findPrByNumber(cwd, number);
+    await run(["git", "fetch", "origin", `+refs/pull/${number}/head:${startPoint}`]);
+    const pr = await findPrByNumber(number);
     const baseRef = pr?.baseBranch ? `origin/${pr.baseBranch.replace(/^.*:/, "")}` : "origin/HEAD";
-    const mergeBase = (await tryRun(["git", "merge-base", baseRef, startPoint], cwd)).trim() || baseRef;
-    const out = await run(["git", "diff", "--no-color", `${mergeBase}..${startPoint}`], cwd);
+    const mergeBase = (await tryRun(["git", "merge-base", baseRef, startPoint])).trim() || baseRef;
+    const out = await run(["git", "diff", "--no-color", `${mergeBase}..${startPoint}`]);
     return { diff: out };
 }

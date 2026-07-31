@@ -1,5 +1,4 @@
-import * as cmd from "@/lib/cmd";
-import { activeWorktreePath } from "@/lib/git";
+import * as repo from "@/lib/repo";
 
 export function remoteToWebUrl(remote) {
     const url = (remote || "").trim();
@@ -18,6 +17,5 @@ export function remoteToWebUrl(remote) {
 }
 
 export async function repoWebUrl() {
-    const cwd = await activeWorktreePath();
-    return remoteToWebUrl(await cmd.remoteUrl(cwd));
+    return remoteToWebUrl(await repo.remoteUrl());
 }

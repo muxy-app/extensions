@@ -1,6 +1,6 @@
 import { branchNameFromTitle } from "@/lib/pr";
 import { cls, h, readPref, writePref } from "@/lib/dom";
-import { activeWorktreePath, confirmAction, listBranches, openDiff } from "@/lib/git";
+import { confirmAction, listBranches, openDiff } from "@/lib/git";
 import { openInEditor, revealInFinder } from "@/lib/file-actions";
 import { icon } from "@/lib/icons";
 import { button, closeFloating, fileRow, iconButton, menuItem, openFloating, smallIconButton, textarea, } from "@/ui/shared";
@@ -8,18 +8,12 @@ import { treeIndent, treeRows } from "@/ui/file-tree";
 const SECTION_PREFIX = "muxy.git.section.";
 const TREE_PREFIX = "muxy.git.tree.";
 const VIEW_KEY = "muxy.git.changes.view";
-async function openFileInEditor(path) {
-    await openInEditor(await activeWorktreePath(), path);
-}
-async function revealFileInFinder(path) {
-    await revealInFinder(await activeWorktreePath(), path);
-}
 function fileActionHandlers(entry) {
     if (entry.label === "D")
         return {};
     return {
-        onOpenEditor: (path) => void openFileInEditor(path),
-        onReveal: (path) => void revealFileInFinder(path),
+        onOpenEditor: (path) => void openInEditor(path),
+        onReveal: (path) => void revealInFinder(path),
     };
 }
 function changesView() {

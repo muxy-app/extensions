@@ -1,5 +1,5 @@
 import { h, readPref, writePref } from "@/lib/dom";
-import * as cmd from "@/lib/cmd";
+import * as repo from "@/lib/repo";
 import { CodeView, parsePatchFiles, preloadHighlighter, getFiletypeFromFileName } from "@pierre/diffs";
 import { getOrCreateWorkerPoolSingleton } from "@pierre/diffs/worker";
 import { DiffFileListView } from "./diff-file-list";
@@ -115,8 +115,8 @@ const sidebar = new DiffFileListView(
   fileListNode,
   (itemId) => setActiveItem(itemId),
   {
-    onOpenEditor: (path) => void openInEditor(diffData().cwd, path),
-    onReveal: (path) => void revealInFinder(diffData().cwd, path),
+    onOpenEditor: (path) => void openInEditor(path),
+    onReveal: (path) => void revealInFinder(path),
   },
 );
 
@@ -330,18 +330,17 @@ function diffData() {
 }
 
 async function loadGitDiff() {
-  if (!window.muxy?.exec) {
+  if (!window.muxy?.git) {
     clearDiff("Muxy unavailable");
     return;
   }
   const data = diffData();
-  const cwd = data.cwd;
   summaryNode.textContent = "Loading diff...";
   try {
     if (data.source === "pr" && data.prNumber) {
       sourceLabelNode.textContent = `PR #${data.prNumber}`;
       showLoading(`Loading diff for PR #${data.prNumber}...`);
-      const { diff } = await cmd.prDiff(cwd, data.prNumber);
+      const { diff } = await repo.prDiff(data.prNumber);
       renderPatch(diff, data.focusPath ?? "");
       return;
     }
@@ -349,31 +348,22 @@ async function loadGitDiff() {
       const label = data.shortHash || data.hash.slice(0, 7);
       sourceLabelNode.textContent = `Commit ${label}`;
       showLoading(`Loading diff for ${label}...`);
-      const res = await window.muxy.exec(["git", "show", "--format=", "--no-color", data.hash], { cwd });
-      if (res.exitCode !== 0) {
-        clearDiff(res.stderr.trim() || "Could not load commit diff.");
-        return;
-      }
-      renderPatch(res.stdout, data.focusPath ?? "");
+      const { diff } = await repo.commitDiff(data.hash);
+      renderPatch(diff, data.focusPath ?? "");
       return;
     }
     if (data.source === "incoming") {
-      const ref = data.ref || "@{upstream}";
       sourceLabelNode.textContent = "Incoming changes";
       showLoading("Loading incoming changes...");
-      const res = await window.muxy.exec(["git", "diff", "--no-color", `HEAD...${ref}`], { cwd });
-      if (res.exitCode !== 0) {
-        clearDiff(res.stderr.trim() || "Could not load incoming changes.");
-        return;
-      }
-      renderPatch(res.stdout, data.focusPath ?? "");
+      const { diff } = await repo.incomingDiff(data.ref || "@{upstream}");
+      renderPatch(diff, data.focusPath ?? "");
       return;
     }
     sourceLabelNode.textContent = "Working Tree";
     showLoading("Loading changes...");
     const [staged, unstaged] = await Promise.all([
-      cmd.diff(cwd, { staged: true }),
-      cmd.diff(cwd, { staged: false }),
+      repo.diff({ staged: true }),
+      repo.diff({ staged: false }),
     ]);
     renderPatch([staged.diff, unstaged.diff].filter((diff) => diff.trim()).join("\n"), data.focusPath ?? "");
   } catch (error) {
