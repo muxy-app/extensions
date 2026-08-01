@@ -5,10 +5,11 @@
     "build": "vite build && node -e \"require('fs').copyFileSync('package.json','dist/package.json')\"",
     "build:surfaces": "vite build",
     "dev": "vite",
+    "test": "node --test tests/*.test.mjs",
     "update-skill": "node scripts/update-skill.mjs"
   },
   "type": "module",
-  "version": "1.13.1",
+  "version": "1.13.2",
   "dependencies": {
     "@pierre/diffs": "^1.2.12"
   },

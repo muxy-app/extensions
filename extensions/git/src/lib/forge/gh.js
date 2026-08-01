@@ -1,4 +1,4 @@
-import { run } from "@/lib/forge/exec";
+import { run } from "./exec.js";
 
 const NO_CHECKS = { status: "none", total: 0, passing: 0, failing: 0, pending: 0 };
 
@@ -58,8 +58,23 @@ export async function prCheckoutWorktree(number, path) {
     return branch;
 }
 
-export function prDiff(number) {
-    return muxy.git.pr.diff({ number });
+async function prDiffFallback(number) {
+    return {
+        diff: await run(["gh", "pr", "diff", String(number), "--color", "never"]),
+        truncated: false,
+    };
+}
+
+export async function prDiff(number) {
+    try {
+        const result = await muxy.git.pr.diff({ number });
+        if (result.diff?.trim())
+            return result;
+    }
+    catch {
+        return prDiffFallback(number);
+    }
+    return prDiffFallback(number);
 }
 
 const RUN_FIELDS = "databaseId,displayTitle,workflowName,status,conclusion,headBranch,event,url,createdAt";
