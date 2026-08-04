@@ -10,6 +10,7 @@ One extension, one `localizations` entry per language — anyone can add a new l
 | --- | --- | --- |
 | 한국어 (Korean) | `ko` | `localization/Korean.bundle` |
 | Português (Brasil) | `pt-BR` | `localization/BrazilianPortuguese.bundle` |
+| فارسی (Persian) | `fa` | `localization/Persian.bundle` |
 
 ## Permissions
 

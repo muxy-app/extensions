@@ -1,6 +1,6 @@
 {
   "name": "language-packs",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "type": "module",
   "description": "Community app language packs for Muxy",
@@ -22,6 +22,12 @@
         "language": "pt-BR",
         "title": "Português (Brasil)",
         "bundle": "localization/BrazilianPortuguese.bundle"
+      },
+      {
+        "id": "fa",
+        "language": "fa",
+        "title": "فارسی",
+        "bundle": "localization/Persian.bundle"
       }
     ],
     "marketplace": {
