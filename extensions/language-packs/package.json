@@ -16,6 +16,12 @@
         "language": "ko",
         "title": "한국어",
         "bundle": "localization/Korean.bundle"
+      },
+      {
+        "id": "pt-BR",
+        "language": "pt-BR",
+        "title": "Português (Brasil)",
+        "bundle": "localization/BrazilianPortuguese.bundle"
       }
     ],
     "marketplace": {
