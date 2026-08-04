@@ -2,7 +2,7 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleIdentifier</key>
-    <string>app.muxy.extensions.korean.localization</string>
+    <string>app.muxy.language-packs.ko</string>
     <key>CFBundleDevelopmentRegion</key>
     <string>ko</string>
 </dict>
