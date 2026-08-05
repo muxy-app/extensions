@@ -10,4 +10,6 @@ minisign.key
 extensions/demo-*
 .claude/
 .agents/
+.sisyphus/
+.muxy/
 skills-lock.json

@@ -8,11 +8,14 @@ function muxy() {
 }
 
 const FILTER_THRESHOLD = 6;
+const POPOVER_MIN_WIDTH = 180;
+const POPOVER_MAX_WIDTH = 280;
 
 const listEl = document.querySelector('#list');
 const emptyEl = document.querySelector('#empty');
 const filterEl = document.querySelector('#filter');
 const manageBtn = document.querySelector('#manage');
+const launcherEl = document.querySelector('.launcher');
 
 manageBtn.querySelector('.manage-icon').innerHTML = iconHTML('gear', 14);
 
@@ -44,7 +47,7 @@ function renderList() {
     li.appendChild(btn);
     listEl.appendChild(li);
   });
-  resize();
+  requestAnimationFrame(resize);
 }
 
 function setActive(i) {
@@ -103,7 +106,28 @@ function onKeydown(event) {
 function resize() {
   const m = muxy();
   if (!m.popover?.resize) return;
-  m.popover.resize(220, Math.min(document.documentElement.scrollHeight, 480));
+  const width = preferredWidth();
+  const height = Math.ceil(launcherEl.getBoundingClientRect().height);
+  m.popover.resize(width, Math.min(height, 480));
+}
+
+function preferredWidth() {
+  const labels = [
+    ...state.filtered.map((cmd) => cmd.name || cmd.command),
+    'Manage commands',
+  ];
+  const widest = labels.reduce((max, label) => Math.max(max, measureText(label)), 0);
+  const filterWidth = filterEl.hidden ? 0 : measureText(filterEl.placeholder || 'Search') + 60;
+  const contentWidth = Math.max(widest + 76, filterWidth);
+  return Math.min(Math.max(Math.ceil(contentWidth), POPOVER_MIN_WIDTH), POPOVER_MAX_WIDTH);
+}
+
+function measureText(text) {
+  const canvas = measureText.canvas || (measureText.canvas = document.createElement('canvas'));
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return String(text || '').length * 7;
+  ctx.font = getComputedStyle(document.body).font;
+  return ctx.measureText(String(text || '')).width;
 }
 
 function escapeHTML(s) {

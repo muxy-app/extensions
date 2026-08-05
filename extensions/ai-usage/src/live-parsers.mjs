@@ -237,9 +237,10 @@ export function parseGrokRows(payload) {
 
     const rows = [];
     if (periodType === "USAGE_PERIOD_TYPE_WEEKLY") {
-      const remainingPercent = clamp(numberOrNull(config.creditUsagePercent) ?? 100, 0, 100);
-      const usedPercent = 100 - remainingPercent;
-      rows.push(row("Weekly limit", clamp(usedPercent, 0, 100), periodEnd, `${formatNumber(usedPercent)}% used`, (periodEnd.getTime() - periodStart.getTime()) / 1000));
+      // creditUsagePercent is pool usage (0–100). Proto-JSON omits zero, so
+      // absent means 0% used — not 100% remaining.
+      const usedPercent = clamp(numberOrNull(config.creditUsagePercent) ?? 0, 0, 100);
+      rows.push(row("Weekly limit", usedPercent, periodEnd, `${formatNumber(usedPercent)}% used`, (periodEnd.getTime() - periodStart.getTime()) / 1000));
     }
 
     const onDemandCap = numberOrNull(config.onDemandCap?.val) ?? 0;

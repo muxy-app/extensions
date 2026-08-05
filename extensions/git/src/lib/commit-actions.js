@@ -1,5 +1,5 @@
-import { alertError, openUrl, runPinned } from "@/lib/git";
-import * as cmd from "@/lib/cmd";
+import { alertError, openUrl, runBusy } from "@/lib/git";
+import * as repo from "@/lib/repo";
 export async function copyHash(commit) {
     try {
         await navigator.clipboard.writeText(commit.hash);
@@ -27,7 +27,7 @@ function commitUrl(remote, hash) {
 }
 export async function openCommitInBrowser(commit) {
     try {
-        const remote = await runPinned((cwd) => cmd.remoteUrl(cwd));
+        const remote = await repo.remoteUrl();
         if (!remote)
             throw new Error("No remote found");
         const url = commitUrl(remote, commit.hash);
@@ -41,7 +41,7 @@ export async function openCommitInBrowser(commit) {
 }
 export async function cherryPickCommit(commit, onDone) {
     try {
-        await runPinned((cwd) => cmd.cherryPick(cwd, commit.hash));
+        await runBusy(() => repo.cherryPick(commit.hash));
         await muxy.toast({ body: `Cherry-picked ${commit.shortHash}`, variant: "success" }).catch(() => undefined);
         onDone();
     }
@@ -51,7 +51,7 @@ export async function cherryPickCommit(commit, onDone) {
 }
 export async function revertCommit(commit, prefill, onDone) {
     try {
-        await runPinned((cwd) => cmd.revert(cwd, commit.hash));
+        await runBusy(() => repo.revert(commit.hash));
         prefill(`Revert: ${commit.subject}`);
         onDone();
     }

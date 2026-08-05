@@ -286,6 +286,11 @@ export class EditorApp {
       if (this.fileLoadId === loadId) {
         this.loading = false;
         this.render();
+        if (this.data?.line && this.child?.gotoLine) {
+          const lineNumber = this.data.line;
+          delete this.data.line;
+          requestAnimationFrame(() => this.child?.gotoLine?.(lineNumber));
+        }
       }
     }
   }
@@ -620,7 +625,8 @@ export class EditorApp {
   }
 
   updateTopbar() {
-    if (!this.topbar || !this.filePath) return;
+    if (!this.topbar) return;
+    if (!this.filePath) return;
     const markdown = this.isMarkdown();
     const image = this.isImage();
     const pdf = this.isPdf();

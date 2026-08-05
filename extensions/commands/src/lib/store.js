@@ -1,4 +1,6 @@
 const STORAGE_KEY = 'muxy-launcher:commands';
+const CHANGE_EVENT = 'muxy-launcher:commands-changed';
+const CHANGE_CHANNEL = 'muxy-launcher:commands';
 
 const DEFAULT_COMMANDS = [
   { id: 'claude', name: 'Claude', command: 'claude', icon: '../icons/claude.svg', cwd: '' },
@@ -27,11 +29,13 @@ export function loadCommands() {
 
 export function resetCommands() {
   localStorage.removeItem(STORAGE_KEY);
+  notifyCommandsChanged();
   return defaults();
 }
 
 export function saveCommands(commands) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(commands.map(normalize)));
+  notifyCommandsChanged();
 }
 
 export function createCommand() {
@@ -49,9 +53,36 @@ function normalize(c) {
 }
 
 export function onCommandsChanged(handler) {
-  const listener = (event) => {
-    if (event.key === STORAGE_KEY) handler(loadCommands());
+  let channel = null;
+  const reload = () => handler(loadCommands());
+  const storageListener = (event) => {
+    if (event.key === STORAGE_KEY || event.key === null) reload();
   };
-  window.addEventListener('storage', listener);
-  return () => window.removeEventListener('storage', listener);
+  const visibilityListener = () => {
+    if (!document.hidden) reload();
+  };
+  window.addEventListener('storage', storageListener);
+  window.addEventListener(CHANGE_EVENT, reload);
+  window.addEventListener('focus', reload);
+  document.addEventListener('visibilitychange', visibilityListener);
+  if ('BroadcastChannel' in window) {
+    channel = new BroadcastChannel(CHANGE_CHANNEL);
+    channel.addEventListener('message', reload);
+  }
+  return () => {
+    window.removeEventListener('storage', storageListener);
+    window.removeEventListener(CHANGE_EVENT, reload);
+    window.removeEventListener('focus', reload);
+    document.removeEventListener('visibilitychange', visibilityListener);
+    channel?.close();
+  };
+}
+
+function notifyCommandsChanged() {
+  window.dispatchEvent(new Event(CHANGE_EVENT));
+  if ('BroadcastChannel' in window) {
+    const channel = new BroadcastChannel(CHANGE_CHANNEL);
+    channel.postMessage({ type: 'changed' });
+    setTimeout(() => channel.close(), 0);
+  }
 }

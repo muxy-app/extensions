@@ -1,6 +1,6 @@
 {
   "name": "files",
-  "version": "1.20.3",
+  "version": "1.21.2",
   "scripts": {
     "dev": "vite",
     "build": "vite build && node scripts/copy-build-assets.mjs",
@@ -45,6 +45,7 @@
     "@tree-sitter-grammars/tree-sitter-lua": "^0.4.1",
     "@tree-sitter-grammars/tree-sitter-toml": "^0.7.0",
     "@tree-sitter-grammars/tree-sitter-zig": "^1.1.2",
+    "esbuild": "^0.27.7",
     "material-icon-theme": "^5.35.0",
     "tailwindcss": "^4.3.0",
     "tree-sitter-bash": "^0.25.1",

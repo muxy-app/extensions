@@ -1,6 +1,6 @@
 import '../src/styles/global.css';
 import { loadCommands, saveCommands, createCommand, resetCommands } from '../src/lib/store.js';
-import { iconHTML, PRESET_ICONS, isImageSrc } from '../src/lib/icons.js';
+import { cacheIconSrc, iconHTML, PRESET_ICONS, isHttpImageSrc, isImageSrc } from '../src/lib/icons.js';
 
 const rowsEl = document.querySelector('#rows');
 const emptyEl = document.querySelector('#empty');
@@ -13,11 +13,27 @@ function persist() {
   saveCommands(commands);
 }
 
+function persistOrToast() {
+  try {
+    persist();
+    return true;
+  } catch (error) {
+    toast('Could not save command', error?.name === 'QuotaExceededError'
+      ? 'The icon is too large for local storage.'
+      : error?.message || String(error));
+    return false;
+  }
+}
+
 function update(id, patch) {
   const item = commands.find((c) => c.id === id);
-  if (!item) return;
+  if (!item) return false;
+  const before = {};
+  Object.keys(patch).forEach((key) => { before[key] = item[key]; });
   Object.assign(item, patch);
-  persist();
+  if (persistOrToast()) return true;
+  Object.assign(item, before);
+  return false;
 }
 
 function field(label, value, placeholder, onInput) {
@@ -53,9 +69,28 @@ function iconPicker(cmd) {
   };
 
   const setIcon = (value) => {
-    update(cmd.id, { icon: value });
+    if (!update(cmd.id, { icon: value })) return false;
     renderSelection();
     wrap.dispatchEvent(new Event('icon-change'));
+    return true;
+  };
+  let cacheTimer = 0;
+  let cacheVersion = 0;
+  const cacheRemoteIcon = (url) => {
+    window.clearTimeout(cacheTimer);
+    const version = ++cacheVersion;
+    cacheTimer = window.setTimeout(async () => {
+      try {
+        await cacheIconSrc(url);
+        if (cmd.icon !== url || version !== cacheVersion) return;
+        wrap.dispatchEvent(new Event('icon-change'));
+        persistOrToast();
+      } catch (error) {
+        if (cmd.icon === url && version === cacheVersion) {
+          toast('Could not cache icon', error?.message || String(error));
+        }
+      }
+    }, 400);
   };
 
   for (const name of PRESET_ICONS) {
@@ -87,24 +122,6 @@ function iconPicker(cmd) {
   emojiLabel.textContent = 'or emoji';
   emojiWrap.append(emojiLabel, emojiInput);
 
-  const fileInput = document.createElement('input');
-  fileInput.type = 'file';
-  fileInput.accept = '.svg,image/*';
-  fileInput.className = 'hidden-file';
-  fileInput.addEventListener('change', () => {
-    const file = fileInput.files && fileInput.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => setIcon(String(reader.result));
-    reader.readAsDataURL(file);
-    fileInput.value = '';
-  });
-  const uploadBtn = document.createElement('button');
-  uploadBtn.type = 'button';
-  uploadBtn.className = 'btn ghost';
-  uploadBtn.textContent = 'Upload file…';
-  uploadBtn.addEventListener('click', () => fileInput.click());
-
   const urlInput = document.createElement('input');
   urlInput.type = 'text';
   urlInput.className = 'url-input';
@@ -113,12 +130,12 @@ function iconPicker(cmd) {
   if (isImageSrc(cmd.icon) && /^https?:/i.test(cmd.icon)) urlInput.value = cmd.icon;
   urlInput.addEventListener('input', () => {
     const v = urlInput.value.trim();
-    if (/^https?:\/\//i.test(v)) setIcon(v);
+    if (isHttpImageSrc(v) && setIcon(v)) cacheRemoteIcon(v);
   });
 
   const sources = document.createElement('div');
   sources.className = 'icon-sources';
-  sources.append(emojiWrap, uploadBtn, fileInput, urlInput);
+  sources.append(emojiWrap, urlInput);
 
   wrap.append(span, grid, sources);
   renderSelection();
@@ -212,3 +229,7 @@ resetBtn.addEventListener('click', async () => {
 });
 
 render();
+
+function toast(title, body) {
+  window.muxy?.toast?.({ title, body });
+}

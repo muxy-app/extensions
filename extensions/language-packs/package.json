@@ -1,0 +1,41 @@
+{
+  "name": "language-packs",
+  "version": "1.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Community app language packs for Muxy",
+  "scripts": {
+    "build": "node scripts/copy-manifest.mjs"
+  },
+  "muxy": {
+    "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
+    "description": "Community app language packs for Muxy — one extension, one language folder per contributor",
+    "localizations": [
+      {
+        "id": "ko",
+        "language": "ko",
+        "title": "한국어",
+        "bundle": "localization/Korean.bundle"
+      },
+      {
+        "id": "pt-BR",
+        "language": "pt-BR",
+        "title": "Português (Brasil)",
+        "bundle": "localization/BrazilianPortuguese.bundle"
+      },
+      {
+        "id": "fa",
+        "language": "fa",
+        "title": "فارسی",
+        "bundle": "localization/Persian.bundle"
+      }
+    ],
+    "marketplace": {
+      "author": "Wonjin",
+      "github": "wjchoi",
+      "categories": ["localization"],
+      "icon": "icon.svg",
+      "screenshots": ["screenshots/screenshot-1.png"]
+    }
+  }
+}

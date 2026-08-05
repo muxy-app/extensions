@@ -1,9 +1,9 @@
 import { clear, h, readPref, writePref } from "@/lib/dom";
 import { computeLanes, toCommitNode } from "@/lib/graph";
-import { alertError, activeWorktreePath, commitAll, confirmAction, hasPendingChanges, isBusy, listBranches, onBusyChange, openIncomingDiff, openUrl, runPinned, toViewStatus, tryAction, } from "@/lib/git";
+import { alertError, commitAll, confirmAction, hasPendingChanges, isBusy, listBranches, onBusyChange, openIncomingDiff, openUrl, repoScope, runBusy, toViewStatus, tryAction, } from "@/lib/git";
 import { repoWebUrl } from "@/lib/repo-web";
 import { checkoutPr, checkoutPrWorktree, cleanupBranch, closePr, confirmOpenExistingPr, createPr, mergePr, parentDir, readyPr, removeWorktreeOrBranch, worktreePathIn, } from "@/lib/pr";
-import * as cmd from "@/lib/cmd";
+import * as scm from "@/lib/repo";
 import { icon } from "@/lib/icons";
 import { button, emptyState, iconButton, loadingOverlay } from "@/ui/shared";
 import { renderBranchSwitcher, renderBranchTab } from "@/panel/branch";
@@ -48,6 +48,12 @@ function writePrListCache(cache) {
     catch {
         return;
     }
+}
+function failureState(err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (/not a git repos/i.test(message))
+        return { kind: "no_repo" };
+    return { kind: "error", message: message.trim() || "Unknown error" };
 }
 async function chooseReconcile() {
     try {
@@ -162,6 +168,14 @@ export class GitPanelApp {
             }))));
             return;
         }
+        if (this.repo.kind === "error") {
+            this.root.appendChild(h("div", { class: "flex h-screen flex-col" }, emptyState(h("div", { class: "text-[12px] font-semibold text-foreground" }, "Could not read this repository"), h("div", { class: "max-w-[90%] break-words font-mono text-[11px] leading-relaxed" }, this.repo.message), button("Retry", {
+                iconName: "refresh",
+                variant: "outline",
+                onClick: () => void this.loadLocal(true, true),
+            }))));
+            return;
+        }
         const status = this.repo.status;
         const changes = status.staged.length + status.unstaged.length;
         const panel = h("div", { class: "flex h-full min-h-0 flex-col" }, h("header", { class: "flex shrink-0 items-center border-b border-border pr-1" }, h("div", { class: "min-w-0 flex-1" }, renderBranchSwitcher(this, status)), iconButton("Refresh", "refresh", () => this.runRefresh()), iconButton("Open repository in browser", "external", () => void this.openRepoInBrowser())), this.renderTabs(changes), this.tab === "branch"
@@ -215,13 +229,12 @@ export class GitPanelApp {
         this.createForm = emptyCreateForm();
     }
     async initRepo() {
-        const cwd = await activeWorktreePath();
-        if (await tryAction(() => cmd.init(cwd), "Could not initialize repository")) {
+        if (await tryAction(() => scm.init(), "Could not initialize repository")) {
             await this.loadLocal(true);
         }
     }
     refreshAll() {
-        void this.loadLocal(true);
+        void this.loadLocal(true, true);
         void this.resetGraph(true);
         if (this.prStarted)
             void this.loadPrList(true);
@@ -230,50 +243,49 @@ export class GitPanelApp {
         this.refreshing = true;
         this.render();
         void this.resetGraph(true);
-        void Promise.all([this.loadLocal(true), new Promise((resolve) => setTimeout(resolve, 400))])
+        void Promise.all([this.loadLocal(true, true), new Promise((resolve) => setTimeout(resolve, 400))])
             .finally(() => {
             this.refreshing = false;
             this.render();
         });
     }
-    async loadLocal(withPr) {
+    async loadLocal(withPr, fresh = false) {
         const id = ++this.refreshId;
-        const cwd = await activeWorktreePath();
+        const scope = await repoScope();
         let next;
         try {
-            const status = toViewStatus(await cmd.status(cwd));
-            const prev = cwd ? this.statusCache.get(cwd) : undefined;
+            const status = toViewStatus(await scm.status({ fresh }));
+            const prev = scope ? this.statusCache.get(scope) : undefined;
             if (prev?.kind === "ready" && prev.status.branch === status.branch) {
                 status.pullRequest = prev.status.pullRequest;
                 status.defaultBranch = prev.status.defaultBranch;
             }
             next = { kind: "ready", status };
         }
-        catch {
-            next = { kind: "no_repo" };
+        catch (err) {
+            next = failureState(err);
         }
         if (this.refreshId !== id)
             return;
-        if (cwd)
-            this.statusCache.set(cwd, next);
+        if (scope)
+            this.statusCache.set(scope, next);
         this.repo = next;
         this.switching = false;
         this.render();
         if (withPr && next.kind === "ready")
-            void this.resolvePr(cwd, next.status.branch);
+            void this.resolvePr(scope, next.status.branch);
     }
-    async stage(path) {
-        this.moveEntry(path, "unstaged", "staged");
-        const ok = await tryAction(() => runPinned((cwd) => cmd.stage(cwd, [path])), "Could not stage file");
-        if (ok)
-            this.reconcile();
-        else
-            await this.loadLocal(false);
-        return ok;
+    async stage(paths) {
+        return this.applyStaging(paths, "unstaged", "staged", () => scm.stage(paths), "stage");
     }
-    async unstage(path) {
-        this.moveEntry(path, "staged", "unstaged");
-        const ok = await tryAction(() => runPinned((cwd) => cmd.unstage(cwd, [path])), "Could not unstage file");
+    async unstage(paths) {
+        return this.applyStaging(paths, "staged", "unstaged", () => scm.unstage(paths), "unstage");
+    }
+    async applyStaging(paths, from, to, exec, verb) {
+        if (paths.length === 0)
+            return false;
+        this.moveEntries(paths, from, to);
+        const ok = await tryAction(() => runBusy(exec), `Could not ${verb} ${paths.length > 1 ? "files" : "file"}`);
         if (ok)
             this.reconcile();
         else
@@ -283,7 +295,7 @@ export class GitPanelApp {
     async discard(path) {
         const entry = this.repo.kind === "ready" ? this.repo.status.unstaged.find((file) => file.path === path) : undefined;
         const untracked = entry?.label === "?";
-        const ok = await tryAction(() => runPinned((cwd) => cmd.discard(cwd, untracked ? { untrackedPaths: [path] } : { paths: [path] })), "Could not discard file");
+        const ok = await tryAction(() => runBusy(() => scm.discard(untracked ? { untrackedPaths: [path] } : { paths: [path] })), "Could not discard file");
         await this.loadLocal(false);
         return ok;
     }
@@ -292,22 +304,22 @@ export class GitPanelApp {
             return false;
         const paths = this.repo.status.unstaged.filter((file) => file.label !== "?").map((file) => file.path);
         const untrackedPaths = this.repo.status.unstaged.filter((file) => file.label === "?").map((file) => file.path);
-        const ok = await tryAction(() => runPinned((cwd) => cmd.discard(cwd, { paths, untrackedPaths })), "Could not discard changes");
+        const ok = await tryAction(() => runBusy(() => scm.discard({ paths, untrackedPaths })), "Could not discard changes");
         await this.loadLocal(false);
         return ok;
     }
     async stageAll() {
-        const ok = await tryAction(() => runPinned((cwd) => cmd.stage(cwd, [])), "Could not stage changes");
+        const ok = await tryAction(() => runBusy(() => scm.stage([])), "Could not stage changes");
         await this.loadLocal(false);
         return ok;
     }
     async unstageAll() {
-        const ok = await tryAction(() => runPinned((cwd) => cmd.unstage(cwd, [])), "Could not unstage changes");
+        const ok = await tryAction(() => runBusy(() => scm.unstage([])), "Could not unstage changes");
         await this.loadLocal(false);
         return ok;
     }
     async commit(message) {
-        const ok = await tryAction(() => runPinned((cwd) => cmd.commit(cwd, { message })), "Commit failed");
+        const ok = await tryAction(() => runBusy(() => scm.commit({ message })), "Commit failed");
         if (ok) {
             await this.loadLocal(false);
             void this.resetGraph(true);
@@ -317,9 +329,9 @@ export class GitPanelApp {
     async sync(op) {
         if (op === "pull")
             return this.pull();
-        const ok = await tryAction(() => runPinned((cwd) => cmd.push(cwd, {})), "Push failed");
+        const ok = await tryAction(() => runBusy(() => scm.push()), "Push failed");
         if (ok) {
-            await this.loadLocal(true);
+            await this.loadLocal(true, true);
             void this.resetGraph(true);
             if (this.repo.kind === "ready" && this.repo.status.pullRequest)
                 void this.refreshCurrentPr();
@@ -327,20 +339,20 @@ export class GitPanelApp {
         return ok;
     }
     async pull() {
-        const ok = await tryAction(() => runPinned(async (cwd) => {
-            await cmd.fetch(cwd);
-            const divergence = await cmd.upstreamDivergence(cwd);
+        const ok = await tryAction(() => runBusy(async () => {
+            await scm.fetch();
+            const divergence = await scm.upstreamDivergence();
             if (!divergence || divergence.behind === 0)
                 return;
             if (divergence.ahead === 0)
-                return cmd.reconcile(cwd, "ff");
+                return scm.reconcile("ff");
             const mode = await chooseReconcile();
             if (mode === "review")
                 return openIncomingDiff();
             if (mode)
-                return cmd.reconcile(cwd, mode);
+                return scm.reconcile(mode);
         }), "Pull failed");
-        await this.loadLocal(true);
+        await this.loadLocal(true, true);
         void this.resetGraph(true);
         return ok;
     }
@@ -358,9 +370,9 @@ export class GitPanelApp {
             if (!(await this.abortPendingOp(op)))
                 return;
         }
-        const ok = await tryAction(() => runPinned((cwd) => create
-            ? cmd.branchCreate(cwd, name)
-            : cmd.branchSwitch(cwd, name)), create ? "Could not create branch" : "Could not switch branch");
+        const ok = await tryAction(() => runBusy(() => create
+            ? scm.branchCreate(name)
+            : scm.branchSwitch(name)), create ? "Could not create branch" : "Could not switch branch");
         if (ok) {
             await this.loadLocal(true);
             void this.resetGraph(true);
@@ -371,7 +383,7 @@ export class GitPanelApp {
             return false;
         this.opPending = true;
         this.render();
-        const ok = await tryAction(() => runPinned((cwd) => cmd.abortOperation(cwd, op)), `Could not abort ${op}`);
+        const ok = await tryAction(() => runBusy(() => scm.abortOperation(op)), `Could not abort ${op}`);
         this.opPending = false;
         if (ok) {
             await this.loadLocal(true);
@@ -391,7 +403,7 @@ export class GitPanelApp {
         });
         if (!confirmed)
             return false;
-        return tryAction(() => runPinned((cwd) => cmd.branchDelete(cwd, name, true)), "Could not delete branch");
+        return tryAction(() => runBusy(() => scm.branchDelete(name, true)), "Could not delete branch");
     }
     async loadBaseBranches() {
         if (this.baseBranches.length > 0)
@@ -404,16 +416,16 @@ export class GitPanelApp {
     }
     async createPullRequest(input) {
         try {
-            return await runPinned(async (cwd) => {
+            return await runBusy(async () => {
                 if (input.newBranch)
-                    await cmd.branchCreate(cwd, input.newBranch);
-                if (await hasPendingChanges(cwd)) {
-                    const committed = await commitAll(input.title, cwd);
+                    await scm.branchCreate(input.newBranch);
+                if (await hasPendingChanges()) {
+                    const committed = await commitAll(input.title);
                     if (!committed)
                         return false;
                 }
-                await cmd.push(cwd, { setUpstream: true });
-                await createPr(input.title, input.body, input.baseBranch, input.draft ?? false, cwd);
+                await scm.push({ setUpstream: true });
+                await createPr(input.title, input.body, input.baseBranch, input.draft ?? false);
                 await this.loadLocal(true);
                 return true;
             });
@@ -428,12 +440,8 @@ export class GitPanelApp {
     async mergeCurrentPr(number, method, target) {
         this.prPending = method;
         this.render();
-        let cleanupCwd;
         try {
-            await runPinned((cwd) => {
-                cleanupCwd = cwd;
-                return mergePr(number, method, false, cwd);
-            });
+            await runBusy(() => mergePr(number, method, false));
         }
         catch (err) {
             await alertError(`Could not merge PR #${number}`, err);
@@ -442,7 +450,7 @@ export class GitPanelApp {
             return false;
         }
         try {
-            await removeWorktreeOrBranch({ branch: target.branch, defaultBranch: target.defaultBranch, dirty: true }, cleanupCwd);
+            await removeWorktreeOrBranch({ branch: target.branch, defaultBranch: target.defaultBranch, dirty: true });
         }
         catch (err) {
             await alertError(`PR #${number} merged, but branch cleanup failed`, err);
@@ -457,7 +465,7 @@ export class GitPanelApp {
         this.prPending = "close";
         this.render();
         try {
-            await runPinned((cwd) => closePr(number, cwd));
+            await runBusy(() => closePr(number));
             return true;
         }
         catch (err) {
@@ -473,7 +481,7 @@ export class GitPanelApp {
         this.prPending = "ready";
         this.render();
         try {
-            await runPinned((cwd) => readyPr(number, title, cwd));
+            await runBusy(() => readyPr(number, title));
             if (this.repo.kind === "ready" && this.repo.status.pullRequest?.number === number) {
                 this.repo = { kind: "ready", status: { ...this.repo.status, pullRequest: { ...this.repo.status.pullRequest, isDraft: false } } };
             }
@@ -492,7 +500,7 @@ export class GitPanelApp {
         this.prPending = "cleanup";
         this.render();
         try {
-            return await runPinned((cwd) => cleanupBranch(target, cwd));
+            return await runBusy(() => cleanupBranch(target));
         }
         finally {
             this.prPending = null;
@@ -510,8 +518,8 @@ export class GitPanelApp {
     async loadPrList(fresh = false) {
         const id = ++this.prListLoadId;
         const filter = this.prFilter;
-        const cwd = await activeWorktreePath();
-        const key = this.prListCacheKey(cwd, filter);
+        const scope = await repoScope();
+        const key = this.prListCacheKey(scope, filter);
         const cached = key ? this.prListCache.get(key) : undefined;
         if (this.prListLoadId !== id)
             return;
@@ -525,7 +533,7 @@ export class GitPanelApp {
         this.prListKey = key;
         this.render();
         try {
-            const prs = await cmd.prList(cwd, { filter, limit: PR_LIMIT });
+            const prs = await scm.prList({ filter, limit: PR_LIMIT });
             if (this.prListLoadId !== id)
                 return;
             if (key) {
@@ -552,16 +560,16 @@ export class GitPanelApp {
             this.render();
         }
     }
-    prListCacheKey(cwd, filter) {
-        return cwd ? `${cwd}\n${filter}` : filter;
+    prListCacheKey(scope, filter) {
+        return scope ? `${scope}\n${filter}` : filter;
     }
     async hydratePrList() {
         if (this.prListRefreshing)
             return;
         const id = this.prListLoadId;
         const filter = this.prFilter;
-        const cwd = await activeWorktreePath();
-        const key = this.prListCacheKey(cwd, filter);
+        const scope = await repoScope();
+        const key = this.prListCacheKey(scope, filter);
         const cached = key ? this.prListCache.get(key) : undefined;
         if (!cached || this.prListLoadId !== id || this.prFilter !== filter || this.prListRefreshing)
             return;
@@ -579,13 +587,12 @@ export class GitPanelApp {
         if (!ok)
             return;
         await this.runRowAction(number, "checkout", async () => {
-            await runPinned((cwd) => checkoutPr(number, cwd));
+            await runBusy(() => checkoutPr(number));
             await muxy.worktrees.refresh().catch(() => undefined);
         }, `Could not checkout PR #${number}`);
     }
     async checkoutPrWorktreeRow(number) {
-        const cwd = await activeWorktreePath();
-        const dir = readPref(WORKTREE_DIR_KEY, "") || parentDir(cwd);
+        const dir = readPref(WORKTREE_DIR_KEY, "") || parentDir(await repoScope());
         this.worktreeForm = { number, path: worktreePathIn(dir, number), busy: false };
         this.render();
     }
@@ -602,8 +609,7 @@ export class GitPanelApp {
             return;
         form.busy = true;
         this.render();
-        const cwd = await activeWorktreePath();
-        const ok = await tryAction(() => runPinned(() => checkoutPrWorktree(form.number, path, cwd)), `Could not create worktree for PR #${form.number}`);
+        const ok = await tryAction(() => runBusy(() => checkoutPrWorktree(form.number, path)), `Could not create worktree for PR #${form.number}`);
         if (ok) {
             writePref(WORKTREE_DIR_KEY, parentDir(path));
             this.worktreeForm = null;
@@ -622,7 +628,7 @@ export class GitPanelApp {
         if (!ok)
             return;
         await this.runRowAction(number, "close", async () => {
-            await runPinned((cwd) => closePr(number, cwd));
+            await runBusy(() => closePr(number));
             await this.loadPrList(true);
         }, `Could not close PR #${number}`);
     }
@@ -632,15 +638,15 @@ export class GitPanelApp {
         this.graph = { ...this.graph, loading: true };
         this.render();
         try {
-            const cwd = await activeWorktreePath();
-            const batch = await this.fetchGraphPage(cwd, skip);
+            const scope = await repoScope();
+            const batch = await this.fetchGraphPage(skip);
             if (this.graphLoadId !== id)
                 return;
             const next = [...this.graphCommits, ...batch];
             this.graphCommits = next;
             const hasMore = batch.length === PAGE;
-            if (cwd)
-                this.graphCache.set(cwd, { commits: next, hasMore });
+            if (scope)
+                this.graphCache.set(scope, { commits: next, hasMore });
             this.publishGraph(next, hasMore, false);
         }
         catch {
@@ -657,8 +663,7 @@ export class GitPanelApp {
             this.runList = { kind: "loading" };
         this.render();
         try {
-            const cwd = await activeWorktreePath();
-            const runs = await cmd.runList(cwd, { limit: RUN_LIMIT });
+            const runs = await scm.runList({ limit: RUN_LIMIT });
             if (this.runListLoadId !== id)
                 return;
             this.runList = { kind: "ready", runs };
@@ -701,7 +706,7 @@ export class GitPanelApp {
         }
     }
     async rerunRow(id, failedOnly) {
-        await this.runRunRowAction(id, failedOnly ? "rerun-failed" : "rerun", () => runPinned((cwd) => cmd.runRerun(cwd, id, { failedOnly })), `Could not rerun workflow run #${id}`);
+        await this.runRunRowAction(id, failedOnly ? "rerun-failed" : "rerun", () => runBusy(() => scm.runRerun(id, { failedOnly })), `Could not rerun workflow run #${id}`);
     }
     async cancelRunRow(id) {
         const ok = await confirmAction({
@@ -711,7 +716,7 @@ export class GitPanelApp {
         });
         if (!ok)
             return;
-        await this.runRunRowAction(id, "cancel", () => runPinned((cwd) => cmd.runCancel(cwd, id)), `Could not cancel workflow run #${id}`);
+        await this.runRunRowAction(id, "cancel", () => runBusy(() => scm.runCancel(id)), `Could not cancel workflow run #${id}`);
     }
     async openRepoInBrowser() {
         const url = await repoWebUrl();
@@ -737,10 +742,10 @@ export class GitPanelApp {
             ? h("span", { class: "rounded-full bg-muted-foreground px-1.5 py-px text-[9px] font-bold leading-none text-background" }, String(changes))
             : null)));
     }
-    async resolvePr(cwd, branch) {
+    async resolvePr(scope, branch) {
         let pr = null;
         try {
-            pr = await cmd.prInfo(cwd);
+            pr = await scm.prInfo();
         }
         catch {
             return;
@@ -748,8 +753,8 @@ export class GitPanelApp {
         if (this.repo.kind !== "ready" || this.repo.status.branch !== branch)
             return;
         this.repo = { kind: "ready", status: { ...this.repo.status, pullRequest: pr } };
-        if (cwd)
-            this.statusCache.set(cwd, this.repo);
+        if (scope)
+            this.statusCache.set(scope, this.repo);
         this.render();
     }
     async refreshCurrentPr() {
@@ -758,8 +763,7 @@ export class GitPanelApp {
         this.prRefreshing = true;
         this.render();
         try {
-            const cwd = await activeWorktreePath();
-            await this.resolvePr(cwd, this.repo.status.branch);
+            await this.resolvePr(await repoScope(), this.repo.status.branch);
         }
         finally {
             this.prRefreshing = false;
@@ -771,8 +775,8 @@ export class GitPanelApp {
             this.pendingSwitch = true;
             return;
         }
-        const cwd = await activeWorktreePath();
-        const cached = cwd ? this.statusCache.get(cwd) : undefined;
+        const scope = await repoScope();
+        const cached = scope ? this.statusCache.get(scope) : undefined;
         if (cached) {
             this.repo = cached;
             this.render();
@@ -795,12 +799,12 @@ export class GitPanelApp {
     }
     async reconcileNow() {
         const id = ++this.refreshId;
-        const cwd = await activeWorktreePath();
+        const scope = await repoScope();
         let next;
         let branchChanged = false;
         try {
-            const status = toViewStatus(await cmd.status(cwd));
-            const prev = cwd ? this.statusCache.get(cwd) : undefined;
+            const status = toViewStatus(await scm.status({ fresh: true }));
+            const prev = scope ? this.statusCache.get(scope) : undefined;
             if (prev?.kind === "ready" && prev.status.branch === status.branch) {
                 status.pullRequest = prev.status.pullRequest;
                 status.defaultBranch = prev.status.defaultBranch;
@@ -809,32 +813,35 @@ export class GitPanelApp {
                 branchChanged = true;
             next = { kind: "ready", status };
         }
-        catch {
-            next = { kind: "no_repo" };
+        catch (err) {
+            next = failureState(err);
         }
         if (this.refreshId !== id)
             return;
-        if (cwd)
-            this.statusCache.set(cwd, next);
+        if (scope)
+            this.statusCache.set(scope, next);
         this.repo = next;
         this.render();
         if (branchChanged && next.kind === "ready")
-            void this.resolvePr(cwd, next.status.branch);
+            void this.resolvePr(scope, next.status.branch);
     }
-    moveEntry(path, from, to) {
+    moveEntries(paths, from, to) {
         if (this.repo.kind !== "ready")
             return;
+        const moving = new Set(paths);
         const src = this.repo.status[from];
-        const entry = src.find((file) => file.path === path);
-        if (!entry)
+        const entries = src.filter((file) => moving.has(file.path));
+        if (entries.length === 0)
             return;
-        const moved = to === "staged" ? { ...entry, label: entry.label === "?" ? "A" : entry.label } : entry;
+        const moved = to === "staged"
+            ? entries.map((entry) => ({ ...entry, label: entry.label === "?" ? "A" : entry.label }))
+            : entries;
         this.repo = {
             kind: "ready",
             status: {
                 ...this.repo.status,
-                [from]: src.filter((file) => file.path !== path),
-                [to]: [...this.repo.status[to], moved].sort((a, b) => a.path.localeCompare(b.path)),
+                [from]: src.filter((file) => !moving.has(file.path)),
+                [to]: [...this.repo.status[to].filter((file) => !moving.has(file.path)), ...moved].sort((a, b) => a.path.localeCompare(b.path)),
             },
         };
         this.render();
@@ -863,14 +870,14 @@ export class GitPanelApp {
         this.graph = { rows: computeLanes(commits), hasMore, loading };
         this.render();
     }
-    async fetchGraphPage(cwd, skip) {
-        const batch = await cmd.log(cwd, { maxCount: PAGE, skip });
+    async fetchGraphPage(skip, fresh = false) {
+        const batch = await scm.log({ maxCount: PAGE, skip, fresh });
         return batch.map(toCommitNode);
     }
     async resetGraph(fresh) {
         const id = ++this.graphLoadId;
-        const cwd = await activeWorktreePath();
-        const cached = cwd ? this.graphCache.get(cwd) : undefined;
+        const scope = await repoScope();
+        const cached = scope ? this.graphCache.get(scope) : undefined;
         if (cached)
             this.publishGraph(cached.commits, cached.hasMore, true);
         else {
@@ -878,13 +885,13 @@ export class GitPanelApp {
             this.publishGraph([], false, true);
         }
         try {
-            const batch = await this.fetchGraphPage(cwd, 0);
+            const batch = await this.fetchGraphPage(0, fresh);
             if (this.graphLoadId !== id)
                 return;
             this.graphCommits = batch;
             const hasMore = batch.length === PAGE;
-            if (cwd)
-                this.graphCache.set(cwd, { commits: batch, hasMore });
+            if (scope)
+                this.graphCache.set(scope, { commits: batch, hasMore });
             this.publishGraph(batch, hasMore, false);
         }
         catch {

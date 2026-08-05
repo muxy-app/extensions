@@ -1,18 +1,16 @@
+import * as repo from "@/lib/repo";
+
 const FILES_EXTENSION_ID = "files";
 
-function stripTrailingSlash(path) {
-    return path.replace(/\/+$/, "");
-}
-
 function joinPath(base, rel) {
-    const root = stripTrailingSlash(base ?? "");
+    const root = (base ?? "").replace(/\/+$/, "");
     const relative = rel.replace(/^\/+/, "");
     if (!root)
         return relative;
     return `${root}/${relative}`;
 }
 
-export async function openInEditor(cwd, relPath) {
+export async function openInEditor(relPath) {
     try {
         await muxy.tabs.open({
             kind: "extensionWebView",
@@ -34,6 +32,9 @@ export async function openInEditor(cwd, relPath) {
     }
 }
 
-export async function revealInFinder(cwd, relPath) {
-    await muxy.exec(["open", "-R", joinPath(cwd, relPath)]).catch(() => undefined);
+export async function revealInFinder(relPath) {
+    const info = await repo.repoInfo().catch(() => null);
+    if (!info?.root)
+        return;
+    await muxy.exec(["open", "-R", joinPath(info.root, relPath)]).catch(() => undefined);
 }

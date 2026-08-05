@@ -1,6 +1,6 @@
 import { branchNameFromTitle } from "@/lib/pr";
 import { cls, h, readPref, writePref } from "@/lib/dom";
-import { activeWorktreePath, confirmAction, listBranches, openDiff } from "@/lib/git";
+import { confirmAction, listBranches, openDiff } from "@/lib/git";
 import { openInEditor, revealInFinder } from "@/lib/file-actions";
 import { icon } from "@/lib/icons";
 import { button, closeFloating, fileRow, iconButton, menuItem, openFloating, smallIconButton, textarea, } from "@/ui/shared";
@@ -8,18 +8,12 @@ import { treeIndent, treeRows } from "@/ui/file-tree";
 const SECTION_PREFIX = "muxy.git.section.";
 const TREE_PREFIX = "muxy.git.tree.";
 const VIEW_KEY = "muxy.git.changes.view";
-async function openFileInEditor(path) {
-    await openInEditor(await activeWorktreePath(), path);
-}
-async function revealFileInFinder(path) {
-    await revealInFinder(await activeWorktreePath(), path);
-}
 function fileActionHandlers(entry) {
     if (entry.label === "D")
         return {};
     return {
-        onOpenEditor: (path) => void openFileInEditor(path),
-        onReveal: (path) => void revealFileInFinder(path),
+        onOpenEditor: (path) => void openInEditor(path),
+        onReveal: (path) => void revealInFinder(path),
     };
 }
 function changesView() {
@@ -79,7 +73,7 @@ export function renderBranchTab(app, status) {
         staged: true,
         bulkLabel: "Unstage all",
         onBulk: () => void app.unstageAll(),
-        onAction: (path) => void app.unstage(path),
+        onAction: (paths) => void app.unstage(paths),
     }), renderFileSection(app, {
         id: "changes",
         title: "Changes",
@@ -88,7 +82,7 @@ export function renderBranchTab(app, status) {
         searchable: true,
         bulkLabel: "Stage all",
         onBulk: () => void app.stageAll(),
-        onAction: (path) => void app.stage(path),
+        onAction: (paths) => void app.stage(paths),
         onDiscard: (path) => void discardOne(app, path),
         onBulkDiscard: () => void discardAll(app, status.unstaged.length),
     }), clean ? h("div", { class: "flex flex-col items-center gap-3 px-4 py-7 text-center text-muted-foreground" }, "No changes.") : null));
@@ -208,6 +202,23 @@ function renderSearchBar(app) {
         }, "absolute right-3 top-1/2 -translate-y-1/2")
         : null);
 }
+function renderLeafRow(entry, opts, indent) {
+    return fileRow(entry, {
+        staged: opts.staged,
+        indent,
+        name: indent === undefined ? undefined : entry.name,
+        onAction: (path) => opts.onAction([path]),
+        onDiscard: opts.onDiscard,
+        onOpen: openDiff,
+        ...fileActionHandlers(entry),
+    });
+}
+function renderFolderActions(opts, files) {
+    return smallIconButton(opts.staged ? "Unstage folder" : "Stage folder", opts.staged ? "minus" : "plus", (event) => {
+        event.stopPropagation();
+        opts.onAction(files.map((file) => file.path));
+    }, "hidden group-hover:flex");
+}
 function renderFileList(app, entries, opts) {
     if (entries.length === 0)
         return h("div", { class: "px-4 py-4 text-center text-[12px] text-muted-foreground" }, "No matching files.");
@@ -215,24 +226,11 @@ function renderFileList(app, entries, opts) {
         return h("ul", { class: "divide-y divide-transparent" }, treeRows(entries, {
             prefix: `${TREE_PREFIX}${opts.id}.`,
             onToggle: () => app.render(),
-            renderLeaf: (file, depth) => fileRow(file, {
-                staged: opts.staged,
-                indent: treeIndent(depth),
-                name: file.name,
-                onAction: opts.onAction,
-                onDiscard: opts.onDiscard,
-                onOpen: openDiff,
-                ...fileActionHandlers(file),
-            }),
+            folderActions: (files) => renderFolderActions(opts, files),
+            renderLeaf: (file, depth) => renderLeafRow(file, opts, treeIndent(depth)),
         }));
     }
-    return h("ul", { class: "divide-y divide-border" }, entries.map((entry) => fileRow(entry, {
-        staged: opts.staged,
-        onAction: opts.onAction,
-        onDiscard: opts.onDiscard,
-        onOpen: openDiff,
-        ...fileActionHandlers(entry),
-    })));
+    return h("ul", { class: "divide-y divide-border" }, entries.map((entry) => renderLeafRow(entry, opts)));
 }
 function filterEntries(app, opts) {
     if (!opts.searchable || !app.changesFilterOpen)

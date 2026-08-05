@@ -1,5 +1,5 @@
-import * as cmd from "@/lib/cmd";
-import { alertError, confirmAction, errorMessage, openUrl, samePath } from "@/lib/git";
+import * as repo from "@/lib/repo";
+import { alertError, confirmAction, errorMessage, openUrl } from "@/lib/git";
 const MAX_SLUG_WORDS = 5;
 const MAX_SLUG_LENGTH = 30;
 export function prState(pr) {
@@ -10,17 +10,17 @@ export function prState(pr) {
         return "closed";
     return "open";
 }
-export function mergePr(number, method, deleteBranch, cwd) {
-    return cmd.prMerge(cwd, { number, method, deleteBranch });
+export function mergePr(number, method, deleteBranch) {
+    return repo.prMerge({ number, method, deleteBranch });
 }
-export function closePr(number, cwd) {
-    return cmd.prClose(cwd, number);
+export function closePr(number) {
+    return repo.prClose(number);
 }
-export function readyPr(number, title, cwd) {
-    return cmd.prReady(cwd, { number, title });
+export function readyPr(number, title) {
+    return repo.prReady({ number, title });
 }
-export function createPr(title, body, baseBranch, draft, cwd) {
-    return cmd.prCreate(cwd, { title, body, baseBranch, draft });
+export function createPr(title, body, baseBranch, draft) {
+    return repo.prCreate({ title, body, baseBranch, draft });
 }
 function slugify(text) {
     return text
@@ -46,32 +46,26 @@ export function existingPrUrl(err) {
     const match = message.match(/https?:\/\/\S+/);
     return match ? match[0].replace(/[.,)\]]+$/, "") : null;
 }
-async function pullQuietly(cwd) {
-    await cmd.pull(cwd).catch(() => undefined);
+async function pullQuietly() {
+    await repo.pullFastForward().catch(() => undefined);
 }
-async function isOnWorktree(cwd) {
-    const info = await cmd.repoInfo(cwd).catch(() => null);
-    return !!info?.isWorktree;
-}
-function replacementWorktree(worktrees, cwd) {
-    const others = worktrees.filter((w) => !samePath(w.path, cwd));
-    return others.find((w) => w.isPrimary) ?? others[0];
-}
-async function removeWorktree(branch, dirty, cwd) {
-    const worktrees = await cmd.worktreesList(cwd).catch(() => []);
-    const replacement = replacementWorktree(worktrees, cwd);
+async function removeWorktree(root, branch, dirty) {
+    const worktrees = await repo.worktreesList().catch(() => []);
+    const others = worktrees.filter((w) => !w.isActive);
+    const replacement = others.find((w) => w.isPrimary) ?? others[0];
     if (!replacement)
         throw new Error("No other worktree to remove from.");
     await muxy.git.worktree.switchTo({ identifier: replacement.path }).catch(() => undefined);
-    await muxy.git.worktree.remove({ path: cwd, force: dirty });
+    await muxy.git.worktree.remove({ path: root, force: dirty });
     if (branch)
-        await cmd.branchDeleteRemote(replacement.path, branch).catch(() => undefined);
-    await pullQuietly(replacement.path);
+        await repo.branchDeleteRemote(branch).catch(() => undefined);
+    await pullQuietly();
     await muxy.worktrees.refresh().catch(() => undefined);
 }
-export async function removeWorktreeOrBranch({ branch, defaultBranch, dirty }, cwd) {
-    if (await isOnWorktree(cwd)) {
-        await removeWorktree(branch, dirty, cwd);
+export async function removeWorktreeOrBranch({ branch, defaultBranch, dirty }) {
+    const info = await repo.repoInfo().catch(() => null);
+    if (info?.isWorktree) {
+        await removeWorktree(info.root, branch, dirty);
         return;
     }
     if (!branch)
@@ -80,21 +74,21 @@ export async function removeWorktreeOrBranch({ branch, defaultBranch, dirty }, c
         throw new Error(`"${branch}" is the default branch and won't be deleted.`);
     }
     const target = defaultBranch ?? "main";
-    await cmd.branchSwitch(cwd, target);
-    const { currentBranch } = await cmd.repoInfo(cwd);
+    await repo.branchSwitch(target);
+    const { currentBranch } = await repo.repoInfo();
     if (currentBranch === branch) {
         throw new Error(`Still on "${branch}" after switching to ${target}.`);
     }
-    await cmd.branchDelete(cwd, branch, true);
-    await cmd.branchDeleteRemote(cwd, branch).catch(() => undefined);
-    await pullQuietly(cwd);
+    await repo.branchDelete(branch, true);
+    await repo.branchDeleteRemote(branch).catch(() => undefined);
+    await pullQuietly();
     await muxy.worktrees.refresh().catch(() => undefined);
 }
-export async function cleanupBranch(target, cwd) {
+export async function cleanupBranch(target) {
     if (!target.branch)
         return false;
     try {
-        await removeWorktreeOrBranch(target, cwd);
+        await removeWorktreeOrBranch(target);
         return true;
     }
     catch (err) {
@@ -102,8 +96,8 @@ export async function cleanupBranch(target, cwd) {
         return false;
     }
 }
-export function checkoutPr(number, cwd) {
-    return cmd.prCheckout(cwd, number);
+export function checkoutPr(number) {
+    return repo.prCheckout(number);
 }
 export function parentDir(path) {
     return (path ?? "").replace(/\/+$/, "").replace(/\/[^/]+$/, "");
@@ -112,9 +106,8 @@ export function worktreePathIn(dir, number) {
     const name = `pr-${number}`;
     return dir ? `${dir.replace(/\/+$/, "")}/${name}` : name;
 }
-export async function checkoutPrWorktree(number, path, cwd) {
-    const branch = await cmd.prepareWorktreeBranch(cwd, number);
-    await muxy.git.worktree.add({ path, branch, createBranch: false });
+export async function checkoutPrWorktree(number, path) {
+    const branch = await repo.prCheckoutWorktree(number, path);
     await muxy.worktrees.refresh().catch(() => undefined);
     return branch;
 }
