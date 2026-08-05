@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!-- Background: rounded app-tile -->
+  <rect width="256" height="256" rx="56" fill="#1B1B24"/>
+  <!-- Checked row -->
+  <rect x="52" y="48" width="32" height="32" rx="9" fill="#4ADE80"/>
+  <path d="M64 60l8 9 16-20" fill="none" stroke="#0E0E14" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <line x1="112" y1="64" x2="196" y2="64" stroke="#F2F2F7" stroke-width="11" stroke-linecap="round"/>
+  <!-- Unchecked rows -->
+  <rect x="52" y="112" width="32" height="32" rx="9" fill="none" stroke="#F2F2F7" stroke-width="8"/>
+  <line x1="112" y1="128" x2="196" y2="128" stroke="#F2F2F7" stroke-width="11" stroke-linecap="round"/>
+  <rect x="52" y="176" width="32" height="32" rx="9" fill="none" stroke="#F2F2F7" stroke-width="8"/>
+  <line x1="112" y1="192" x2="196" y2="192" stroke="#F2F2F7" stroke-width="11" stroke-linecap="round"/>
+</svg>

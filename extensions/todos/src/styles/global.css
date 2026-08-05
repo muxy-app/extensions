@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: var(--muxy-background);
+  --color-foreground: var(--muxy-foreground);
+  --color-muted: var(--muxy-surface-solid);
+  --color-muted-foreground: var(--muxy-foreground-muted);
+  --color-surface: var(--muxy-surface-solid);
+  --color-primary: var(--muxy-accent);
+  --color-primary-foreground: var(--muxy-accent-foreground);
+  --color-accent: var(--muxy-hover);
+  --color-accent-foreground: var(--muxy-foreground);
+  --color-border: var(--muxy-border);
+  --color-input: var(--muxy-border);
+  --color-ring: var(--muxy-accent);
+  --radius: 6px;
+}
+
+html,
+body,
+#root {
+  height: 100vh;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+  font: 13px -apple-system, "SF Pro", system-ui, sans-serif;
+  background: var(--muxy-background);
+  color: var(--muxy-foreground);
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: default;
+}
+
+/* ---- Drag to reorder ---- */
+/* Insert-position indicator: 2px accent line on top / bottom edge */
+.drag-before {
+  box-shadow: inset 0 2px 0 var(--muxy-accent);
+}
+
+.drag-after {
+  box-shadow: inset 0 -2px 0 var(--muxy-accent);
+}
+
+/* The row being dragged turns translucent */
+.dragging {
+  opacity: 0.45;
+}
