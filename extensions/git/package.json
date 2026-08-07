@@ -9,9 +9,11 @@
     "update-skill": "node scripts/update-skill.mjs"
   },
   "type": "module",
-  "version": "1.13.2",
+  "version": "1.14.0",
   "dependencies": {
-    "@pierre/diffs": "^1.2.12"
+    "@pierre/diffs": "^1.2.12",
+    "dompurify": "^3.4.13",
+    "marked": "^18.0.9"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.0",
@@ -28,6 +30,8 @@
       "worktrees:read",
       "worktrees:write",
       "notifications:write",
+      "storage:read",
+      "storage:write",
       "files:read",
       "git:read",
       "git:write"
@@ -73,6 +77,19 @@
       {
         "id": "refresh-scm",
         "title": "Refresh"
+      },
+      {
+        "id": "checkout-pr",
+        "title": "Checkout Pull Request…",
+        "subtitle": "Search open pull requests",
+        "defaultShortcut": "cmd+shift+y",
+        "action": {
+          "kind": "openModal",
+          "entry": "modal/pr-checkout.html",
+          "width": 800,
+          "height": 680,
+          "dismissOnOutsideClick": true
+        }
       }
     ],
     "topbarItems": [

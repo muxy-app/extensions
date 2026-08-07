@@ -1,4 +1,5 @@
 import { run, tryRun } from "@/lib/forge/exec";
+import { diffStats } from "@/lib/diff-stats";
 
 const PR_FIELDS = "index,state,title,author,url,mergeable,base,head,ci";
 
@@ -108,6 +109,47 @@ export async function prList({ filter, limit } = {}) {
     catch {
         return [];
     }
+}
+
+function detailComment(raw, kind) {
+    return {
+        id: raw.id ?? `${kind}-${raw.created ?? ""}`,
+        author: asString(raw.author ?? raw.reviewer) || "Unknown author",
+        body: raw.body ?? "",
+        createdAt: raw.created ?? "",
+        kind,
+        state: String(raw.state ?? "").toLowerCase(),
+    };
+}
+
+export async function prDetails(number) {
+    const [out, stats] = await Promise.all([
+        run(["tea", "pr", String(number), "--comments", "--output", "json"]),
+        prDiff(number).then((patch) => diffStats(patch.diff)).catch(() => diffStats("")),
+    ]);
+    const raw = JSON.parse(out);
+    const comments = [
+        ...(raw.comments ?? []).map((comment) => detailComment(comment, "comment")),
+        ...(raw.reviews ?? []).filter((review) => review.body?.trim()).map((review) => detailComment(review, "review")),
+    ].sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+    return {
+        number: Number(raw.index ?? raw.number) || Number(number),
+        title: raw.title ?? "",
+        summary: raw.body ?? "",
+        author: asString(raw.user ?? raw.author) || "Unknown author",
+        headBranch: asString(raw.head),
+        baseBranch: asString(raw.base),
+        state: resolveState(raw),
+        url: asString(raw.url),
+        isDraft: /^wip:/i.test(String(raw.title ?? "").trim()),
+        mergeable: mapMergeable(raw.mergeable),
+        mergeStateStatus: "",
+        reviewDecision: "",
+        ...stats,
+        comments,
+        createdAt: raw.created ?? "",
+        updatedAt: raw.updated ?? "",
+    };
 }
 
 async function findPrByNumber(number) {

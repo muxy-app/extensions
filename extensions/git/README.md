@@ -10,6 +10,8 @@ diff viewer, and pull requests.
 - **Branch switcher** — switch and create branches from the status bar.
 - **Diff viewer** — inline file diffs.
 - **Pull Requests** — browse PRs and view the current PR for the branch.
+- **Pull request picker** — search open PRs from the command palette, open
+  details with `Enter`, or choose a checkout target with `Shift+Enter`.
 - **Worktrees** — create and switch worktrees.
 
 ## Pull request backends

@@ -1,0 +1,131 @@
+.pr-choice-body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--s6);
+  overflow-y: auto;
+  border-top: 1px solid var(--muxy-border);
+  border-bottom: 1px solid var(--muxy-border);
+  padding: var(--s7);
+}
+
+.pr-choice-branch {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s3);
+  color: var(--muxy-foreground-muted);
+  font: var(--font-footnote) "SF Mono", Menlo, monospace;
+}
+
+.pr-choice-branch span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pr-choice-branch span:nth-child(2) {
+  flex: 0 0 auto;
+  color: var(--muxy-accent);
+}
+
+.pr-choice-options {
+  display: flex;
+  width: 100%;
+  max-width: 520px;
+  flex-direction: column;
+  gap: var(--s4);
+  margin: auto;
+}
+
+.pr-choice-option {
+  position: relative;
+  display: grid;
+  width: 100%;
+  min-height: calc(var(--row-height) + var(--s9));
+  grid-template-columns: var(--s10) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s5);
+  border: 1px solid var(--muxy-border);
+  border-radius: var(--radius-card);
+  padding: var(--s5) var(--s6);
+  background: var(--muxy-surface);
+  color: var(--muxy-foreground);
+  text-align: left;
+}
+
+.pr-choice-option:hover {
+  border-color: var(--muxy-accent);
+  background: var(--muxy-hover);
+}
+
+.pr-choice-option-selected,
+.pr-choice-option-selected:hover {
+  border-color: var(--muxy-accent);
+  background: var(--muxy-accent-soft);
+}
+
+.pr-choice-option-selected::before {
+  position: absolute;
+  top: var(--s4);
+  bottom: var(--s4);
+  left: calc(var(--s1) * -1);
+  width: var(--s1);
+  border-radius: var(--s1);
+  background: var(--muxy-accent);
+  content: "";
+}
+
+.pr-choice-icon {
+  display: grid;
+  width: var(--s10);
+  height: var(--s10);
+  place-items: center;
+  border-radius: var(--radius);
+  background: var(--muxy-background);
+  color: var(--muxy-accent);
+}
+
+.pr-choice-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--s2);
+}
+
+.pr-choice-copy strong {
+  font-size: var(--font-emphasis);
+  font-weight: 600;
+}
+
+.pr-choice-copy span {
+  overflow: hidden;
+  color: var(--muxy-foreground-muted);
+  font-size: var(--font-footnote);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pr-choice-option kbd,
+.pr-detail-action kbd {
+  display: grid;
+  width: var(--control);
+  height: var(--s8);
+  place-items: center;
+  border: 1px solid var(--muxy-border);
+  border-radius: var(--s2);
+  background: var(--muxy-background);
+  color: var(--muxy-foreground-muted);
+  font: var(--font-caption) "SF Mono", Menlo, monospace;
+}
+
+.pr-choice-option-selected kbd {
+  border-color: var(--muxy-accent);
+  color: var(--muxy-foreground);
+}
+
+.pr-choice.pr-modal-busy .pr-choice-option {
+  opacity: 0.62;
+}

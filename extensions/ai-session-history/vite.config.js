@@ -8,20 +8,12 @@ export default defineConfig({
   resolve: {
     alias: { "@": resolve(__dirname, "src") },
   },
-  define: {
-    "process.env.NODE_ENV": JSON.stringify("production"),
-  },
-  worker: {
-    format: "es",
-  },
   build: {
     outDir: "dist",
     emptyOutDir: true,
     rollupOptions: {
       input: {
-        scm: resolve(__dirname, "panel/index.html"),
-        "diff-viewer": resolve(__dirname, "panel/diff-viewer.html"),
-        "pr-checkout": resolve(__dirname, "modal/pr-checkout.html"),
+        sessions: resolve(__dirname, "panel/index.html"),
       },
     },
   },
