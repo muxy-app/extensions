@@ -1,6 +1,6 @@
 {
   "name": "ai-session-history",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -23,9 +23,12 @@
       "panels:write",
       "tabs:write",
       "commands:exec",
+      "commands:run-script",
       "projects:read",
       "worktrees:read",
-      "notifications:write"
+      "notifications:write",
+      "storage:read",
+      "storage:write"
     ],
     "events": [
       "project.switched",
@@ -40,7 +43,11 @@
         },
         "entry": "panel/index.html",
         "position": "right",
-        "mode": "floating",
+        "mode": "pinned",
+        "hiddenControls": [
+          "pin",
+          "position"
+        ],
         "headerButtons": [
           {
             "id": "refresh",

@@ -59,6 +59,7 @@ export class SessionsPanel {
     /** Stable aria-live region (not recreated filled on every render). */
     this._liveRegion = null;
     this._startMenuDocListener = null;
+    this.disposers = [];
   }
 
   clearEditState() {
@@ -150,15 +151,36 @@ export class SessionsPanel {
     this.render();
   }
 
-  async start() {
-    this.preferredCli = await getPreferredCli();
-    this.filter = await getListFilter();
+  start() {
+    // Match the Git/Files panels: paint a useful shell synchronously, then
+    // hydrate. A rejected bridge call can no longer leave a blank webview.
+    this.render();
+    this.disposers = [
+      muxy.events.subscribe("command.refresh-sessions", () => void this.refresh()),
+      muxy.events.subscribe("project.switched", () => void this.refresh()),
+      muxy.events.subscribe("worktree.switched", () => void this.refresh()),
+    ].filter(Boolean);
+    void this.bootstrap();
+  }
 
-    muxy.events.subscribe("command.refresh-sessions", () => this.refresh());
-    muxy.events.subscribe("project.switched", () => this.refresh());
-    muxy.events.subscribe("worktree.switched", () => this.refresh());
+  async bootstrap() {
+    try {
+      [this.preferredCli, this.filter] = await Promise.all([
+        getPreferredCli(),
+        getListFilter(),
+      ]);
+      await this.refresh();
+    } catch (err) {
+      this.loading = false;
+      this.error = err?.message || String(err);
+      this.render();
+    }
+  }
 
-    await this.refresh();
+  dispose() {
+    this._detachStartMenuListeners();
+    for (const dispose of this.disposers) dispose();
+    this.disposers = [];
   }
 
   /**
