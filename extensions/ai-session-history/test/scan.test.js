@@ -19,7 +19,10 @@ import { listCodex } from "../src/lib/sessions/scan/codex.js";
 import {
   listCopilot,
   buildCopilotProbeEntries,
+  COPILOT_SQLITE_SOFT_ERROR,
 } from "../src/lib/sessions/scan/copilot.js";
+import { listSessionsForCli } from "../src/lib/sessions/scan.js";
+import { listAll } from "../src/lib/sessions/index.js";
 import {
   pathQuote,
   md5Hex,
@@ -47,6 +50,21 @@ function realExec(argv, opts = {}) {
     stderr: result.stderr ?? "",
     exitCode: result.status ?? 1,
   };
+}
+
+/** Assert metadata was read only via head -c (no full cat). */
+function assertReadHeadOnly(calls, { maxBytes = 64_000 } = {}) {
+  const catCalls = calls.filter((a) => a[0] === "/bin/cat");
+  const headCalls = calls.filter((a) => a[0] === "/usr/bin/head");
+  assert.equal(catCalls.length, 0, "must not full-cat metadata");
+  assert.ok(headCalls.length >= 1, "expected readHead for metadata");
+  assert.ok(
+    headCalls.some((a) => {
+      const i = a.indexOf("-c");
+      return i >= 0 && Number(a[i + 1]) === maxBytes;
+    }),
+    `expected head -c ${maxBytes}, got ${JSON.stringify(headCalls)}`,
+  );
 }
 
 describe("scan helpers", () => {
@@ -165,6 +183,66 @@ describe("listGrok", () => {
     assert.equal(rows.length, 1);
     assert.equal(rows[0].title, "Sync Path");
   });
+
+  it("caps huge summary.json via readHead (no full cat)", async () => {
+    const root = join(home, ".grok", "sessions", pathQuote(PROJ));
+    const sess = join(root, SID);
+    mkdirSync(sess, { recursive: true });
+    // Title fields first; padding forces file well past the 64 KiB head cap.
+    const summary = JSON.stringify({
+      generated_title: "Huge Grok",
+      updated_at: "2026-08-06T12:00:00Z",
+      info: { id: SID },
+      padding: "x".repeat(100_000),
+    });
+    assert.ok(summary.length > 64_000);
+    writeFileSync(join(sess, "summary.json"), summary);
+
+    const calls = [];
+    const exec = (argv, opts = {}) => {
+      calls.push(argv.slice());
+      return realExec(argv, opts);
+    };
+    const fs = createHostFs(exec);
+    const rows = await listGrok(fs, PROJ, { home });
+    assert.equal(rows.length, 1);
+    // Truncated head is invalid JSON → fail-open with dir name + fallback title.
+    assert.equal(rows[0].id, SID);
+    assert.equal(rows[0].title, "(untitled)");
+    assertReadHeadOnly(calls, { maxBytes: 64_000 });
+  });
+
+  it("still parses large-but-capped summary.json under the head limit", async () => {
+    const root = join(home, ".grok", "sessions", pathQuote(PROJ));
+    const sess = join(root, SID);
+    mkdirSync(sess, { recursive: true });
+    // Pad until near the cap but keep full JSON ≤ 64_000 so parse succeeds.
+    let pad = 50_000;
+    let summary = "";
+    for (; pad >= 0; pad -= 500) {
+      summary = JSON.stringify({
+        generated_title: "Still Parses",
+        updated_at: "2026-08-06T12:00:00Z",
+        info: { id: SID },
+        padding: "x".repeat(pad),
+      });
+      if (summary.length <= 64_000) break;
+    }
+    assert.ok(summary.length > 8_000 && summary.length <= 64_000);
+    writeFileSync(join(sess, "summary.json"), summary);
+
+    const calls = [];
+    const exec = (argv, opts = {}) => {
+      calls.push(argv.slice());
+      return realExec(argv, opts);
+    };
+    const fs = createHostFs(exec);
+    const rows = await listGrok(fs, PROJ, { home });
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].id, SID);
+    assert.equal(rows[0].title, "Still Parses");
+    assertReadHeadOnly(calls, { maxBytes: 64_000 });
+  });
 });
 
 describe("listCursor", () => {
@@ -193,6 +271,66 @@ describe("listCursor", () => {
     assert.equal(rows.length, 1);
     assert.equal(rows[0].title, "Cursor Title");
     assert.equal(rows[0].branch, "main");
+  });
+
+  it("caps huge meta.json via readHead (no full cat)", async () => {
+    const hash = createHash("md5").update(PROJ, "utf8").digest("hex");
+    const sess = join(home, ".cursor", "chats", hash, SID);
+    mkdirSync(sess, { recursive: true });
+    const meta = JSON.stringify({
+      title: "Huge Cursor",
+      branch: "main",
+      updatedAtMs: 1_700_000_000_000,
+      padding: "y".repeat(100_000),
+    });
+    assert.ok(meta.length > 64_000);
+    writeFileSync(join(sess, "meta.json"), meta);
+
+    const calls = [];
+    const exec = (argv, opts = {}) => {
+      calls.push(argv.slice());
+      return realExec(argv, opts);
+    };
+    const fs = createHostFs(exec);
+    const rows = await listCursor(fs, PROJ, { home });
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].id, SID);
+    // Truncated head is invalid JSON → fail-open without branch from meta.
+    assert.equal(rows[0].title, "(untitled)");
+    assert.equal(rows[0].branch, null);
+    assertReadHeadOnly(calls, { maxBytes: 64_000 });
+  });
+
+  it("still parses large-but-capped meta.json under the head limit", async () => {
+    const hash = createHash("md5").update(PROJ, "utf8").digest("hex");
+    const sess = join(home, ".cursor", "chats", hash, SID);
+    mkdirSync(sess, { recursive: true });
+    let pad = 50_000;
+    let meta = "";
+    for (; pad >= 0; pad -= 500) {
+      meta = JSON.stringify({
+        title: "Still Parses",
+        branch: "main",
+        updatedAtMs: 1_700_000_000_000,
+        padding: "y".repeat(pad),
+      });
+      if (meta.length <= 64_000) break;
+    }
+    assert.ok(meta.length > 8_000 && meta.length <= 64_000);
+    writeFileSync(join(sess, "meta.json"), meta);
+
+    const calls = [];
+    const exec = (argv, opts = {}) => {
+      calls.push(argv.slice());
+      return realExec(argv, opts);
+    };
+    const fs = createHostFs(exec);
+    const rows = await listCursor(fs, PROJ, { home });
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].id, SID);
+    assert.equal(rows[0].title, "Still Parses");
+    assert.equal(rows[0].branch, "main");
+    assertReadHeadOnly(calls, { maxBytes: 64_000 });
   });
 });
 
@@ -694,5 +832,85 @@ describe("listCopilot", () => {
       rows.every((r) => r.cwd === PROJ),
       true,
     );
+    assert.equal(rows.softError, COPILOT_SQLITE_SOFT_ERROR);
+  });
+
+  it("sqliteAvailable false: soft error set; events kept; turns-only omitted", async () => {
+    const eventsSid = uuidAt(10);
+    const turnsOnly = uuidAt(11);
+    sessionDir(eventsSid, {
+      cwd: PROJ,
+      events: '{"type":"user.message","data":{"content":"events-backed"}}\n',
+    });
+    // Turns-only: workspace + dir only — resume evidence lives in sqlite turns.
+    sessionDir(turnsOnly, { cwd: PROJ });
+    writeStore({
+      sessions: [
+        [eventsSid, PROJ, "Events"],
+        [turnsOnly, PROJ, "Turns only"],
+      ],
+      turns: [turnsOnly],
+    });
+
+    const fs = createHostFs(realExec);
+    const rows = await listCopilot(fs, PROJ, {
+      copilotHome: home,
+      sqliteAvailable: false,
+    });
+    assert.ok(ids(rows).has(eventsSid), "events-backed session still listed");
+    assert.equal(ids(rows).has(turnsOnly), false, "turns-only omitted without sqlite");
+    assert.equal(rows.softError, COPILOT_SQLITE_SOFT_ERROR);
+
+    // Façade preserves softError for listAll / panel muted status line.
+    const viaCli = await listSessionsForCli("copilot", PROJ, {
+      fs,
+      sqliteAvailable: false,
+      copilotHome: home,
+    });
+    assert.ok(ids(viaCli).has(eventsSid));
+    assert.equal(viaCli.softError, COPILOT_SQLITE_SOFT_ERROR);
+  });
+
+  it("sqliteAvailable false: no soft error when session-state is empty", async () => {
+    mkdirSync(join(home, "session-state"), { recursive: true });
+    const fs = createHostFs(realExec);
+    const rows = await listCopilot(fs, PROJ, {
+      copilotHome: home,
+      sqliteAvailable: false,
+    });
+    assert.equal(rows.length, 0);
+    assert.equal(rows.softError, undefined);
+  });
+
+  it("listAll: soft error in errorsByCli while events sessions remain", async () => {
+    const eventsSid = uuidAt(20);
+    sessionDir(eventsSid, {
+      cwd: PROJ,
+      events: '{"type":"user.message","data":{"content":"listed"}}\n',
+    });
+    const fs = createHostFs(realExec);
+    const { sessionsByCli, errorsByCli, groups } = await listAll(PROJ, {
+      exec: realExec,
+      fs,
+      home,
+      sqliteAvailable: false,
+      installed: [
+        {
+          id: "copilot",
+          displayName: "Copilot",
+          binary: "copilot",
+          path: "/usr/bin/copilot",
+        },
+      ],
+    });
+    assert.equal(errorsByCli.copilot, COPILOT_SQLITE_SOFT_ERROR);
+    assert.ok(
+      (sessionsByCli.copilot || []).some((s) => s.id === eventsSid),
+      "events-backed session kept in sessionsByCli",
+    );
+    const group = groups.find((g) => g.cli === "copilot");
+    assert.ok(group, "copilot group present");
+    assert.equal(group.error, COPILOT_SQLITE_SOFT_ERROR);
+    assert.ok(group.sessions.some((s) => s.id === eventsSid));
   });
 });

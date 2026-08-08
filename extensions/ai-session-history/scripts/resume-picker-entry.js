@@ -210,6 +210,10 @@ function main() {
         if (!uncapped && cappedTotal >= GLOBAL_CAP) continue;
         try {
           const rows = listRowsSync(fs, provider.id, cwd, scanOpts);
+          // Soft partial (e.g. Copilot without sqlite): keep residual rows, notify.
+          if (rows && rows.softError) {
+            softErrors.push(provider.displayName + ": " + String(rows.softError));
+          }
           /** @type {Array<{ id: string, title: string, subtitle: string, _updatedAt: number }>} */
           const batch = [];
           for (let j = 0; j < rows.length; j++) {

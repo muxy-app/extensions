@@ -3,17 +3,17 @@
 @theme inline {
   --color-background: var(--muxy-background);
   --color-foreground: var(--muxy-foreground);
-  --color-muted: var(--muxy-surface-solid);
+  --color-muted: var(--muxy-surface);
   --color-muted-foreground: var(--muxy-foreground-muted);
-  --color-surface: var(--muxy-surface-solid);
+  --color-surface: var(--muxy-surface);
   --color-primary: var(--muxy-accent);
-  --color-primary-foreground: var(--muxy-accent-foreground, var(--muxy-background));
+  --color-primary-foreground: var(--muxy-background);
   --color-accent: var(--muxy-hover);
   --color-accent-foreground: var(--muxy-foreground);
   --color-border: var(--muxy-border);
   --color-input: var(--muxy-border);
   --color-ring: var(--muxy-accent);
-  --color-destructive: var(--muxy-danger, var(--muxy-error, #dc2626));
+  --color-destructive: var(--muxy-diff-remove);
   --radius: 6px;
 }
 
@@ -72,4 +72,13 @@ button:disabled {
 
 .animate-spin {
   animation: spin 0.8s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
 }

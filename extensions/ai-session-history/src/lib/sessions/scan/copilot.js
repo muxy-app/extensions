@@ -14,6 +14,14 @@ import {
   tryChain,
 } from "./helpers.js";
 
+/**
+ * Soft warning when sqlite3 is missing but session-state dirs exist.
+ * Turns-only sessions need the DB; residual FS still lists events-backed ones.
+ * Attached as `rows.softError` on the list result (non-element property).
+ */
+export const COPILOT_SQLITE_SOFT_ERROR =
+  "Install sqlite3 to list turns-only Copilot sessions";
+
 /** Path-like columns allowed after PRAGMA discovery (never free-form SQL). */
 const PATH_COL_CANDIDATES = [
   "cwd",
@@ -523,9 +531,15 @@ function probeCopilotStateDir(fs, state, entry, cwd, turnIds, store) {
  * mtime top-N as the sole gate before cwd match.
  *
  * Returns plain array when fs is sync; Promise when exec is async.
+ *
+ * When `sqliteAvailable === false` and session-state dirs exist, the array may
+ * carry a non-index property `softError` ({@link COPILOT_SQLITE_SOFT_ERROR}).
+ * Callers must read it before `map`/`filter`/`slice` (those drop non-element props).
+ *
  * @param {*} fs
  * @param {string} cwd
  * @param {{ home?: string, copilotHome?: string | null, sqliteAvailable?: boolean }} [opts]
+ * @returns {Array | Promise<Array>} session rows; optional `softError` string property
  */
 export function listCopilot(fs, cwd, opts = {}) {
   return chain(resolveCopilotHome(fs, opts), (home) => {
@@ -540,6 +554,9 @@ export function listCopilot(fs, cwd, opts = {}) {
     return chain(turnIdsP, (turnIds) => {
       const state = joinPath(home, "session-state");
       return chain(tryChain(() => fs.listDirDetailed(state), []), (stateEntries) => {
+        const hasStateDirs = (stateEntries || []).some(
+          (e) => e && e.kind === "dir" && isSafeSessionId(e.name),
+        );
         const dbSidsP =
           opts.sqliteAvailable === false
             ? new Set()
@@ -583,6 +600,10 @@ export function listCopilot(fs, cwd, opts = {}) {
                 }
                 out.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
                 // Project-complete: no silent PER_GROUP_CAP for Copilot.
+                // Soft-error (not throw): keep residual FS sessions, warn about turns-only.
+                if (opts.sqliteAvailable === false && hasStateDirs) {
+                  out.softError = COPILOT_SQLITE_SOFT_ERROR;
+                }
                 return out;
               });
             },
