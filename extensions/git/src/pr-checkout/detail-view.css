@@ -317,7 +317,7 @@
 .pr-detail-actions {
   display: grid;
   flex: 0 0 auto;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--s4);
   border-top: 1px solid var(--muxy-border);
   border-bottom: 1px solid var(--muxy-border);
@@ -452,6 +452,10 @@
 }
 
 @media (max-width: 460px) {
+  .pr-detail-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .pr-detail-ledger {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

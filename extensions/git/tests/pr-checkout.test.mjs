@@ -4,7 +4,7 @@ import test from "node:test";
 import { diffStats } from "../src/lib/diff-stats.js";
 import { PrCache, prListCacheKey } from "../src/pr-checkout/cache.js";
 import { markdownHtml, resolveMarkdownUrl } from "../src/pr-checkout/markdown.js";
-import { checksLabel, detailAction, filterPullRequests, isBackShortcut, isPrOpen, isTextInputTarget, prWorktreePath, RequestGate, selectionMode } from "../src/pr-checkout/model.js";
+import { checksLabel, defaultWorktreeRoot, detailAction, filterPullRequests, isBackShortcut, isPrOpen, isTextInputTarget, prWorktreePath, RequestGate, selectionMode } from "../src/pr-checkout/model.js";
 
 const prs = [
     {
@@ -39,12 +39,13 @@ test("maps Enter and Shift+Enter to list actions", () => {
 });
 
 test("maps detail shortcuts without arrow selection", () => {
+    assert.equal(detailAction({ key: "Enter", shiftKey: false, metaKey: false, ctrlKey: false, altKey: false }), "checkout");
     assert.equal(detailAction({ key: "Enter", shiftKey: true }), "open");
     assert.equal(detailAction({ key: "o", metaKey: true }), null);
     assert.equal(detailAction({ key: "Enter", metaKey: true }), "merge");
     assert.equal(detailAction({ key: "Backspace", metaKey: true }), "close");
     assert.equal(detailAction({ key: "Delete", metaKey: true }), "close");
-    assert.equal(detailAction({ key: "Enter", metaKey: false }), null);
+    assert.equal(detailAction({ key: "Enter", ctrlKey: true }), null);
     assert.equal(detailAction({ key: "ArrowRight", metaKey: false }), null);
 });
 
@@ -101,6 +102,16 @@ test("derives a repository-specific sibling worktree path", () => {
     assert.equal(prWorktreePath("/Users/saeed/Projects/muxy", 42), "/Users/saeed/Projects/muxy.pr-42");
     assert.equal(prWorktreePath("/repo/", 7), "/repo.pr-7");
     assert.equal(prWorktreePath("", 9), "pr-9");
+});
+
+test("finds the repository default worktree independently of the active worktree", () => {
+    const worktrees = [
+        { path: "/projects/app", isPrimary: true, isActive: false },
+        { path: "/projects/app-feature", isPrimary: false, isActive: true },
+    ];
+    assert.equal(defaultWorktreeRoot(worktrees), "/projects/app");
+    assert.equal(defaultWorktreeRoot([{ path: "/projects/app", isActive: true }]), "/projects/app");
+    assert.equal(defaultWorktreeRoot([]), "");
 });
 
 test("formats pull request check summaries", () => {

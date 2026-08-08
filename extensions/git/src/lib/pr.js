@@ -99,6 +99,12 @@ export async function cleanupBranch(target) {
 export function checkoutPr(number) {
     return repo.prCheckout(number);
 }
+export async function checkoutPrDefaultWorktree(number, path) {
+    if (!path)
+        throw new Error("Default worktree not found.");
+    await muxy.git.worktree.switchTo({ identifier: path });
+    return checkoutPr(number);
+}
 export function parentDir(path) {
     return (path ?? "").replace(/\/+$/, "").replace(/\/[^/]+$/, "");
 }
@@ -109,6 +115,7 @@ export function worktreePathIn(dir, number) {
 export async function checkoutPrWorktree(number, path) {
     const branch = await repo.prCheckoutWorktree(number, path);
     await muxy.worktrees.refresh().catch(() => undefined);
+    await muxy.git.worktree.switchTo({ identifier: path });
     return branch;
 }
 export async function confirmOpenExistingPr(err, refresh) {

@@ -9,7 +9,7 @@
     "update-skill": "node scripts/update-skill.mjs"
   },
   "type": "module",
-  "version": "1.14.0",
+  "version": "1.14.1",
   "dependencies": {
     "@pierre/diffs": "^1.2.12",
     "dompurify": "^3.4.13",
