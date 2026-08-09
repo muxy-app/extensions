@@ -36,32 +36,36 @@ export function listGrok(fs, cwd, opts = {}) {
           const name = entry.name;
           const child = joinPath(root, name);
           const summary = joinPath(child, "summary.json");
-          return chain(tryChain(() => fs.readText(summary), null), (text) => {
-            let title = "(untitled)";
-            let updated = entry.mtimeMs || 0;
-            let sid = name;
-            if (text) {
-              try {
-                const data = JSON.parse(text);
-                if (data && typeof data === "object") {
-                  const info =
-                    data.info && typeof data.info === "object" ? data.info : {};
-                  if (typeof info.id === "string") sid = info.id;
-                  title =
-                    data.generated_title ||
-                    data.session_summary ||
-                    data.agent_name ||
-                    title;
-                  updated =
-                    isoToMs(data.updated_at || data.last_active_at) || updated;
-                  return sessionRow("grok", sid, String(title), updated, null);
+          // Cap title metadata reads — huge/corrupt summary.json must not full-cat.
+          return chain(
+            tryChain(() => fs.readHead(summary, { maxBytes: 64_000 }), null),
+            (text) => {
+              let title = "(untitled)";
+              let updated = entry.mtimeMs || 0;
+              let sid = name;
+              if (text) {
+                try {
+                  const data = JSON.parse(text);
+                  if (data && typeof data === "object") {
+                    const info =
+                      data.info && typeof data.info === "object" ? data.info : {};
+                    if (typeof info.id === "string") sid = info.id;
+                    title =
+                      data.generated_title ||
+                      data.session_summary ||
+                      data.agent_name ||
+                      title;
+                    updated =
+                      isoToMs(data.updated_at || data.last_active_at) || updated;
+                    return sessionRow("grok", sid, String(title), updated, null);
+                  }
+                } catch {
+                  /* missing, invalid, or truncated summary — use dir mtime */
                 }
-              } catch {
-                /* missing or invalid summary — use dir mtime */
               }
-            }
-            return sessionRow("grok", name, title, updated, null);
-          });
+              return sessionRow("grok", name, title, updated, null);
+            },
+          );
         }),
         (rows) => {
           const out = rows.filter(Boolean);

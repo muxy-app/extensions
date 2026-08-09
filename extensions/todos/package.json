@@ -1,0 +1,82 @@
+{
+  "devDependencies" : {
+    "@tailwindcss\/vite" : "^4.3.0",
+    "tailwindcss" : "^4.3.0",
+    "vite" : "^7.3.5"
+  },
+  "muxy" : {
+    "$schema" : "https:\/\/raw.githubusercontent.com\/muxy-app\/muxy\/main\/docs\/extensions\/schema\/manifest.schema.json",
+    "description" : "Per-project todo list — every Muxy project keeps its own tasks.",
+    "commands" : [
+      {
+        "action" : {
+          "kind" : "togglePanel",
+          "panel" : "todos"
+        },
+        "defaultShortcut" : "cmd+shift+t",
+        "id" : "toggle-todos",
+        "title" : "Todos: Toggle Panel"
+      },
+      {
+        "id" : "todos-clear-completed",
+        "title" : "Todos: Clear Completed"
+      }
+    ],
+    "events" : [
+      "project.switched",
+      "projects.changed"
+    ],
+    "marketplace" : {
+      "categories" : [ "productivity" ],
+      "icon" : "assets/icon.svg",
+      "screenshots" : [ "assets/screenshots/screenshot-1.png" ]
+    },
+    "panels" : [
+      {
+        "entry" : "panel\/index.html",
+        "headerButtons" : [
+          {
+            "command" : "todos-clear-completed",
+            "icon" : {
+              "symbol" : "trash"
+            },
+            "id" : "clear",
+            "tooltip" : "Clear completed tasks"
+          }
+        ],
+        "icon" : {
+          "symbol" : "checklist"
+        },
+        "id" : "todos",
+        "mode" : "pinned",
+        "position" : "right",
+        "title" : "Todos"
+      }
+    ],
+    "permissions" : [
+      "panels:write",
+      "projects:read",
+      "storage:read",
+      "storage:write"
+    ],
+    "topbarItems" : [
+      {
+        "command" : "toggle-todos",
+        "icon" : {
+          "symbol" : "checklist"
+        },
+        "id" : "todos",
+        "tooltip" : "Toggle Todos Panel"
+      }
+    ]
+  },
+  "name" : "todos",
+  "private" : true,
+  "scripts" : {
+    "build" : "vite build && node scripts\/copy-manifest.mjs",
+    "dev" : "vite",
+    "update-skill" : "node -e \"const fs=require('fs'),p=require('path');const url='https:\/\/raw.githubusercontent.com\/muxy-app\/muxy\/main\/Muxy\/Resources\/skills\/muxy-extension\/SKILL.md';fetch(url).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.text()}).then(t=>{for(const d of ['.claude\/skills\/muxy-extension','.agents\/skills\/muxy-extension']){fs.mkdirSync(d,{recursive:true});fs.writeFileSync(p.join(d,'SKILL.md'),t);console.log('Updated '+p.join(d,'SKILL.md'))}}).catch(e=>{console.error('Failed to update skill:',e.message);process.exit(1)})\""
+  },
+  "type" : "module",
+  "version" : "1.0.0"
+}

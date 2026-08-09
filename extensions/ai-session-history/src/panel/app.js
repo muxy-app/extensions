@@ -10,7 +10,13 @@ import {
 } from "@/lib/storage";
 import { openResumeTerminal, openStartTerminal } from "@/lib/resume";
 import { filterGroups, listAll } from "@/lib/sessions/index";
-import { buildStartActionModel, pickStartCli } from "@/lib/sessions/start-cli";
+import {
+  buildStartActionModel,
+  isFilterStartOverride,
+  pickStartCli,
+  resolveStartPreference,
+  shouldHealPreferredAfterStart,
+} from "@/lib/sessions/start-cli";
 import { dateGroup, relativeTime } from "@/lib/time";
 import { groupByDate } from "@/lib/sessions/group";
 import { deleteSession, renameSession } from "@/lib/sessions/manage";
@@ -131,6 +137,21 @@ export class SessionsPanel {
     this.render();
   }
 
+  /** @internal test seam — preference persistence */
+  _writePreferredCli(id) {
+    return setPreferredCli(id);
+  }
+
+  /** @internal test seam — list filter persistence */
+  _writeListFilter(filter) {
+    return setListFilter(filter);
+  }
+
+  /** @internal test seam — terminal launch */
+  _openStartTerminal(cli) {
+    return openStartTerminal(cli);
+  }
+
   async preferCli(id) {
     if (!id || !this.installed.some((p) => p.id === id)) {
       this.closeStartMenu();
@@ -138,17 +159,25 @@ export class SessionsPanel {
       this.render();
       return;
     }
-    if (id !== this.preferredCli) {
-      this.preferredCli = id;
-      try {
-        await setPreferredCli(id);
-      } catch {
-        // Keep in-memory preferred; storage may catch up on next write.
-      }
-    }
+    // Menu pick always becomes preferred and resets filter to All so
+    // preferred ≡ effective Start target (even if preferred id is unchanged).
+    this.preferredCli = id;
+    this.filter = "all";
     this.closeStartMenu();
     this._pendingFocus = "start-chevron";
     this.render();
+    // Writes return false on failure (do not throw). Memory-first UX stands either way.
+    const [okPref, okFilter] = await Promise.all([
+      this._writePreferredCli(id),
+      this._writeListFilter("all"),
+    ]);
+    if (!okPref || !okFilter) {
+      // Soft-log only: denied storage:write must not break the panel UI.
+      console.warn(
+        "[ai-session-history] preferCli storage write failed",
+        { preferred: okPref, filter: okFilter, id },
+      );
+    }
   }
 
   start() {
@@ -329,14 +358,33 @@ export class SessionsPanel {
       this.closeStartMenu();
       this.render();
     }
-    const cli = pickStartCli(this.preferredCli, this.installed);
+    // Snapshot before await so concurrent filter/menu changes cannot mis-heal.
+    const preferredAtStart = this.preferredCli;
+    const filterAtStart = this.filter;
+    const installed = this.installed;
+    const resolved = resolveStartPreference(
+      preferredAtStart,
+      filterAtStart,
+      installed,
+    );
+    const cli = pickStartCli(resolved, installed);
     if (!cli) return;
     try {
-      await openStartTerminal(cli);
+      await this._openStartTerminal(cli);
       // Heal stored preference when pick fell back (e.g. preferred CLI uninstalled).
-      if (cli !== this.preferredCli) {
+      // Filter-driven Start must not write preferredCli. Only heal if preferred
+      // was not updated while the terminal opened (e.g. concurrent menu pick).
+      if (
+        shouldHealPreferredAfterStart(
+          cli,
+          preferredAtStart,
+          filterAtStart,
+          installed,
+        ) &&
+        this.preferredCli === preferredAtStart
+      ) {
         this.preferredCli = cli;
-        await setPreferredCli(cli);
+        await this._writePreferredCli(cli);
         this.render();
       }
     } catch (err) {
@@ -573,18 +621,24 @@ export class SessionsPanel {
         btn.focus();
         return;
       }
-      // Deleted row gone: fall back to Start chevron or first filter chip.
-      scope.querySelector("button[data-start-chevron]")?.focus() ||
-        scope.querySelector("button[aria-pressed]")?.focus();
+      // Deleted row gone: fall back to Start chevron or active filter chip.
+      // focus() returns undefined — never chain with || or the fallback always runs.
+      const chevron = scope.querySelector("button[data-start-chevron]");
+      if (chevron) {
+        chevron.focus();
+        return;
+      }
+      scope.querySelector('button[aria-pressed="true"]')?.focus();
       return;
     }
     if (intent === "start-chevron") {
-      scope.querySelector("button[data-start-chevron]")?.focus() ||
-        scope
-          .querySelector(
-            "button.h-7.rounded-md.bg-primary, button[data-start-main]",
-          )
-          ?.focus();
+      const chevron = scope.querySelector("button[data-start-chevron]");
+      if (chevron) {
+        chevron.focus();
+        return;
+      }
+      // Footer + empty CTA both set data-start-main; avoid Tailwind class soup.
+      scope.querySelector("button[data-start-main]")?.focus();
       return;
     }
     if (intent === "start-menu-item") {
@@ -1001,7 +1055,11 @@ export class SessionsPanel {
 
   footer() {
     const canStart = this.installed.length > 0;
-    const model = buildStartActionModel(this.preferredCli, this.installed);
+    const model = buildStartActionModel(
+      this.preferredCli,
+      this.installed,
+      this.filter,
+    );
 
     if (!canStart || !model.showMenu) {
       return h(
@@ -1011,9 +1069,10 @@ export class SessionsPanel {
           "button",
           {
             type: "button",
+            "data-start-main": "true",
             disabled: !canStart,
             class:
-              "flex h-7 w-full items-center justify-center gap-1.5 rounded-md border border-border bg-surface text-[12px] text-foreground outline-none hover:bg-accent disabled:opacity-50",
+              "flex h-7 w-full items-center justify-center gap-1.5 rounded-md border border-border bg-surface text-[12px] text-foreground outline-none hover:bg-accent focus-visible:ring-1 focus-visible:ring-primary disabled:opacity-50",
             onclick: () => this.startNew(),
           },
           icon("sparkles", 12),
@@ -1023,6 +1082,15 @@ export class SessionsPanel {
     }
 
     const menuOpen = this.startMenuOpen;
+    // Checkmark / aria-selected track effective Start (filter when override).
+    // Rename chrome so AT is not told a "preferred" list with a temporary selection.
+    const filterOverride = isFilterStartOverride(this.filter, this.installed);
+    const chevronLabel = filterOverride
+      ? "Choose CLI to start with"
+      : "Choose preferred CLI";
+    const menuLabel = filterOverride
+      ? "CLI used when starting"
+      : "Preferred AI CLI";
 
     return h(
       "div",
@@ -1039,6 +1107,7 @@ export class SessionsPanel {
           "button",
           {
             type: "button",
+            "data-start-main": "true",
             class:
               "flex h-7 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-l-md border border-border border-r-0 bg-surface text-[12px] text-foreground outline-none hover:bg-accent focus-visible:ring-1 focus-visible:ring-primary",
             onclick: () => this.startNew(),
@@ -1051,7 +1120,7 @@ export class SessionsPanel {
           {
             type: "button",
             "data-start-chevron": "true",
-            "aria-label": "Choose preferred CLI",
+            "aria-label": chevronLabel,
             "aria-haspopup": "listbox",
             "aria-expanded": menuOpen ? "true" : "false",
             "aria-controls": menuOpen ? "start-cli-menu" : undefined,
@@ -1071,7 +1140,7 @@ export class SessionsPanel {
               {
                 id: "start-cli-menu",
                 role: "listbox",
-                "aria-label": "Preferred AI CLI",
+                "aria-label": menuLabel,
                 "data-start-menu": "true",
                 class:
                   "absolute bottom-full left-0 right-0 z-20 mb-1 overflow-hidden rounded-md border border-border bg-surface shadow-md",
@@ -1143,7 +1212,11 @@ export class SessionsPanel {
   }
 
   emptyState(message, showStart = false) {
-    const model = buildStartActionModel(this.preferredCli, this.installed);
+    const model = buildStartActionModel(
+      this.preferredCli,
+      this.installed,
+      this.filter,
+    );
     return h(
       "div",
       {
@@ -1158,7 +1231,7 @@ export class SessionsPanel {
               type: "button",
               "data-start-main": "true",
               class:
-                "h-7 rounded-md bg-primary px-3 text-[12px] font-medium text-primary-foreground",
+                "h-7 rounded-md bg-primary px-3 text-[12px] font-medium text-primary-foreground outline-none focus-visible:ring-1 focus-visible:ring-primary",
               onclick: () => this.startNew(),
             },
             model.label,

@@ -14,7 +14,10 @@ import {
 } from "../src/lib/sessions/inline-rename.js";
 import {
   buildStartActionModel,
+  isFilterStartOverride,
   pickStartCli,
+  resolveStartPreference,
+  shouldHealPreferredAfterStart,
   showStartCliMenu,
   startButtonLabel,
   startMenuItems,
@@ -298,5 +301,70 @@ describe("start-cli helpers", () => {
     const alone = buildStartActionModel("codex", single);
     assert.equal(alone.showMenu, false);
     assert.equal(alone.label, "Start new Codex");
+  });
+
+  it("resolveStartPreference uses installed filter over preferred", () => {
+    assert.equal(resolveStartPreference("grok", "all", multi), "grok");
+    assert.equal(resolveStartPreference("grok", "claude", multi), "claude");
+    assert.equal(resolveStartPreference("grok", "cursor", multi), "grok");
+    assert.equal(resolveStartPreference("grok", "claude", []), "grok");
+    assert.equal(resolveStartPreference(null, "codex", multi), "codex");
+  });
+
+  it("isFilterStartOverride is true only for installed provider filters", () => {
+    assert.equal(isFilterStartOverride("all", multi), false);
+    assert.equal(isFilterStartOverride("claude", multi), true);
+    assert.equal(isFilterStartOverride("cursor", multi), false);
+    assert.equal(isFilterStartOverride("claude", []), false);
+    assert.equal(isFilterStartOverride(null, multi), false);
+  });
+
+  it("buildStartActionModel with filter overrides preferred for label/start/selected", () => {
+    const model = buildStartActionModel("grok", multi, "claude");
+    assert.equal(model.startCli, "claude");
+    assert.equal(model.label, "Start new Claude");
+    assert.equal(model.items.find((i) => i.id === "claude")?.selected, true);
+    assert.equal(model.items.find((i) => i.id === "grok")?.selected, false);
+  });
+
+  it("buildStartActionModel default listFilter keeps preferred behavior", () => {
+    const model = buildStartActionModel("claude", multi);
+    assert.equal(model.startCli, "claude");
+    assert.equal(model.label, "Start new Claude");
+    assert.equal(model.items.find((i) => i.id === "claude")?.selected, true);
+  });
+
+  it("buildStartActionModel ignores uninstalled filter", () => {
+    const model = buildStartActionModel("grok", multi, "cursor");
+    assert.equal(model.startCli, "grok");
+    assert.equal(model.label, "Start new Grok");
+    assert.equal(model.items.find((i) => i.id === "grok")?.selected, true);
+  });
+
+  it("shouldHealPreferredAfterStart gates filter override and no-ops on match", () => {
+    // Filter override + mismatch → never heal (filter Start must not persist).
+    assert.equal(
+      shouldHealPreferredAfterStart("claude", "grok", "claude", multi),
+      false,
+    );
+    // No override + mismatch (ghost preferred fallback) → heal.
+    assert.equal(
+      shouldHealPreferredAfterStart("grok", "missing", "all", multi),
+      true,
+    );
+    // Match → no-op.
+    assert.equal(
+      shouldHealPreferredAfterStart("grok", "grok", "all", multi),
+      false,
+    );
+    // Uninstalled filter is not an override → heal allowed when mismatch.
+    assert.equal(
+      shouldHealPreferredAfterStart("grok", "missing", "cursor", multi),
+      true,
+    );
+    assert.equal(
+      shouldHealPreferredAfterStart(null, "grok", "all", multi),
+      false,
+    );
   });
 });
