@@ -6,13 +6,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHostFs } from "../src/lib/host-fs.js";
 import { listGrok } from "../src/lib/sessions/scan/grok.js";
+import { listCursor } from "../src/lib/sessions/scan/cursor.js";
 import { listClaude } from "../src/lib/sessions/scan/claude.js";
 import { listCodex } from "../src/lib/sessions/scan/codex.js";
 import { listCopilot } from "../src/lib/sessions/scan/copilot.js";
 import {
   pathQuote,
+  md5Hex,
   slugify,
   PER_GROUP_CAP,
+  ENRICH_SLACK,
   COPILOT_MAX_STATE_DIRS,
 } from "../src/lib/sessions/scan/helpers.js";
 import { countingExec } from "./helpers/counting-exec.js";
@@ -77,7 +80,50 @@ describe("scan exec budgets (amplification)", () => {
     const fs = createHostFs(exec);
     const rows = await listGrok(fs, PROJ, { home });
     assert.equal(rows.length, PER_GROUP_CAP);
-    // listDir + batched stat + at most cap+slack readText (no per-child isDir/isFile/mtime)
+    // listDir + batched stat + at most cap+slack readHead (no per-child isDir/isFile/mtime)
+    const catCalls = exec.countWhere((a) => a[0] === "/bin/cat");
+    const headCalls = exec.countWhere((a) => a[0] === "/usr/bin/head");
+    assert.equal(catCalls, 0, "title metadata must use readHead, not full cat");
+    assert.ok(
+      headCalls <= PER_GROUP_CAP + ENRICH_SLACK,
+      `expected ≤${PER_GROUP_CAP + ENRICH_SLACK} head calls, got ${headCalls}`,
+    );
+    assert.ok(
+      exec.calls.length <= 50,
+      `expected ≤50 execs, got ${exec.calls.length}`,
+    );
+  });
+
+  it("listCursor N=40 stays under budget and returns PER_GROUP_CAP", async () => {
+    const hash = md5Hex(PROJ);
+    const root = join(home, ".cursor", "chats", hash);
+    for (let i = 0; i < N; i++) {
+      const sid = uuidAt(i);
+      const sess = join(root, sid);
+      mkdirSync(sess, { recursive: true });
+      writeFileSync(
+        join(sess, "meta.json"),
+        JSON.stringify({
+          title: `Cursor ${i}`,
+          branch: "main",
+          updatedAtMs: Date.UTC(2026, 0, 1, 0, 0, i),
+        }),
+      );
+      const t = new Date(2026, 0, 1, 0, 0, i);
+      utimesSync(sess, t, t);
+    }
+
+    const exec = countingExec(realExec);
+    const fs = createHostFs(exec);
+    const rows = await listCursor(fs, PROJ, { home });
+    assert.equal(rows.length, PER_GROUP_CAP);
+    const catCalls = exec.countWhere((a) => a[0] === "/bin/cat");
+    const headCalls = exec.countWhere((a) => a[0] === "/usr/bin/head");
+    assert.equal(catCalls, 0, "title metadata must use readHead, not full cat");
+    assert.ok(
+      headCalls <= PER_GROUP_CAP + ENRICH_SLACK,
+      `expected ≤${PER_GROUP_CAP + ENRICH_SLACK} head calls, got ${headCalls}`,
+    );
     assert.ok(
       exec.calls.length <= 50,
       `expected ≤50 execs, got ${exec.calls.length}`,
@@ -128,8 +174,17 @@ describe("scan exec budgets (amplification)", () => {
     const headCalls = exec.countWhere((a) => a[0] === "/usr/bin/head");
     // Only cap+slack heads, not N*2 projects
     assert.ok(
-      headCalls <= PER_GROUP_CAP + 15,
-      `expected ≤${PER_GROUP_CAP + 15} head calls, got ${headCalls}`,
+      headCalls <= PER_GROUP_CAP + ENRICH_SLACK,
+      `expected ≤${PER_GROUP_CAP + ENRICH_SLACK} head calls, got ${headCalls}`,
+    );
+    // Name-match from listDirDetailed — no per-file isFile/isDir probes.
+    const ldProbes = exec.countWhere(
+      (a) => a[0] === "/bin/ls" && (a[1] === "-ld" || a[1] === "-ldL"),
+    );
+    assert.equal(
+      ldProbes,
+      0,
+      `expected no isFile/isDir after name-match, got ${ldProbes}`,
     );
     assert.ok(
       exec.calls.length <= 60,
@@ -166,8 +221,21 @@ describe("scan exec budgets (amplification)", () => {
     assert.equal(rows.length, PER_GROUP_CAP);
     const headCalls = exec.countWhere((a) => a[0] === "/usr/bin/head");
     assert.ok(
-      headCalls <= PER_GROUP_CAP + 15,
-      `expected capped head calls, got ${headCalls}`,
+      headCalls <= PER_GROUP_CAP + ENRICH_SLACK,
+      `expected ≤${PER_GROUP_CAP + ENRICH_SLACK} head calls, got ${headCalls}`,
+    );
+    // Walk uses listDirDetailed kinds; no per-rollout isFile after name-match.
+    // isDir(sessions root) is one ls -ldL; anything more is amplification.
+    const isFileProbes = exec.countWhere(
+      (a) => a[0] === "/bin/ls" && a[1] === "-ld",
+    );
+    const isDirProbes = exec.countWhere(
+      (a) => a[0] === "/bin/ls" && a[1] === "-ldL",
+    );
+    assert.equal(isFileProbes, 0, `expected no isFile probes, got ${isFileProbes}`);
+    assert.ok(
+      isDirProbes <= 1,
+      `expected ≤1 isDir(root) probe, got ${isDirProbes}`,
     );
   });
 

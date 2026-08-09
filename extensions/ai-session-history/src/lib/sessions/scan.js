@@ -57,6 +57,7 @@ export async function resolveSqliteAvailable(exec) {
 
 /**
  * List sessions for one CLI + cwd via pure JS scanners + host-fs.
+ *
  * @param {string} cli
  * @param {string} cwd
  * @param {{
@@ -68,6 +69,9 @@ export async function resolveSqliteAvailable(exec) {
  *   codexHome?: string | null,
  *   copilotHome?: string | null,
  * }} [opts]
+ * @returns {Promise<Array & { softError?: string }>}
+ *   Session rows. Optional non-index property `softError` for partial success
+ *   (e.g. Copilot without sqlite). Dropped by `map`/`filter`/`slice` — read first.
  */
 export async function listSessionsForCli(cli, cwd, opts = {}) {
   const exec = opts.exec ?? ((argv, options) => muxy.exec(argv, options));
@@ -87,9 +91,16 @@ export async function listSessionsForCli(cli, cwd, opts = {}) {
         copilotHome: opts.copilotHome,
       }),
     );
-    return (rows || [])
+    // Non-element property from scanners (e.g. Copilot residual list without sqlite).
+    const softError =
+      rows && typeof rows === "object" && rows.softError
+        ? String(rows.softError)
+        : null;
+    const sessions = (rows || [])
       .map((item) => normalizeSession(item, cli))
       .filter(Boolean);
+    if (softError) sessions.softError = softError;
+    return sessions;
   } catch (err) {
     // Soft-fail message for sqlite-dependent CLIs
     if (
@@ -116,7 +127,8 @@ export async function listSessionsForCli(cli, cwd, opts = {}) {
  * @param {string} cli
  * @param {string} cwd
  * @param {Function | { exec?: Function, fs?: object, home?: string, sqliteAvailable?: boolean }} [execOrOpts]
- * @returns {Array}
+ * @returns {Array & { softError?: string }}
+ *   Session rows; optional non-index `softError` (see {@link listSessionsForCli}).
  * @throws {Error} when exec is async and resolves to a Promise
  */
 export function listSessionsForCliSync(cli, cwd, execOrOpts = muxy.exec) {
@@ -138,9 +150,15 @@ export function listSessionsForCliSync(cli, cwd, execOrOpts = muxy.exec) {
       "listSessionsForCliSync: exec returned Promises; use listSessionsForCli",
     );
   }
-  return (rows || [])
+  const softError =
+    rows && typeof rows === "object" && rows.softError
+      ? String(rows.softError)
+      : null;
+  const sessions = (rows || [])
     .map((item) => normalizeSession(item, cli))
     .filter(Boolean);
+  if (softError) sessions.softError = softError;
+  return sessions;
 }
 
 // re-export chain for tests

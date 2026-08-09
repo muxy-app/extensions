@@ -25,6 +25,50 @@ export function pickStartCli(preferredCli, installed) {
 }
 
 /**
+ * True when Start should follow the filter chip (installed provider filter ≠ all).
+ * Used to gate preferredCli heal writes so filter-driven Start never persists.
+ * @param {string | null | undefined} listFilter
+ * @param {{ id: string }[]} installed
+ * @returns {boolean}
+ */
+export function isFilterStartOverride(listFilter, installed) {
+  if (!listFilter || listFilter === "all") return false;
+  return asInstalledList(installed).some((p) => p.id === listFilter);
+}
+
+/**
+ * Temporary Start preference from an active provider filter chip.
+ * When the filter is a specific installed agent, Start targets that agent
+ * without treating it as stored preferredCli.
+ * @param {string | null | undefined} preferredCli
+ * @param {string | null | undefined} listFilter
+ * @param {{ id: string }[]} installed
+ * @returns {string | null | undefined}
+ */
+export function resolveStartPreference(preferredCli, listFilter, installed) {
+  return isFilterStartOverride(listFilter, installed) ? listFilter : preferredCli;
+}
+
+/**
+ * Whether startNew should heal stored preferredCli after a successful start.
+ * Callers must pass the filter/preferred snapshot from before openStartTerminal.
+ * @param {string | null} cli - CLI that was actually started
+ * @param {string | null | undefined} preferredCli - preferred at start time
+ * @param {string | null | undefined} listFilter - filter at start time
+ * @param {{ id: string }[]} installed
+ * @returns {boolean}
+ */
+export function shouldHealPreferredAfterStart(
+  cli,
+  preferredCli,
+  listFilter,
+  installed,
+) {
+  if (cli == null || cli === preferredCli) return false;
+  return !isFilterStartOverride(listFilter, installed);
+}
+
+/**
  * Whether the footer should show a chevron menu (need ≥2 installed CLIs).
  * @param {{ id: string }[]} installed
  * @returns {boolean}
@@ -52,7 +96,7 @@ export function startButtonLabel(startCli, installed) {
 /**
  * Menu rows for installed CLIs, ordered by START_PREFERENCE ∩ installed.
  * `selected` marks the CLI that would actually start (after ghost preferred fallback), not the raw stored id.
- * @param {string | null | undefined} preferredCli - stored preference (may be uninstalled)
+ * @param {string | null | undefined} preferredCli - effective preference (may already include filter override)
  * @param {{ id: string, displayName?: string }[]} installed
  * @returns {{ id: string, displayName: string, selected: boolean }[]}
  */
@@ -85,8 +129,11 @@ export function startMenuItems(preferredCli, installed) {
 
 /**
  * Full model for the Start footer control.
+ * When listFilter is a specific installed agent, Start labels/actions target that agent
+ * without changing stored preferredCli.
  * @param {string | null | undefined} preferredCli
  * @param {{ id: string, displayName?: string }[]} installed
+ * @param {string | null | undefined} [listFilter="all"]
  * @returns {{
  *   startCli: string | null,
  *   label: string,
@@ -94,13 +141,14 @@ export function startMenuItems(preferredCli, installed) {
  *   items: { id: string, displayName: string, selected: boolean }[]
  * }}
  */
-export function buildStartActionModel(preferredCli, installed) {
+export function buildStartActionModel(preferredCli, installed, listFilter = "all") {
   const list = asInstalledList(installed);
-  const startCli = pickStartCli(preferredCli, list);
+  const resolved = resolveStartPreference(preferredCli, listFilter, list);
+  const startCli = pickStartCli(resolved, list);
   return {
     startCli,
     label: startButtonLabel(startCli, list),
     showMenu: showStartCliMenu(list),
-    items: startMenuItems(preferredCli, list),
+    items: startMenuItems(resolved, list),
   };
 }

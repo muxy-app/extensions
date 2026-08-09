@@ -36,26 +36,30 @@ export function listCursor(fs, cwd, opts = {}) {
           const name = entry.name;
           const child = joinPath(root, name);
           const metaPath = joinPath(child, "meta.json");
-          return chain(tryChain(() => fs.readText(metaPath), null), (text) => {
-            let title = "(untitled)";
-            let updated = entry.mtimeMs || 0;
-            let branch = null;
-            if (text) {
-              try {
-                const data = JSON.parse(text);
-                if (data && typeof data === "object") {
-                  title = data.title || data.name || title;
-                  updated =
-                    isoToMs(data.updatedAtMs || data.updatedAt || data.updated_at) ||
-                    updated;
-                  if (typeof data.branch === "string") branch = data.branch;
+          // Cap title metadata reads — huge/corrupt meta.json must not full-cat.
+          return chain(
+            tryChain(() => fs.readHead(metaPath, { maxBytes: 64_000 }), null),
+            (text) => {
+              let title = "(untitled)";
+              let updated = entry.mtimeMs || 0;
+              let branch = null;
+              if (text) {
+                try {
+                  const data = JSON.parse(text);
+                  if (data && typeof data === "object") {
+                    title = data.title || data.name || title;
+                    updated =
+                      isoToMs(data.updatedAtMs || data.updatedAt || data.updated_at) ||
+                      updated;
+                    if (typeof data.branch === "string") branch = data.branch;
+                  }
+                } catch {
+                  /* missing, invalid, or truncated meta */
                 }
-              } catch {
-                /* missing or invalid meta */
               }
-            }
-            return sessionRow("cursor", name, String(title), updated, branch);
-          });
+              return sessionRow("cursor", name, String(title), updated, branch);
+            },
+          );
         }),
         (rows) => {
           const out = rows.filter(Boolean);
