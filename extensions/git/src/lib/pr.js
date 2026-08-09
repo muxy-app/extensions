@@ -1,5 +1,6 @@
 import * as repo from "@/lib/repo";
 import { alertError, confirmAction, errorMessage, openUrl } from "@/lib/git";
+import { runInWorktree } from "@/lib/worktree-action";
 const MAX_SLUG_WORDS = 5;
 const MAX_SLUG_LENGTH = 30;
 export function prState(pr) {
@@ -102,8 +103,10 @@ export function checkoutPr(number) {
 export async function checkoutPrDefaultWorktree(number, path) {
     if (!path)
         throw new Error("Default worktree not found.");
-    await muxy.git.worktree.switchTo({ identifier: path });
-    return checkoutPr(number);
+    const currentPath = (await repo.repoInfo()).root;
+    if (!currentPath)
+        throw new Error("Current worktree not found.");
+    return runInWorktree(path, currentPath, (identifier) => muxy.git.worktree.switchTo({ identifier }), () => checkoutPr(number));
 }
 export function parentDir(path) {
     return (path ?? "").replace(/\/+$/, "").replace(/\/[^/]+$/, "");

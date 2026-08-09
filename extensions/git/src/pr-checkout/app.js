@@ -46,10 +46,9 @@ export class PrCheckoutApp {
         void this.initialize();
     }
     async initialize() {
-        try {
-            this.scopeRoot = defaultWorktreeRoot(await scm.worktreesList());
-        }
-        catch {
+        const worktrees = await scm.worktreesList().catch(() => []);
+        this.scopeRoot = defaultWorktreeRoot(worktrees);
+        if (!this.scopeRoot) {
             const info = await scm.repoInfo().catch(() => null);
             this.scopeRoot = info?.root ?? "";
         }
