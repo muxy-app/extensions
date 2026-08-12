@@ -3,6 +3,8 @@ import test from "node:test";
 
 import {
     branchOptions,
+    canSubmitCreatePr,
+    createPrFieldLocks,
     createPrShortcut,
     isDefaultBranch,
     repositoryHint,
@@ -12,6 +14,31 @@ test("recognizes when pull request creation needs a new branch", () => {
     assert.equal(isDefaultBranch("main", "main"), true);
     assert.equal(isDefaultBranch("feature/pr", "main"), false);
     assert.equal(isDefaultBranch("", "main"), false);
+});
+
+test("requires a new branch before creating from the default branch", () => {
+    const state = {
+        ready: true,
+        busy: false,
+        currentBranch: "main",
+        defaultBranch: "main",
+        newBranch: "",
+        title: "Add command modals",
+    };
+    assert.equal(canSubmitCreatePr(state), false);
+    assert.equal(canSubmitCreatePr({ ...state, newBranch: "add-command-modals" }), true);
+    assert.equal(canSubmitCreatePr({ ...state, currentBranch: "feature/modals" }), true);
+});
+
+test("keeps pull request metadata editable after branch preparation", () => {
+    assert.deepEqual(createPrFieldLocks(false, true), {
+        metadata: false,
+        sourceBranch: true,
+    });
+    assert.deepEqual(createPrFieldLocks(true, false), {
+        metadata: true,
+        sourceBranch: true,
+    });
 });
 
 test("builds unique target branch options without the source branch", () => {

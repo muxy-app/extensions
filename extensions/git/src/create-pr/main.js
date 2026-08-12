@@ -2,7 +2,14 @@ import { changedFileCount, errorMessage } from "@/commit/model";
 import { hasPendingChanges, openUrl } from "@/lib/git";
 import { branchNameFromTitle, createPr, existingPrUrl } from "@/lib/pr";
 import * as repo from "@/lib/repo";
-import { branchOptions, createPrShortcut, isDefaultBranch, repositoryHint } from "./model";
+import {
+    branchOptions,
+    canSubmitCreatePr,
+    createPrFieldLocks,
+    createPrShortcut,
+    isDefaultBranch,
+    repositoryHint,
+} from "./model";
 import "@/commit/commit.css";
 import "./create-pr.css";
 
@@ -61,9 +68,18 @@ function isPartiallyComplete() {
 }
 
 function syncControls() {
-    const canCreate = ready && !!currentBranch && titleInput.value.trim().length > 0 && !busy;
-    for (const field of [titleInput, bodyInput, newBranchInput, baseBranchSelect, draftInput])
-        field.disabled = busy || isPartiallyComplete();
+    const canCreate = canSubmitCreatePr({
+        ready,
+        busy,
+        currentBranch,
+        defaultBranch,
+        newBranch: newBranchInput.value,
+        title: titleInput.value,
+    });
+    const locks = createPrFieldLocks(busy, branchPrepared);
+    for (const field of [titleInput, bodyInput, baseBranchSelect, draftInput])
+        field.disabled = locks.metadata;
+    newBranchInput.disabled = locks.sourceBranch;
     advancedToggle.disabled = busy;
     createButton.disabled = !canCreate;
     createButtonLabel.textContent = isPartiallyComplete() ? "Retry Create PR" : "Create PR";
@@ -155,7 +171,14 @@ async function handleExistingPullRequest(error) {
 
 async function submit() {
     const title = titleInput.value.trim();
-    if (busy || !ready || !currentBranch || !title)
+    if (!canSubmitCreatePr({
+        ready,
+        busy,
+        currentBranch,
+        defaultBranch,
+        newBranch: newBranchInput.value,
+        title,
+    }))
         return;
 
     busy = true;
@@ -212,6 +235,7 @@ titleInput?.addEventListener("input", () => {
 newBranchInput?.addEventListener("input", () => {
     branchEdited = true;
     updateBranchContext();
+    syncControls();
 });
 baseBranchSelect?.addEventListener("change", updateBranchContext);
 advancedToggle?.addEventListener("click", () => {

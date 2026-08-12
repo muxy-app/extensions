@@ -2,6 +2,19 @@ export function isDefaultBranch(currentBranch, defaultBranch) {
     return !!currentBranch && currentBranch === defaultBranch;
 }
 
+export function canSubmitCreatePr({ ready, busy, currentBranch, defaultBranch, newBranch, title }) {
+    if (!ready || busy || !currentBranch || !title.trim())
+        return false;
+    return !isDefaultBranch(currentBranch, defaultBranch) || !!newBranch.trim();
+}
+
+export function createPrFieldLocks(busy, branchPrepared) {
+    return {
+        metadata: busy,
+        sourceBranch: busy || branchPrepared,
+    };
+}
+
 export function branchOptions(branches, currentBranch, selectedBranch) {
     const options = [...new Set((branches ?? []).filter((name) => name && name !== currentBranch))];
     if (selectedBranch && !options.includes(selectedBranch))
