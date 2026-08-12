@@ -9,7 +9,7 @@
     "update-skill": "node scripts/update-skill.mjs"
   },
   "type": "module",
-  "version": "1.14.1",
+  "version": "1.15.0",
   "dependencies": {
     "@pierre/diffs": "^1.2.12",
     "dompurify": "^3.4.13",
@@ -77,6 +77,38 @@
       {
         "id": "refresh-scm",
         "title": "Refresh"
+      },
+      {
+        "id": "open-diff",
+        "title": "Open Diff",
+        "action": {
+          "kind": "openTab",
+          "tabType": "diff-viewer"
+        }
+      },
+      {
+        "id": "commit",
+        "title": "Commit",
+        "subtitle": "Stage all changes and commit",
+        "action": {
+          "kind": "openModal",
+          "entry": "modal/commit.html",
+          "width": 520,
+          "height": 310,
+          "dismissOnOutsideClick": true
+        }
+      },
+      {
+        "id": "create-pr",
+        "title": "Create PR",
+        "subtitle": "Commit, push, and open a pull request",
+        "action": {
+          "kind": "openModal",
+          "entry": "modal/create-pr.html",
+          "width": 520,
+          "height": 450,
+          "dismissOnOutsideClick": true
+        }
       },
       {
         "id": "checkout-pr",

@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Create PR</title>
+  </head>
+  <body>
+    <main class="commit-modal create-pr-modal" aria-labelledby="create-pr-title">
+      <header class="commit-header">
+        <span class="commit-mark" aria-hidden="true">
+          <svg viewBox="0 0 16 16">
+            <circle cx="4" cy="3.5" r="1.5" />
+            <circle cx="4" cy="12.5" r="1.5" />
+            <circle cx="12" cy="12.5" r="1.5" />
+            <path d="M4 5v6M6 4h2.5A3.5 3.5 0 0 1 12 7.5V11" />
+          </svg>
+        </span>
+        <h1 id="create-pr-title">Create pull request</h1>
+        <span id="branch-context" class="commit-branch" aria-label="Pull request branches"></span>
+      </header>
+
+      <section class="commit-body create-pr-body">
+        <div class="create-pr-field">
+          <label for="pr-title">Title</label>
+          <textarea
+            id="pr-title"
+            rows="1"
+            maxlength="1000"
+            placeholder="Pull request title"
+            autocorrect="off"
+            autocapitalize="off"
+            spellcheck="false"
+            autofocus
+          ></textarea>
+        </div>
+
+        <div class="create-pr-field create-pr-description">
+          <label for="pr-body">Description <span>(optional)</span></label>
+          <textarea
+            id="pr-body"
+            rows="3"
+            maxlength="50000"
+            placeholder="Summarize the changes…"
+            autocorrect="off"
+            autocapitalize="off"
+            spellcheck="false"
+          ></textarea>
+        </div>
+
+        <div id="changes" class="commit-changes" aria-live="polite">
+          <span class="commit-dot" aria-hidden="true"></span>
+          <span>Loading repository…</span>
+        </div>
+
+        <button
+          id="advanced-toggle"
+          class="create-pr-advanced-toggle"
+          type="button"
+          aria-expanded="false"
+          aria-controls="advanced-options"
+        >
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6 4 4 4-4 4" /></svg>
+          <span>Advanced</span>
+        </button>
+
+        <div id="advanced-options" class="create-pr-advanced" hidden>
+          <div id="new-branch-field" class="create-pr-field" hidden>
+            <label for="new-branch">New branch</label>
+            <input
+              id="new-branch"
+              type="text"
+              maxlength="255"
+              autocorrect="off"
+              autocapitalize="off"
+              spellcheck="false"
+            />
+          </div>
+
+          <div class="create-pr-field">
+            <label for="base-branch">Target branch</label>
+            <select id="base-branch"></select>
+          </div>
+
+          <label class="create-pr-check" for="draft">
+            <input id="draft" type="checkbox" />
+            <span>Create as draft</span>
+          </label>
+        </div>
+      </section>
+
+      <footer class="commit-footer">
+        <span id="status" class="commit-status" role="status" aria-live="polite"></span>
+        <button id="create-pr" class="primary" type="button" disabled>
+          <span class="button-label">Create PR</span>
+          <kbd>⌘↵</kbd>
+        </button>
+      </footer>
+    </main>
+
+    <script type="module" src="/src/create-pr/main.js"></script>
+  </body>
+</html>
