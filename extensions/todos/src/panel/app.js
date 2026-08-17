@@ -26,6 +26,11 @@ export class TodosPanel {
 		this.todos = [];
 		this.input = null;
 		this.canAdd = false;
+		// Note composer state
+		this.noteOpen = false;
+		this.noteInput = null;
+		// Edit state
+		this.editingId = null;
 		// Drag-to-reorder state
 		this.sorted = [];
 		this.dragId = null;
@@ -59,8 +64,7 @@ export class TodosPanel {
 		this.projectName = "";
 		if (this.projectID) {
 			const projects = await muxy.projects.list();
-			this.projectName =
-				projects.find((p) => p.id === this.projectID)?.name ?? "";
+			this.projectName = projects.find((p) => p.id === this.projectID)?.name ?? "";
 			const stored = await muxy.storage.get(keyFor(this.projectID));
 			this.todos = Array.isArray(stored) ? stored : [];
 		} else {
@@ -90,14 +94,19 @@ export class TodosPanel {
 	addTodo() {
 		const text = this.input.value.trim();
 		if (!text) return;
+		const note = this.noteInput?.value.trim() ?? "";
 		this.todos.unshift({
 			id: uid(),
 			text,
+			note,
 			done: false,
 			createdAt: Date.now(),
 			completedAt: null,
 		});
 		this.input.value = "";
+		if (this.noteInput) this.noteInput.value = "";
+		this.noteOpen = false;
+		this.updateNoteArea();
 		this.setCanAdd(false);
 		this.save();
 	}
@@ -126,8 +135,7 @@ export class TodosPanel {
 			items: PRIORITY_ORDER.map((p) => ({
 				id: p,
 				title: PRIORITIES[p].label,
-				subtitle:
-					(todo.priority === p ? "✓ Current · " : "") + PRIORITIES[p].desc,
+				subtitle: (todo.priority === p ? "✓ Current · " : "") + PRIORITIES[p].desc,
 			})),
 		});
 		if (!choice) return;
@@ -247,12 +255,14 @@ export class TodosPanel {
 		const footer = this.root.querySelector("#todos-footer");
 		if (!list || !footer) return;
 		// Incomplete first, completed sink to the bottom (stable within groups) — this is the drag order
-		this.sorted = [...this.todos].sort(
-			(a, b) => Number(a.done) - Number(b.done),
-		);
+		this.sorted = [...this.todos].sort((a, b) => Number(a.done) - Number(b.done));
 		let rows;
 		if (this.sorted.length) {
-			rows = this.sorted.map((todo) => this.row(todo));
+			rows = this.sorted.map((todo) => {
+				const rowEl = this.row(todo);
+				if (todo.id === this.editingId) this.attachEditKeys(rowEl, todo);
+				return rowEl;
+			});
 		} else {
 			const [title, hint] = this.projectID
 				? ["No tasks in this project", "Add your first task above"]
@@ -271,8 +281,7 @@ export class TodosPanel {
 			h(
 				"span",
 				{
-					class:
-						"min-w-0 truncate text-[11px] font-semibold text-muted-foreground",
+					class: "min-w-0 truncate text-[11px] font-semibold text-muted-foreground",
 				},
 				this.projectName || "No project",
 			),
@@ -301,6 +310,20 @@ export class TodosPanel {
 			h(
 				"button",
 				{
+					type: "button",
+					class: cls(
+						"flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground",
+						this.noteOpen && "bg-accent text-foreground",
+					),
+					onclick: () => this.toggleNote(),
+					"aria-label": "Add note",
+					title: "Add note",
+				},
+				icon("sticky-note", 13),
+			),
+			h(
+				"button",
+				{
 					type: "submit",
 					id: "todos-add-btn",
 					disabled: !this.canAdd,
@@ -317,7 +340,42 @@ export class TodosPanel {
 			this.setCanAdd(input.value.trim().length > 0),
 		);
 		this.input = input;
-		return form;
+		return h(
+			"div",
+			{ class: "shrink-0" },
+			form,
+			h("div", { id: "todos-note-area" }),
+		);
+	}
+
+	// Note composer: toggled by the paperclip button; textarea keeps its newlines
+	noteArea() {
+		return h(
+			"div",
+			{ class: "pl-[30px] pr-[10px] pt-[6px]" },
+			h("textarea", {
+				id: "todos-note-input",
+				rows: 4,
+				class:
+					"w-full resize-y rounded-md border border-border bg-surface px-[8px] py-[6px] text-[12px] leading-4 text-foreground placeholder:text-muted-foreground outline-none focus:border-ring",
+				placeholder: "Note (optional), newlines are preserved…",
+			}),
+		);
+	}
+
+	toggleNote() {
+		this.noteOpen = !this.noteOpen;
+		this.updateNoteArea();
+		if (this.noteOpen) this.noteInput?.focus();
+	}
+
+	// Refresh only the note slot so the task input keeps its focus
+	updateNoteArea() {
+		const area = this.root.querySelector("#todos-note-area");
+		if (!area) return;
+		if (this.noteOpen) area.replaceChildren(this.noteArea());
+		else area.replaceChildren(); // no args: clear children (null would render a "null" text node)
+		this.noteInput = this.noteOpen ? area.querySelector("textarea") : null;
 	}
 
 	setCanAdd(canAdd) {
@@ -340,13 +398,14 @@ export class TodosPanel {
 	}
 
 	row(todo) {
+		if (this.editingId === todo.id) return this.editRow(todo);
 		const done = todo.done;
 		const priority = todo.priority ? PRIORITIES[todo.priority] : null;
 		return h(
 			"div",
 			{
 				class:
-					"group flex items-center gap-[8px] rounded-md px-[10px] py-[4px] transition-colors hover:bg-accent",
+					"group flex items-start gap-[8px] rounded-md px-[10px] py-[4px] transition-colors hover:bg-accent",
 				draggable: true,
 				"data-id": todo.id,
 				oncontextmenu: (e) => {
@@ -357,14 +416,14 @@ export class TodosPanel {
 			icon(
 				"grip-vertical",
 				13,
-				"shrink-0 cursor-grab text-muted-foreground opacity-0 transition-opacity group-hover:opacity-60 active:cursor-grabbing",
+				"mt-[6px] shrink-0 cursor-grab text-muted-foreground opacity-0 transition-opacity group-hover:opacity-60 active:cursor-grabbing",
 			),
 			h(
 				"button",
 				{
 					type: "button",
 					class: cls(
-						"flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[4px] border transition-colors outline-none",
+						"mt-[2px] flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[4px] border transition-colors outline-none",
 						done
 							? "border-primary bg-primary text-primary-foreground"
 							: "border-border bg-surface text-transparent hover:border-ring",
@@ -378,21 +437,47 @@ export class TodosPanel {
 			priority
 				? h("span", {
 						class:
-							"h-[10px] w-[10px] shrink-0 rounded-full ring-1 ring-inset ring-black/15",
+							"mt-[7px] h-[10px] w-[10px] shrink-0 rounded-full ring-1 ring-inset ring-black/15",
 						style: `background: ${priority.color}`,
 						title: priority.label,
 					})
 				: null,
+			// Content column: title (single line) + note (newlines collapsed to spaces so rows stay compact)
 			h(
-				"span",
+				"div",
+				{ class: "flex min-w-0 flex-1 flex-col py-[2px]" },
+				h(
+					"span",
+					{
+						class: cls(
+							"truncate text-[12px] leading-5",
+							done ? "text-muted-foreground line-through" : "text-foreground",
+						),
+						title: todo.text,
+					},
+					todo.text,
+				),
+				todo.note
+					? h(
+							"span",
+							{
+								class: "line-clamp-2 text-[11px] leading-4 text-muted-foreground/90",
+								title: todo.note,
+							},
+							todo.note.replace(/\n+/g, " "),
+						)
+					: null,
+			),
+			h(
+				"button",
 				{
-					class: cls(
-						"min-w-0 flex-1 truncate py-[2px] text-[12px] leading-5",
-						done ? "text-muted-foreground line-through" : "text-foreground",
-					),
-					title: todo.text,
+					type: "button",
+					class:
+						"flex h-6 w-6 shrink-0 items-center justify-center rounded-[4px] text-muted-foreground opacity-0 outline-none transition-opacity hover:bg-surface hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100",
+					onclick: () => this.editTodo(todo.id),
+					"aria-label": "Edit task",
 				},
-				todo.text,
+				icon("pen-line", 12),
 			),
 			h(
 				"button",
@@ -406,6 +491,110 @@ export class TodosPanel {
 				icon("x", 13),
 			),
 		);
+	}
+
+	// Edit mode: replaces the row with a title + note form (not draggable, no context menu)
+	editRow(todo) {
+		return h(
+			"div",
+			{
+				class: "flex items-start gap-[8px] rounded-md px-[10px] py-[6px]",
+				"data-id": todo.id,
+			},
+			icon(
+				"grip-vertical",
+				13,
+				"shrink-0 cursor-default text-muted-foreground opacity-30",
+			),
+			h(
+				"div",
+				{ class: "flex min-w-0 flex-1 flex-col gap-[6px]" },
+				h("input", {
+					type: "text",
+					id: "edit-text",
+					class:
+						"h-7 w-full rounded-md border border-border bg-surface px-[8px] text-[12px] text-foreground outline-none focus:border-ring",
+					value: todo.text,
+					"aria-label": "Task text",
+				}),
+				h(
+					"textarea",
+					{
+						id: "edit-note",
+						rows: 4,
+						class:
+							"w-full resize-y rounded-md border border-border bg-surface px-[8px] py-[6px] text-[12px] leading-4 text-foreground placeholder:text-muted-foreground outline-none focus:border-ring",
+						placeholder: "Note (optional), newlines are preserved…",
+					},
+					todo.note ?? "",
+				),
+				h(
+					"div",
+					{ class: "flex items-center gap-[6px]" },
+					h(
+						"button",
+						{
+							type: "button",
+							class:
+								"flex h-7 items-center justify-center gap-[4px] rounded-md bg-primary px-[10px] text-[12px] font-medium text-primary-foreground outline-none transition-opacity hover:opacity-90",
+							onclick: () => this.saveEdit(todo.id),
+						},
+						icon("check", 12),
+						"Save",
+					),
+					h(
+						"button",
+						{
+							type: "button",
+							class:
+								"flex h-7 items-center justify-center rounded-md px-[10px] text-[12px] text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground",
+							onclick: () => this.cancelEdit(),
+						},
+						"Cancel",
+					),
+				),
+			),
+		);
+	}
+
+	// Keyboard: Enter saves, Esc cancels; in the note field Cmd/Ctrl+Enter saves
+	attachEditKeys(row, todo) {
+		const text = row.querySelector("#edit-text");
+		const note = row.querySelector("#edit-note");
+		const save = () => this.saveEdit(todo.id);
+		const cancel = () => this.cancelEdit();
+		text.addEventListener("keydown", (e) => {
+			if (e.key === "Enter") {
+				e.preventDefault();
+				save();
+			} else if (e.key === "Escape") cancel();
+		});
+		note.addEventListener("keydown", (e) => {
+			if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) save();
+			else if (e.key === "Escape") cancel();
+		});
+	}
+
+	editTodo(id) {
+		this.editingId = id;
+		this.renderList();
+		this.root.querySelector("#edit-text")?.focus();
+	}
+
+	async saveEdit(id) {
+		const todo = this.todos.find((t) => t.id === id);
+		if (!todo) return;
+		const text = this.root.querySelector("#edit-text")?.value.trim();
+		if (!text) return;
+		todo.text = text;
+		todo.note = this.root.querySelector("#edit-note")?.value.trim() ?? "";
+		this.editingId = null;
+		await this.save();
+	}
+
+	cancelEdit() {
+		this.editingId = null;
+		this.renderList();
 	}
 
 	footer() {
