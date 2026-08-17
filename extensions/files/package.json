@@ -1,6 +1,6 @@
 {
   "name": "files",
-  "version": "1.21.2",
+  "version": "1.21.4",
   "scripts": {
     "dev": "vite",
     "build": "vite build && node scripts/copy-build-assets.mjs",
@@ -91,7 +91,6 @@
         "position": "right",
         "mode": "pinned",
         "hiddenControls": [
-          "pin",
           "position"
         ],
         "icon": {
@@ -132,7 +131,7 @@
         "patterns": [
           "*"
         ],
-        "singleton": true
+        "singleton": false
       }
     ],
     "commands": [

@@ -54,6 +54,7 @@ async function backend() {
 }
 
 export const prList = async (opts) => (await backend()).prList(opts);
+export const prDetails = async (number) => (await backend()).prDetails(number);
 export const prInfo = async () => (await backend()).prInfo();
 export const prCreate = async (opts) => (await backend()).prCreate(opts);
 export const prMerge = async (opts) => (await backend()).prMerge(opts);

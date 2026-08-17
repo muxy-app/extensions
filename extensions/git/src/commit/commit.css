@@ -1,0 +1,253 @@
+:root {
+  --s1: 2px;
+  --s2: 4px;
+  --s3: 6px;
+  --s4: 8px;
+  --s5: 10px;
+  --s6: 12px;
+  --s7: 16px;
+  --s8: 20px;
+  --s9: 24px;
+  --s10: 32px;
+  --font-caption: 10px;
+  --font-footnote: 11px;
+  --font-body: 12px;
+  --font-emphasis: 13px;
+  --font-title: 14px;
+  --control: 24px;
+  --radius: 6px;
+  --radius-card: 8px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+  background: var(--muxy-background);
+  color: var(--muxy-foreground);
+  font: var(--font-emphasis) -apple-system, "SF Pro Text", system-ui, sans-serif;
+}
+
+button,
+textarea {
+  font: inherit;
+}
+
+.commit-modal {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  background: var(--muxy-background);
+}
+
+.commit-header {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--s4);
+  padding: var(--s6) var(--s7);
+  border-bottom: 1px solid var(--muxy-border);
+}
+
+.commit-mark {
+  display: grid;
+  width: var(--control);
+  height: var(--control);
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: var(--radius);
+  background: var(--muxy-accent-soft);
+  color: var(--muxy-accent);
+}
+
+.commit-mark svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}
+
+.commit-header h1 {
+  margin: 0;
+  font-size: var(--font-title);
+  font-weight: 600;
+}
+
+.commit-branch {
+  min-width: 0;
+  margin-left: auto;
+  overflow: hidden;
+  color: var(--muxy-foreground-muted);
+  font: var(--font-footnote) "SF Mono", Menlo, monospace;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commit-body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  padding: var(--s6) var(--s7) var(--s5);
+}
+
+.commit-body label {
+  display: block;
+  margin-bottom: var(--s3);
+  color: var(--muxy-foreground-muted);
+  font-size: var(--font-footnote);
+  font-weight: 600;
+}
+
+.commit-body textarea {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  flex: 1;
+  resize: none;
+  border: 1px solid var(--muxy-border);
+  border-radius: var(--radius-card);
+  outline: none;
+  padding: var(--s6);
+  background: var(--muxy-surface);
+  color: var(--muxy-foreground);
+  font-size: var(--font-emphasis);
+  line-height: 1.45;
+}
+
+.commit-body textarea::placeholder {
+  color: var(--muxy-foreground-muted);
+}
+
+.commit-body textarea:focus {
+  border-color: var(--muxy-accent);
+  box-shadow: 0 0 0 var(--s1) var(--muxy-accent-soft);
+}
+
+.commit-body textarea:disabled {
+  opacity: 0.7;
+}
+
+.commit-changes {
+  display: flex;
+  min-height: var(--s7);
+  align-items: center;
+  gap: var(--s3);
+  margin-top: var(--s4);
+  color: var(--muxy-foreground-muted);
+  font-size: var(--font-footnote);
+}
+
+.commit-dot {
+  width: var(--s3);
+  height: var(--s3);
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--muxy-diff-add);
+}
+
+.commit-changes-empty .commit-dot {
+  background: var(--muxy-foreground-muted);
+}
+
+.commit-footer {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--s3);
+  padding: var(--s5) var(--s7) var(--s7);
+}
+
+.commit-status {
+  min-width: 0;
+  min-height: var(--s7);
+  flex: 1;
+  overflow: hidden;
+  color: var(--muxy-foreground-muted);
+  font-size: var(--font-footnote);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commit-status-success {
+  color: var(--muxy-diff-add);
+}
+
+.commit-status-error {
+  color: var(--muxy-diff-remove);
+}
+
+.commit-footer button {
+  display: inline-flex;
+  height: 28px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--s4);
+  border: 1px solid var(--muxy-border);
+  border-radius: var(--radius);
+  padding: 0 var(--s5);
+  background: var(--muxy-surface);
+  color: var(--muxy-foreground);
+  font-size: var(--font-body);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.commit-footer button:hover:not(:disabled),
+.commit-footer button:focus-visible:not(:disabled) {
+  border-color: var(--muxy-accent);
+  outline: none;
+  background: var(--muxy-hover);
+}
+
+.commit-footer button.primary {
+  border-color: var(--muxy-accent);
+  background: var(--muxy-accent);
+  color: var(--muxy-background);
+}
+
+.commit-footer button.primary:hover:not(:disabled),
+.commit-footer button.primary:focus-visible:not(:disabled) {
+  background: var(--muxy-accent);
+  box-shadow: 0 0 0 var(--s1) var(--muxy-accent-soft);
+}
+
+.commit-footer button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.commit-footer kbd {
+  padding: var(--s1) var(--s2);
+  border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+  border-radius: 4px;
+  font: var(--font-caption) "SF Mono", Menlo, monospace;
+}
+
+.commit-is-busy .commit-footer button:not(:disabled) {
+  cursor: wait;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}

@@ -1,6 +1,24 @@
 import { run } from "./exec.js";
 
 const NO_CHECKS = { status: "none", total: 0, passing: 0, failing: 0, pending: 0 };
+const DETAIL_FIELDS = "number,title,body,author,baseRefName,headRefName,state,url,isDraft,mergeable,mergeStateStatus,reviewDecision,additions,deletions,changedFiles,comments,reviews,createdAt,updatedAt";
+
+function authorName(author) {
+    if (typeof author === "string")
+        return author;
+    return author?.login ?? author?.name ?? "Unknown author";
+}
+
+function detailComment(raw, kind) {
+    return {
+        id: raw.id ?? `${kind}-${raw.submittedAt ?? raw.createdAt ?? ""}`,
+        author: authorName(raw.author),
+        body: raw.body ?? "",
+        createdAt: raw.submittedAt ?? raw.createdAt ?? "",
+        kind,
+        state: String(raw.state ?? "").toLowerCase(),
+    };
+}
 
 function toPr(raw) {
     return {
@@ -18,9 +36,37 @@ function toPr(raw) {
     };
 }
 
-export async function prList({ filter, limit } = {}) {
-    const prs = await muxy.git.pr.list({ filter: filter || "open", limit });
+export async function prList({ filter, limit, fresh } = {}) {
+    const prs = await muxy.git.pr.list({ filter: filter || "open", limit, fresh: !!fresh });
     return prs.map(toPr);
+}
+
+export async function prDetails(number) {
+    const raw = JSON.parse(await run(["gh", "pr", "view", String(number), "--json", DETAIL_FIELDS]));
+    const comments = [
+        ...(raw.comments ?? []).map((comment) => detailComment(comment, "comment")),
+        ...(raw.reviews ?? []).filter((review) => review.body?.trim()).map((review) => detailComment(review, "review")),
+    ].sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+    return {
+        number: raw.number,
+        title: raw.title ?? "",
+        summary: raw.body ?? "",
+        author: authorName(raw.author),
+        headBranch: raw.headRefName ?? "",
+        baseBranch: raw.baseRefName ?? "",
+        state: String(raw.state ?? "").toLowerCase(),
+        url: raw.url ?? "",
+        isDraft: !!raw.isDraft,
+        mergeable: raw.mergeable ?? null,
+        mergeStateStatus: raw.mergeStateStatus ?? "",
+        reviewDecision: raw.reviewDecision ?? "",
+        additions: raw.additions ?? 0,
+        deletions: raw.deletions ?? 0,
+        changedFiles: raw.changedFiles ?? 0,
+        comments,
+        createdAt: raw.createdAt ?? "",
+        updatedAt: raw.updatedAt ?? "",
+    };
 }
 
 export async function prInfo() {

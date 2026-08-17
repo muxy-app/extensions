@@ -107,8 +107,8 @@ muxy.modal.open({
         extension: {
           id: extId,
           tabType: "code-editor",
-          singleton: true,
-          data: { filePath: choice.id, replaceable: true },
+          singleton: false,
+          data: { filePath: choice.id, replaceable: false },
         },
       });
     } catch (err) {

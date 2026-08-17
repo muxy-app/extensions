@@ -250,6 +250,7 @@ export async function worktreesList() {
 }
 
 export const prList = (opts) => forge.prList(opts);
+export const prDetails = (number) => forge.prDetails(number);
 export const prInfo = () => forge.prInfo();
 export const prCreate = (opts) => forge.prCreate(opts);
 export const prMerge = (opts) => forge.prMerge(opts);
