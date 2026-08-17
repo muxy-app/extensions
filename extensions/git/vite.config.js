@@ -21,6 +21,8 @@ export default defineConfig({
       input: {
         scm: resolve(__dirname, "panel/index.html"),
         "diff-viewer": resolve(__dirname, "panel/diff-viewer.html"),
+        commit: resolve(__dirname, "modal/commit.html"),
+        "create-pr": resolve(__dirname, "modal/create-pr.html"),
         "pr-checkout": resolve(__dirname, "modal/pr-checkout.html"),
       },
     },

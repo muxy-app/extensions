@@ -19,6 +19,13 @@ export function prWorktreePath(root, number) {
     return parent === "/" ? `/${name}` : `${parent}/${name}`;
 }
 
+export function defaultWorktreeRoot(worktrees) {
+    return worktrees.find((worktree) => worktree.isPrimary)?.path
+        ?? worktrees.find((worktree) => worktree.isActive)?.path
+        ?? worktrees[0]?.path
+        ?? "";
+}
+
 export function checksLabel(checks) {
     if (!checks || checks.status === "none")
         return "";
@@ -40,6 +47,8 @@ export function selectionMode(event) {
 export function detailAction(event) {
     if (event.key === "Enter" && event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey)
         return "open";
+    if (event.key === "Enter" && !event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey)
+        return "checkout";
     if (!event.metaKey)
         return null;
     if (event.key === "Enter")

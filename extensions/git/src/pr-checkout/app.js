@@ -1,11 +1,11 @@
 import { alertError, confirmAction, openUrl, runBusy } from "@/lib/git";
-import { checkoutPr, checkoutPrWorktree, closePr, mergePr } from "@/lib/pr";
+import { checkoutPrDefaultWorktree, checkoutPrWorktree, closePr, mergePr } from "@/lib/pr";
 import * as scm from "@/lib/repo";
 import { PrCache } from "@/pr-checkout/cache";
 import { CheckoutView } from "@/pr-checkout/checkout-view";
 import { DetailView } from "@/pr-checkout/detail-view";
 import { PrListView } from "@/pr-checkout/list-view";
-import { isBackShortcut, isPrOpen, prWorktreePath, RequestGate } from "@/pr-checkout/model";
+import { defaultWorktreeRoot, isBackShortcut, isPrOpen, prWorktreePath, RequestGate } from "@/pr-checkout/model";
 
 const PR_LIMIT = 100;
 
@@ -24,6 +24,7 @@ export class PrCheckoutApp {
     listView;
     checkoutView;
     detailView;
+    checkoutReturnView = "list";
     cache = new PrCache();
     selectedPr;
     scopeRoot = "";
@@ -45,12 +46,11 @@ export class PrCheckoutApp {
         void this.initialize();
     }
     async initialize() {
-        try {
-            const info = await scm.repoInfo();
+        const worktrees = await scm.worktreesList().catch(() => []);
+        this.scopeRoot = defaultWorktreeRoot(worktrees);
+        if (!this.scopeRoot) {
+            const info = await scm.repoInfo().catch(() => null);
             this.scopeRoot = info?.root ?? "";
-        }
-        catch {
-            this.scopeRoot = "";
         }
         const restored = await this.cache.restore(this.scopeRoot);
         if (restored) {
@@ -103,9 +103,10 @@ export class PrCheckoutApp {
             return false;
         }
     }
-    openCheckout(pr) {
+    openCheckout(pr, returnView = "list") {
         this.detailRequests.invalidate();
         this.selectedPr = pr;
+        this.checkoutReturnView = returnView;
         this.view = "checkout";
         this.detailView = null;
         this.checkoutView = new CheckoutView(this.root, pr, prWorktreePath(this.scopeRoot, pr.number), {
@@ -170,8 +171,13 @@ export class PrCheckoutApp {
             this.selectedPr = this.cache.list.find((pr) => pr.number === detail.number) ?? this.selectedPr;
     }
     goBack() {
-        if (!this.busy)
-            this.showList();
+        if (this.busy)
+            return;
+        if (this.view === "checkout" && this.checkoutReturnView === "details" && this.selectedPr) {
+            this.openDetails(this.selectedPr);
+            return;
+        }
+        this.showList();
     }
     onKeyDown(event) {
         if (event.metaKey && event.key.toLowerCase() === "r") {
@@ -211,7 +217,7 @@ export class PrCheckoutApp {
             const loaded = await this.loadList(true);
             const pr = this.cache.list?.find((item) => item.number === number) ?? this.selectedPr;
             if (loaded && pr)
-                this.openCheckout(pr);
+                this.openCheckout(pr, this.checkoutReturnView);
             else
                 this.checkoutView?.setBusy(false);
         }
@@ -226,15 +232,15 @@ export class PrCheckoutApp {
         const worktree = mode === "worktree";
         const path = worktree ? prWorktreePath(this.scopeRoot, pr.number) : "";
         this.busy = true;
-        this.checkoutView?.setBusy(true, worktree ? `Creating worktree for PR #${pr.number}…` : `Checking out PR #${pr.number}…`);
+        this.checkoutView?.setBusy(true, worktree ? `Creating worktree for PR #${pr.number}…` : `Checking out PR #${pr.number} in the default worktree…`);
         try {
             await runBusy(async () => {
                 if (worktree)
                     return checkoutPrWorktree(pr.number, path);
-                await checkoutPr(pr.number);
+                await checkoutPrDefaultWorktree(pr.number, this.scopeRoot);
                 await muxy.worktrees.refresh().catch(() => undefined);
             });
-            await notify(worktree ? "Pull request worktree created" : "Pull request checked out", worktree ? `${path} is ready.` : `PR #${pr.number} is checked out.`);
+            await notify(worktree ? "Pull request worktree created" : "Pull request checked out", worktree ? `${path} is ready.` : `PR #${pr.number} is checked out in the default worktree.`);
             muxy.lifecycle.close();
         }
         catch (err) {
@@ -256,6 +262,10 @@ export class PrCheckoutApp {
         }
         if (!isPrOpen(this.detailView?.detail ?? pr))
             return;
+        if (action === "checkout") {
+            this.openCheckout(this.detailView?.detail ?? pr, "details");
+            return;
+        }
         const merge = action === "merge";
         const confirmed = await confirmAction({
             title: merge ? `Merge PR #${pr.number}?` : `Close PR #${pr.number}?`,

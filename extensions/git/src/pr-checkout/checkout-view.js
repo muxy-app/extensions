@@ -3,7 +3,7 @@ import { icon } from "@/lib/icons";
 import { footer, heading } from "@/pr-checkout/ui";
 
 const OPTIONS = [
-    { id: "checkout", icon: "branchPlus", title: "Checkout in this worktree", description: "Switch the current worktree to the pull request branch." },
+    { id: "default", icon: "branchPlus", title: "Checkout in default worktree", description: "Switch the repository's default worktree to the pull request branch." },
     { id: "worktree", icon: "folderGit", title: "Checkout as a new worktree", description: "Create a sibling worktree and switch Muxy to it." },
 ];
 
@@ -40,7 +40,7 @@ export class CheckoutView {
             role: "option",
             "aria-selected": index === this.selected,
             disabled: this.busy,
-            onmouseenter: () => this.select(index),
+            onpointermove: () => this.select(index),
             onclick: () => {
                 this.select(index);
                 this.onChoose(option.id);

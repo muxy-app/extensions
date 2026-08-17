@@ -11,7 +11,8 @@ diff viewer, and pull requests.
 - **Diff viewer** — inline file diffs.
 - **Pull Requests** — browse PRs and view the current PR for the branch.
 - **Pull request picker** — search open PRs from the command palette, open
-  details with `Enter`, or choose a checkout target with `Shift+Enter`.
+  details with `Enter`, or choose the default worktree or a new worktree with
+  `Shift+Enter`.
 - **Worktrees** — create and switch worktrees.
 
 ## Pull request backends

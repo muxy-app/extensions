@@ -26,7 +26,7 @@ function toggleChangesView(app) {
 export function renderBranchSwitcher(app, status) {
     return h("button", {
         type: "button",
-        class: "flex h-8 w-full items-center gap-1.5 px-2.5 text-[12px] text-foreground outline-none hover:bg-accent",
+        class: "flex h-full w-full items-center gap-1.5 px-2.5 text-[12px] text-foreground outline-none hover:bg-accent",
         onclick: (event) => openBranchMenu(app, event.currentTarget),
     }, icon("branch", 13, "text-muted-foreground", 2), h("span", { class: "truncate font-medium" }, status.branch ?? "No branch"), status.ahead > 0 || status.behind > 0
         ? h("span", { class: "flex shrink-0 items-center gap-1 font-mono text-[10px] text-muted-foreground" }, status.behind > 0

@@ -107,7 +107,7 @@ export class PrListView {
             "aria-selected": false,
             "data-index": index,
             tabindex: index === this.selected ? 0 : -1,
-            onmouseenter: () => this.setSelected(index),
+            onpointermove: () => this.setSelected(index),
             onclick: () => {
                 this.setSelected(index);
                 this.onDetails(pr);

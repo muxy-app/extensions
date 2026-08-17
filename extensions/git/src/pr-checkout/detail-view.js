@@ -6,6 +6,7 @@ import { detailAction, isPrOpen } from "@/pr-checkout/model";
 import { footer, heading, message, refreshBar } from "@/pr-checkout/ui";
 
 const ACTIONS = [
+    { id: "checkout", icon: "branchPlus", title: "Checkout", description: "Choose a worktree for this pull request.", shortcut: "↵" },
     { id: "open", icon: "external", title: "Open in browser", description: "View this pull request on its forge.", shortcut: "⇧↵" },
     { id: "merge", icon: "merge", title: "Merge pull request", description: "Merge this branch into its base branch.", shortcut: "⌘↵" },
     { id: "close", icon: "prClosed", title: "Close pull request", description: "Close it without merging any changes.", shortcut: "⌘⌫" },
@@ -102,7 +103,7 @@ export class DetailView {
                         : `${detail?.comments?.length ?? 0} comment${detail?.comments?.length === 1 ? "" : "s"}`;
         const shortcuts = detail && !isPrOpen(detail)
             ? [["⇧↵", "Open"], ["⌘R", "Reload"], ["←", "Back"]]
-            : [["⇧↵", "Open"], ["⌘↵", "Merge"], ["⌘⌫", "Close"], ["⌘R", "Reload"], ["←", "Back"]];
+            : [["↵", "Checkout"], ["⇧↵", "Open"], ["⌘↵", "Merge"], ["⌘⌫", "Close"], ["⌘R", "Reload"], ["←", "Back"]];
         const shell = h("main", { class: `pr-modal pr-detail${this.refreshing ? " pr-is-refreshing" : ""}${this.busy ? " pr-modal-busy" : ""}`, tabindex: -1 }, refreshBar(this.refreshing, "Refreshing pull request details"), heading(`Pull request #${this.pr.number}`, `${this.pr.headBranch || "head"} → ${this.pr.baseBranch || "base"}`, "pr", this.onBack), content, actions, footer(label, shortcuts));
         clear(this.root);
         this.root.appendChild(shell);

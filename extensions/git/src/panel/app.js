@@ -5,7 +5,7 @@ import { repoWebUrl } from "@/lib/repo-web";
 import { checkoutPr, checkoutPrWorktree, cleanupBranch, closePr, confirmOpenExistingPr, createPr, mergePr, parentDir, readyPr, removeWorktreeOrBranch, worktreePathIn, } from "@/lib/pr";
 import * as scm from "@/lib/repo";
 import { icon } from "@/lib/icons";
-import { button, emptyState, iconButton, loadingOverlay } from "@/ui/shared";
+import { button, emptyState, loadingOverlay } from "@/ui/shared";
 import { renderBranchSwitcher, renderBranchTab } from "@/panel/branch";
 import { renderHistoryTab } from "@/panel/history";
 import { renderPrsTab } from "@/panel/prs";
@@ -133,6 +133,7 @@ export class GitPanelApp {
             muxy.events.subscribe("worktree.switched", () => void this.switchScope()),
             muxy.events.subscribe("file.changed", () => this.reconcile()),
             muxy.events.subscribe("command.refresh-scm", () => this.runRefresh()),
+            muxy.events.subscribe("command.open-repository", () => void this.openRepoInBrowser()),
             muxy.events.subscribe("project.switched", () => void this.resetGraph(false)),
             muxy.events.subscribe("worktree.switched", () => void this.resetGraph(false)),
             muxy.events.subscribe("project.switched", () => this.reloadPrListOnScopeChange()),
@@ -178,7 +179,7 @@ export class GitPanelApp {
         }
         const status = this.repo.status;
         const changes = status.staged.length + status.unstaged.length;
-        const panel = h("div", { class: "flex h-full min-h-0 flex-col" }, h("header", { class: "flex shrink-0 items-center border-b border-border pr-1" }, h("div", { class: "min-w-0 flex-1" }, renderBranchSwitcher(this, status)), iconButton("Refresh", "refresh", () => this.runRefresh()), iconButton("Open repository in browser", "external", () => void this.openRepoInBrowser())), this.renderTabs(changes), this.tab === "branch"
+        const panel = h("div", { class: "flex h-full min-h-0 flex-col" }, h("header", { class: "h-[34px] shrink-0 border-b border-border" }, renderBranchSwitcher(this, status)), this.renderTabs(changes), this.tab === "branch"
             ? renderBranchTab(this, status)
             : this.tab === "prs"
                 ? renderPrsTab(this, status)
