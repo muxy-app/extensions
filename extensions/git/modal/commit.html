@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Commit</title>
+  </head>
+  <body>
+    <main class="commit-modal" aria-labelledby="commit-title">
+      <header class="commit-header">
+        <span class="commit-mark" aria-hidden="true">
+          <svg viewBox="0 0 16 16">
+            <path d="m3.5 8.25 2.75 2.75 6.25-6.25" />
+          </svg>
+        </span>
+        <h1 id="commit-title">Commit changes</h1>
+        <span id="branch" class="commit-branch" aria-label="Current branch"></span>
+      </header>
+
+      <section class="commit-body">
+        <label for="message">Commit message</label>
+        <textarea
+          id="message"
+          rows="4"
+          maxlength="10000"
+          placeholder="Describe what changed…"
+          autocorrect="off"
+          autocapitalize="off"
+          spellcheck="false"
+          autofocus
+        ></textarea>
+        <div id="changes" class="commit-changes" aria-live="polite">
+          <span class="commit-dot" aria-hidden="true"></span>
+          <span>Loading changes…</span>
+        </div>
+      </section>
+
+      <footer class="commit-footer">
+        <span id="status" class="commit-status" role="status" aria-live="polite"></span>
+        <button id="commit-push" type="button" disabled>
+          <span class="button-label">Commit &amp; Push</span>
+          <kbd>⇧⌘↵</kbd>
+        </button>
+        <button id="commit" class="primary" type="button" disabled>
+          <span class="button-label">Commit</span>
+          <kbd>⌘↵</kbd>
+        </button>
+      </footer>
+    </main>
+
+    <script type="module" src="/src/commit/main.js"></script>
+  </body>
+</html>

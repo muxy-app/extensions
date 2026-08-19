@@ -90,13 +90,6 @@ body.popover-body #root {
   background: transparent;
 }
 
-.panel-topbar {
-  box-sizing: content-box;
-  height: var(--muxy-topbar-height, 32px);
-  flex-shrink: 0;
-  border-bottom: 1px solid var(--color-border);
-}
-
 .floating-menu {
   position: fixed;
   z-index: 50;
