@@ -1,6 +1,6 @@
 {
   "name": "files",
-  "version": "1.21.4",
+  "version": "1.22.0",
   "scripts": {
     "dev": "vite",
     "build": "vite build && node scripts/copy-build-assets.mjs",
@@ -63,7 +63,7 @@
   },
   "muxy": {
     "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
-    "description": "File explorer for Muxy",
+    "description": "File explorer and photo editor for Muxy",
     "permissions": [
       "files:read",
       "files:write",
@@ -165,6 +165,15 @@
         "subtitle": "Switch the file tree between stroke and colored icons"
       },
       {
+        "id": "files-edit-image",
+        "title": "Photo: Edit Image…",
+        "subtitle": "Pick an image and open it in the photo editor",
+        "action": {
+          "kind": "runScript",
+          "script": "scripts/edit-image.js"
+        }
+      },
+      {
         "id": "files-find-in-files",
         "title": "Files: Find in Files…",
         "subtitle": "Search text across all workspace files",
@@ -191,7 +200,9 @@
       "repository": "https://github.com/muxy-app/extensions",
       "categories": [
         "files",
-        "explorer"
+        "explorer",
+        "images",
+        "editor"
       ],
       "icon": "icon.svg",
       "screenshots": [

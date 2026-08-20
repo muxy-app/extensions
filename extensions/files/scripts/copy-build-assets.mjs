@@ -7,6 +7,7 @@ const scripts = resolve(dist, "scripts");
 mkdirSync(scripts, { recursive: true });
 copyFileSync("package.json", resolve(dist, "package.json"));
 copyFileSync("scripts/quick-open.js", resolve(scripts, "quick-open.js"));
+copyFileSync("scripts/edit-image.js", resolve(scripts, "edit-image.js"));
 
 // find-in-files is split across scripts/find-in-files/, and runScript entries are
 // loaded as a single plain script, so this one is bundled rather than copied.
