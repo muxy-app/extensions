@@ -103,6 +103,26 @@ test("scheduled-job cadence stays human-readable and timezone-neutral", () => {
   assert.equal(formatScheduleCadence(null, ""), "Schedule unavailable");
 });
 
+test("unavailable worker telemetry does not hide valid queue stats", async () => {
+  const session = sessionFixture({
+    workers: { status: 503, body: { detail: "offline" } },
+    queue: {
+      status: 200,
+      body: { by_status: { ready: 3, running: 1, blocked: 2, review: 4 }, oldest_ready_age_seconds: 90 },
+    },
+  });
+  const snapshot = await new DashboardOperationsClient({ baseUrl: "http://127.0.0.1:9119", session }).load();
+
+  assert.equal(snapshot.state, "ready");
+  assert.equal(snapshot.available.queue, true);
+  assert.equal(snapshot.queue.waiting, 3);
+  assert.equal(snapshot.queue.running, 1);
+  assert.equal(snapshot.queue.blocked, 2);
+  assert.equal(snapshot.queue.review, 4);
+  assert.equal(snapshot.queue.oldestWaitingSeconds, 90);
+  assert.equal(snapshot.queue.activeWorkers, 0);
+});
+
 test("optional Hermes surfaces degrade independently", async () => {
   const session = sessionFixture({
     jobs: { status: 404, body: { detail: "missing" } },

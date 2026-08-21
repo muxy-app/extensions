@@ -323,9 +323,12 @@ export class DashboardOperationsClient {
 
     try {
       if (results.queue.status === "fulfilled") {
-        const workers = results.workers.status === "fulfilled"
-          ? responseBody(results.workers.value, "workers_request_failed")
-          : null;
+        let workers = null;
+        try {
+          if (results.workers.status === "fulfilled") {
+            workers = responseBody(results.workers.value, "workers_request_failed");
+          }
+        } catch { /* worker telemetry is optional enrichment for valid queue stats */ }
         queue = normalizeQueueStats(responseBody(results.queue.value, "queue_request_failed"), workers);
         available.queue = true;
       }
