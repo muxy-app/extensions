@@ -8,14 +8,34 @@ const uid = () =>
 	crypto.randomUUID?.() ??
 	`${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-// Priorities (semantic colors, theme-independent)
-const PRIORITY_ORDER = ["highest", "high", "medium", "low", "lowest"];
-const PRIORITIES = {
-	highest: { label: "Highest", color: "#FF0000", desc: "Solid red" },
-	high: { label: "High", color: "#FF7A00", desc: "Orange-red" },
-	medium: { label: "Medium", color: "#FFD600", desc: "Golden" },
-	low: { label: "Low", color: "#00C853", desc: "Green" },
-	lowest: { label: "Lowest", color: "#2196F3", desc: "Sky blue" },
+// Free-form color palette for the right-click menu (no preset priority semantics)
+const COLORS = [
+	{ hex: "#FF0000", label: "Red" },
+	{ hex: "#FF7A00", label: "Orange" },
+	{ hex: "#FFD600", label: "Yellow" },
+	{ hex: "#00C853", label: "Green" },
+	{ hex: "#00BCD4", label: "Cyan" },
+	{ hex: "#2196F3", label: "Blue" },
+	{ hex: "#9C27B0", label: "Purple" },
+	{ hex: "#FF4081", label: "Pink" },
+	{ hex: "#795548", label: "Brown" },
+	{ hex: "#9E9E9E", label: "Gray" },
+];
+
+// Legacy named priorities from v1.x still display their original color
+const LEGACY_COLORS = {
+	highest: "#FF0000",
+	high: "#FF7A00",
+	medium: "#FFD600",
+	low: "#00C853",
+	lowest: "#2196F3",
+};
+
+// Resolve a todo's display color: hex value, or a legacy named priority
+const colorFor = (todo) => {
+	const c = todo.priority;
+	if (!c) return null;
+	return c.startsWith("#") ? c : LEGACY_COLORS[c] || null;
 };
 
 export class TodosPanel {
@@ -124,24 +144,99 @@ export class TodosPanel {
 		await this.save();
 	}
 
-	// Right-click a row → native picker to set priority
-	async setPriority(id) {
+	// Right-click a row → in-place color picker menu (free colors, no preset priorities)
+	showColorMenu(e, todo) {
+		e.preventDefault();
+		this.closeColorMenu();
+		const menu = h(
+			"div",
+			{
+				class:
+					"fixed z-50 rounded-md border border-border bg-surface p-[6px] shadow-xl",
+			},
+			h(
+				"div",
+				{ class: "grid grid-cols-5 gap-[4px]" },
+				COLORS.map((c) => this.colorSwatch(c, todo)),
+			),
+			h(
+				"div",
+				{ class: "mt-[6px] border-t border-border pt-[4px]" },
+				h(
+					"button",
+					{
+						type: "button",
+						class:
+							"flex w-full items-center gap-[6px] rounded-[4px] px-[6px] py-[4px] text-[11px] text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground",
+						onclick: () => this.clearColor(todo.id),
+					},
+					icon("x", 11),
+					"Clear color",
+				),
+			),
+		);
+		document.body.append(menu);
+		this.menuEl = menu;
+		this.placeMenu(e.clientX, e.clientY);
+		setTimeout(() => document.addEventListener("click", this.onDocClick), 0);
+		document.addEventListener("keydown", this.onKeyDown);
+	}
+
+	colorSwatch(c, todo) {
+		const active = colorFor(todo) === c.hex;
+		return h("button", {
+			type: "button",
+			class: cls(
+				"h-[22px] w-[22px] rounded-full ring-1 ring-inset ring-black/15 transition-transform hover:scale-110",
+				active && "ring-2 ring-foreground",
+			),
+			style: `background:${c.hex}`,
+			title: c.label,
+			"aria-label": c.label,
+			onclick: () => this.setColor(todo.id, c.hex),
+		});
+	}
+
+	// Keep the menu inside the viewport
+	placeMenu(x, y) {
+		if (!this.menuEl) return;
+		const rect = this.menuEl.getBoundingClientRect();
+		const nx = Math.min(x, window.innerWidth - rect.width - 4);
+		const ny = Math.min(y, window.innerHeight - rect.height - 4);
+		this.menuEl.style.left = `${Math.max(0, nx)}px`;
+		this.menuEl.style.top = `${Math.max(0, ny)}px`;
+	}
+
+	async setColor(id, hex) {
 		const todo = this.todos.find((t) => t.id === id);
 		if (!todo) return;
-		const choice = await muxy.modal.open({
-			placeholder: "Set priority…",
-			emptyLabel: "No options",
-			noMatchLabel: "No matches",
-			items: PRIORITY_ORDER.map((p) => ({
-				id: p,
-				title: PRIORITIES[p].label,
-				subtitle: (todo.priority === p ? "✓ Current · " : "") + PRIORITIES[p].desc,
-			})),
-		});
-		if (!choice) return;
-		todo.priority = choice.id;
+		todo.priority = hex;
+		this.closeColorMenu();
 		await this.save();
 	}
+
+	async clearColor(id) {
+		const todo = this.todos.find((t) => t.id === id);
+		if (!todo) return;
+		delete todo.priority;
+		this.closeColorMenu();
+		await this.save();
+	}
+
+	closeColorMenu() {
+		this.menuEl?.remove();
+		this.menuEl = null;
+		document.removeEventListener("click", this.onDocClick);
+		document.removeEventListener("keydown", this.onKeyDown);
+	}
+
+	onDocClick = (e) => {
+		if (this.menuEl && !this.menuEl.contains(e.target)) this.closeColorMenu();
+	};
+
+	onKeyDown = (e) => {
+		if (e.key === "Escape") this.closeColorMenu();
+	};
 
 	async clearCompleted() {
 		const done = this.todos.filter((t) => t.done);
@@ -400,7 +495,7 @@ export class TodosPanel {
 	row(todo) {
 		if (this.editingId === todo.id) return this.editRow(todo);
 		const done = todo.done;
-		const priority = todo.priority ? PRIORITIES[todo.priority] : null;
+		const color = colorFor(todo);
 		return h(
 			"div",
 			{
@@ -408,10 +503,7 @@ export class TodosPanel {
 					"group flex items-start gap-[8px] rounded-md px-[10px] py-[4px] transition-colors hover:bg-accent",
 				draggable: true,
 				"data-id": todo.id,
-				oncontextmenu: (e) => {
-					e.preventDefault();
-					this.setPriority(todo.id);
-				},
+				oncontextmenu: (e) => this.showColorMenu(e, todo),
 			},
 			icon(
 				"grip-vertical",
@@ -433,13 +525,12 @@ export class TodosPanel {
 				},
 				icon("check", 12),
 			),
-			// Priority circle: between the checkbox and the text
-			priority
+			// Color circle: between the checkbox and the text
+			color
 				? h("span", {
 						class:
 							"mt-[7px] h-[10px] w-[10px] shrink-0 rounded-full ring-1 ring-inset ring-black/15",
-						style: `background: ${priority.color}`,
-						title: priority.label,
+						style: `background: ${color}`,
 					})
 				: null,
 			// Content column: title (single line) + note (newlines collapsed to spaces so rows stay compact)
