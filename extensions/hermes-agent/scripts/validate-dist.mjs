@@ -86,6 +86,7 @@ function assertManifest(manifest, label) {
     categories: ["developer-tools", "productivity"],
     github: "gabeosx",
     icon: "assets/icon.svg",
+    repository: "https://github.com/gabeosx/muxy-hermes-extension",
     screenshots: REQUIRED_SCREENSHOTS,
   }, `${label} must contain the frozen listing metadata`);
   return [panel.entry, manifest.muxy.tabTypes[0].entry];

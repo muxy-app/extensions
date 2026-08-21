@@ -15,6 +15,7 @@ test("marketplace identity, metadata, and permissions are frozen", async () => {
     categories: ["developer-tools", "productivity"],
     github: "gabeosx",
     icon: "assets/icon.svg",
+    repository: "https://github.com/gabeosx/muxy-hermes-extension",
     screenshots: [
       "assets/screenshots/screenshot-1.png",
       "assets/screenshots/screenshot-2.png",
