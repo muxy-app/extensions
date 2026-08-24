@@ -2,7 +2,7 @@
 
 > ⚠️ **SUPERSEDED** — All `scanner.py` / `manage.py` citations in this document refer to the **removed Python back-end** (deleted as part of the pure-JS host-fs migration). The on-disk formats described are still accurate, but the implementation now lives in `src/lib/sessions/scan/` (JS scanners) and `src/lib/sessions/manage/` (JS manage). References to Python line numbers are kept as historical context only.
 
-> **Errata / authority:** For **Copilot on-disk layout, title chain, and rename**, prefer [04-copilot-session-identity.md](./04-copilot-session-identity.md) (local `data.db` + `session-state` + `workspace.yaml` + `session-store.db` probes). Sections below that say Copilot schema is fully unknown or only `meta.json` are incomplete. For **which sessions are CLI-resumable** (`No session, task, or name matched`), prefer [06-copilot-resume-mismatch.md](./06-copilot-resume-mismatch.md) — directory existence alone is insufficient; need non-empty `events.jsonl` and/or `turns`. For **archive product choice**, locked plan is Muxy-only for all CLIs (including Codex)—see [01-implementation-plan.md](./01-implementation-plan.md).
+> **Errata / authority:** For **Copilot on-disk layout, title chain, and rename**, prefer [04-copilot-session-identity.md](./04-copilot-session-identity.md) (local `data.db` + `session-state` + `workspace.yaml` + `session-store.db` probes). Sections below that say Copilot schema is fully unknown or only `meta.json` are incomplete. For **which sessions are CLI-resumable** (`No session, task, or name matched`), prefer [06-copilot-resume-mismatch.md](./06-copilot-resume-mismatch.md) — directory existence alone is insufficient; need non-empty `events.jsonl` and/or `turns`. For **archive product choice**, locked plan is Muxy-only for all CLIs (including Codex)—see [01-implementation-plan.md](./01-implementation-plan.md). For **Cursor Agent session titles / `(untitled)` / `store.db`**, prefer [docs/research/07-cursor-session-titles.md](./docs/research/07-cursor-session-titles.md) and the 2026-08-22 section at the end of this file — §1.1 Cursor rows that treat `meta.json` as the native title store are incomplete.
 
 ## 1. Per-CLI Session Storage & Management Capabilities
 
@@ -511,3 +511,141 @@ Here is the complete **RESEARCH.md** written above. Below is a summary of what w
 4. **Provider icons are in-app resources only** — extensions cannot reference core `ProviderIcons/*.svg`; must vendor or use text labels.
 
 5. **All action icons are Lucide SVG paths** inlined in `icons.js`; manifest chrome items use SF Symbols.
+
+---
+
+## Cursor Agent session titles (`store.db`) — 2026-08-22
+
+Canonical copy: [docs/research/07-cursor-session-titles.md](./docs/research/07-cursor-session-titles.md).
+
+### Why the panel shows `(untitled)`
+
+`listCursor` only `readHead`s `~/.cursor/chats/<md5(cwd)>/<id>/meta.json` for `title`/`name`. On a live machine that file is a **sidecar cache**, not the session store. Most session directories contain only `store.db` (+ WAL). Cursor’s own resume picker **skips subagents** and empty chats; Muxy lists every child directory, so the untitled flood is mostly unnamed child-agent dirs plus parents whose sidecar was never written.
+
+**Live probe (this host, 2026-08-22):** 25 session dirs under two cwd-hash roots, **24 `store.db`**, **5 `meta.json`**. Of 24 DBs: **20** have `subagentInfo` and `name: "New Agent"` (no sidecar); **4** parent chats have human `name` matching sidecar `title`.
+
+### On-disk layout
+
+```
+~/.cursor/chats/<md5(path.resolve(cwd))>/<uuid>/
+  store.db            # authoritative (always for real chats)
+  store.db-wal/shm    # optional
+  meta.json           # optional sidecar for agent ls / resume picker
+  prompt_history.json # optional; up-arrow history, not a title source
+```
+
+CWD hash is MD5 of Node `path.resolve(cwd)` hex, matching Muxy’s `md5Hex(cwd)` when `cwd` is already absolute. Confirmed: `md5("/Users/gerlaca1/Projects/rust/smartsprayer-agronomic-service")` = `76e942f8bbf2776ec786e38f27dc6bad`.
+
+**Citations:** `cursor-cli` 2026.08.11-e8db854 `3363.index.js` `src/state/index.ts` (`join(WI(),"chats")` + `createHash("md5").update(resolve(cwd))`); live `~/.cursor/chats/`.
+
+### `store.db` schema
+
+| Table | SQL (from Cursor + live PRAGMA) |
+|-------|----------------------------------|
+| `blobs` | `CREATE TABLE blobs (id TEXT PRIMARY KEY, data BLOB)` |
+| `meta` | `CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT)` |
+
+Cursor init: `PRAGMA journal_mode = WAL; busy_timeout = 5000; user_version = 1;` then the two `CREATE TABLE IF NOT EXISTS`. Single meta row: **`key = '0'`**.
+
+**`meta.value` encoding:** SQLite **TEXT**, lowercase **hex of UTF-8 JSON** (not JSON stored as text, not a BLOB). `typeof(value)` is `text`. Decode: `JSON.parse(Buffer.from(hex, 'hex').toString('utf8'))`.
+
+**Decoded meta JSON fields (24/24 DBs):** `agentId`, `latestRootBlobId`, `name`, `mode`, `isRunEverything`, `createdAt`, `blobEncryptionKey`. Optional: `subagentInfo` (20/24), `lastUsedModel` (4), `approvalMode` (3).
+
+Default constructor in Cursor:
+
+`name: "New Agent"`, `latestRootBlobId: new Uint8Array`, `subagentInfo: undefined`, `blobEncryptionKey: random 32 bytes as 64 hex chars`.
+
+**Sidecar `meta.json`** (`src/state/chat-session-meta.ts` / `chat-session-sidecar.ts`): `schemaVersion`, `title` (omitted if name is empty/`New Agent`), `createdAtMs`, `updatedAtMs`, `hasConversation`, optional `isSubagent`, `cwd`. Live parent example: `{ schemaVersion: 1, title: "MC Health Summary", hasConversation: true, cwd: "…" }`.
+
+**Citations:** CLI `3363.index.js` CREATE TABLE + `INSERT OR REPLACE INTO meta (key, value) VALUES ('0', hex)`; `index.js` default metadata `J`; live sqlite `PRAGMA table_info`.
+
+### Transcript / blobs
+
+`blobs.data` is mixed:
+
+1. **Plain UTF-8 JSON** `{ "role": "system"|"user"|"assistant"|"tool", "content": string | ContentPart[] }` — readable **without** the encryption key. First user blob is typically `"<user_info>\nOS Version: …"`. Subagent first “user” blob is `"<system_reminder>\nYou are running as a subagent…"`. Real prompts are often nested in `<user_query>…</user_query>` inside that dump.
+2. **Binary protobuf-like DAG nodes** (prefix `0x0a 0x20` = 32-byte hash field). `latestRootBlobId` points at one of these, not a JSON message. Not gzip (`1f8b` count = 0 on sampled DBs).
+3. Occasional non-JSON UTF-8 fragments.
+
+**`blobEncryptionKey`:** 64 lowercase hex chars (32 random bytes). Cursor sends it as HTTP header `x-blob-encryption-key` (`blob-encryption-key-header.ts`). It is **not** required to parse the local JSON blobs observed here. **Do not extract or persist this key.** Binary blobs should be skipped (or `hex(data)` only); never try to decrypt with a stored key.
+
+`sqlite3 -json` (host-fs): TEXT hex `meta.value` comes through as a JSON string. JSON blobs come through as escaped JSON strings. **Binary BLOBs are lossy** (`\u00xx` / replacement). Use `hex(data)` / `substr(CAST(data AS TEXT),1,N)` for probes.
+
+### Subagents
+
+`subagentInfo` is `{ parentAgentId, rootParentAgentId, toolCallId, typeName }` (e.g. `generalPurpose`). Cursor resume enumeration:
+
+```
+if (s.isSubagent) return;
+if (!s.hasConversation) return;
+```
+
+(`6260.index.js` session listing.) Changelog 2026-07-06: subagents persist and can be resumed from the parent UI, but they are **not** top-level `agent ls` rows. **Recommendation:** omit `subagentInfo` dirs from Muxy’s resume list (or nest under parent). They are child agents, not user-facing chats. Official CLI docs do not mention `subagentInfo`; subagent behavior is documented in the [CLI changelog](https://cursor.com/docs/cli/changelog) (March 2026 “Subagents in the CLI”; July 2026 resume/context).
+
+### Official Cursor Agent CLI
+
+Installed binary `cursor-agent` 2026.08.11-e8db854 (`--help` aliases `agent`).
+
+| Action | Documented / observed |
+|--------|------------------------|
+| List/resume picker | `agent ls` ([overview](https://cursor.com/docs/cli/overview), [using](https://cursor.com/docs/cli/using)) |
+| Resume latest | `agent resume`, `--continue` |
+| Resume by id | `agent --resume="chat-id-here"` / `--resume [chatId]` ([parameters](https://cursor.com/docs/cli/reference/parameters)) |
+| Rename | **No** `agent rename` flag. In-session `/rename <name>` ([slash-commands](https://cursor.com/docs/cli/reference/slash-commands)); forum staff 2026-08-20: name then shows in `agent ls`. Implementation: `agentStore.setMetadata("name", s)` — **store.db**, not a JSON file. |
+| Create empty | `agent create-chat` → UUID + `store.db` under md5(cwd) |
+| Default display name | `"New Agent"` (treated as **non-title** by `iq()`: trim nonempty **and** `!== "New Agent"`) |
+
+No public Anysphere GitHub source for this store; schema taken from the shipped `cursor-cli` cask + live DBs.
+
+### This repo’s current behavior
+
+| Piece | Behavior | Path |
+|-------|----------|------|
+| Scan | `title = data.title \|\| data.name \|\| "(untitled)"` from `meta.json` only | `src/lib/sessions/scan/cursor.js` |
+| Rename | writes `meta.json` `title` only; does **not** update `store.db` `name` | `src/lib/sessions/manage/index.js` `renameCursor` |
+| Weak titles | `""`, `"(untitled)"`, `untitled`, `session`, UUID, hex — **not** `"New Agent"` | `helpers.js` `WEAK_TITLES` / `isWeakTitle` |
+| Copilot precedent | `pickDisplayTitle`: db → yaml → meta → first user | `helpers.js`, `scan/copilot.js` |
+| sqlite | `/usr/bin/sqlite3 -readonly -json -- db sql` | `src/lib/host-fs.js` `sqliteQuery`; sqlite3 is **optional** (`OPTIONAL_HOST_TOOLS`) |
+| Budget | `listCursor` N=40: no `/bin/cat`, `head` ≤ cap+slack, **≤50 execs** | `test/scan-budget.test.js` |
+
+Muxy rename-only-sidecar is **fragile**: Cursor’s sidecar writer resyncs `meta.json` from store `name` when the session is opened (`subscribeToMetadata("name")`). A Muxy-only `meta.json` title can be overwritten by `"New Agent"` or the old store name.
+
+### Recommended title chain (research, not implemented)
+
+1. **Filter (to match `agent ls`):** skip dirs whose store/sidecar has `isSubagent` / `subagentInfo`, or `hasConversation === false` / empty `latestRootBlobId`. Empty `create-chat` leftovers stay out.
+2. **Sidecar `meta.json` `title`** if present and not weak (includes treating **`"New Agent"` as weak — yes**). Evidence: Cursor `iq()` rejects it; sidecar `g(name)` omits title when `iq` fails.
+3. **`store.db` `meta.value` → hex-decode JSON → `name`**, same weak check. Use `createdAt` as timestamp if sidecar `updatedAtMs` missing.
+4. **First real user text** (optional, expensive): scan JSON blobs only (`CAST(data AS TEXT) LIKE '{%'` or `json_valid`), `role === "user"`, skip bodies that start with `<user_info>`, `<system_reminder>`, `<manually_attached_skills>`; prefer inner `<user_query>`; skip subagent task prompts (`You are the **…** expert`, `You are running as a subagent`). Cap blobs scanned (e.g. 40) and payload size.
+5. **Fallback:** `(untitled)` or Copilot-style `Cursor · ${shortId}` — not the raw UUID if we can avoid it.
+
+**sqlite3 missing:** degrade like Copilot: keep listing from `meta.json` + dir mtime; store-only dirs stay untitled; do not fail the whole scan.
+
+**Rename:** must write **`store.db` `name`** (decode hex JSON, set `name`, re-hex, `UPDATE meta SET value=… WHERE key='0'`, preserve `blobEncryptionKey` / `subagentInfo`). Also write sidecar `meta.json` `title` so Muxy scan and `agent ls` agree before the next Cursor open. Do not invent encryption or rewrite blobs.
+
+**Budget risk:** one `sqliteQuery` per candidate (~35) **exceeds** the current ≤50 exec budget if added on top of 35 `readHead`s. Mitigations: sqlite only when sidecar missing/weak; skip blob walks in the list path; raise the Cursor budget; or listDir + sqlite-only (drop `readHead` when querying store).
+
+### Risks
+
+| Risk | Detail |
+|------|--------|
+| Encryption | Key is in meta JSON; do not log/store it. JSON blobs today are plaintext; future builds may encrypt. |
+| Hex encoding | Must hex-decode `meta.value`; naive `JSON.parse(value)` fails. |
+| Lossy sqlite JSON | Binary `blobs.data` via `-json` is not round-trippable; use `hex()`. |
+| Subagent flood | Listing every dir makes untitled/New Agent the majority. |
+| Sidecar vs store | Rename must hit store.db. |
+| Exec budget | Per-session sqlite + blob scans vs `test/scan-budget.test.js` ≤50. |
+| ACP path | `~/.cursor/acp-sessions/<id>/` also uses `store.db`+`meta.json`; out of scope for cwd chat hash. |
+
+## Decisions — 2026-08-22 (Cursor untitled sessions)
+
+Grilling locked these product choices for the Cursor `(untitled)` work. Research: [docs/research/07-cursor-session-titles.md](./docs/research/07-cursor-session-titles.md).
+
+| Decision | Chosen | Why | Rejected |
+|----------|--------|-----|----------|
+| Subagent rows | **Hide** sibling dirs with sidecar `isSubagent` or store `subagentInfo`. Resume list is parent chats only. | Matches Cursor `agent ls` (`if (s.isSubagent) return`). 20/24 local stores were unnamed subagents; listing them is the untitled flood. | Show as peers; nest under parent (later UI ticket if wanted). |
+| Empty chats | **Hide** sidecar `hasConversation === false` and store with empty/missing `latestRootBlobId`. | Matches Cursor. Not resumable. | Show so users can delete leftovers. |
+| Title chain | Sidecar `title`/`name` → store `name` → first real user text (`<user_query>` after skipping `<user_info>` / `<system_reminder>` dumps) → last resort. Treat **`"New Agent"` as weak** (same as Cursor `iq()`). | Same pattern as Copilot `pickDisplayTitle`. Store name is authoritative; blob scan only when the name is weak. | Sidecar+store only; always prefer first user prompt over store name. |
+| Last-resort label | **`Cursor · ${shortId(id)}`** (never a bare UUID). | Matches Copilot `pickDisplayTitle` last resort. | Keep `(untitled)` as the displayed title. |
+| sqlite3 missing | **Degrade:** sidecar + mtime only; do not fail the whole Cursor scan; do not hide parents that lack a sidecar. | sqlite3 is already optional (`OPTIONAL_HOST_TOOLS`). Hiding missing sidecars would drop most parents. Soft warning optional, Copilot-style. | Hard-fail Cursor listing. |
+| Rename | Write **`store.db` `meta` `name`** (hex JSON, preserve other keys including `blobEncryptionKey`) **and** sidecar `meta.json` `title`. | Cursor `/rename` is store `name`; sidecar is rewritten from store on open. Sidecar-only Muxy rename does not stick. | Sidecar-only rename. |
+| Encryption | **Never** copy `blobEncryptionKey` onto session rows, logs, or rewritten sidecar. If blobs are encrypted later, skip blob titles. | Key is an HTTP header secret; local JSON is readable without it today. | Decryptor / persist key. |

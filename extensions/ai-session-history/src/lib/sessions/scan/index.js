@@ -26,7 +26,7 @@ export function listSessionsJs(fs, cli, cwd, opts = {}) {
     case "grok":
       return listGrok(fs, cwd, opts);
     case "cursor":
-      return listCursor(fs, cwd, opts);
+      return listCursor(fs, cwd, { ...opts, sqliteAvailable });
     case "claude":
       return listClaude(fs, cwd, opts);
     case "codex":

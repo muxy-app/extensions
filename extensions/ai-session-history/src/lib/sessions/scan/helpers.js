@@ -110,6 +110,213 @@ export function utf8Bytes(str) {
 }
 
 /**
+ * UTF-8 decode without TextDecoder (unavailable in Muxy runScript / JSC).
+ * Inverse of {@link utf8Bytes}. Invalid sequences return null.
+ * @param {Uint8Array | ArrayLike<number>} bytes
+ * @returns {string | null}
+ */
+export function utf8FromBytes(bytes) {
+  const arr =
+    bytes instanceof Uint8Array
+      ? bytes
+      : bytes == null
+        ? new Uint8Array(0)
+        : new Uint8Array(bytes);
+  let out = "";
+  let i = 0;
+  while (i < arr.length) {
+    const c = arr[i++];
+    let code;
+    if (c <= 0x7f) {
+      code = c;
+    } else if ((c & 0xe0) === 0xc0) {
+      if (i >= arr.length) return null;
+      const c1 = arr[i++];
+      if ((c1 & 0xc0) !== 0x80) return null;
+      code = ((c & 0x1f) << 6) | (c1 & 0x3f);
+      if (code < 0x80) return null;
+    } else if ((c & 0xf0) === 0xe0) {
+      if (i + 1 >= arr.length) return null;
+      const c1 = arr[i++];
+      const c2 = arr[i++];
+      if ((c1 & 0xc0) !== 0x80 || (c2 & 0xc0) !== 0x80) return null;
+      code = ((c & 0x0f) << 12) | ((c1 & 0x3f) << 6) | (c2 & 0x3f);
+      if (code < 0x800) return null;
+    } else if ((c & 0xf8) === 0xf0) {
+      if (i + 2 >= arr.length) return null;
+      const c1 = arr[i++];
+      const c2 = arr[i++];
+      const c3 = arr[i++];
+      if ((c1 & 0xc0) !== 0x80 || (c2 & 0xc0) !== 0x80 || (c3 & 0xc0) !== 0x80) {
+        return null;
+      }
+      code =
+        ((c & 0x07) << 18) | ((c1 & 0x3f) << 12) | ((c2 & 0x3f) << 6) | (c3 & 0x3f);
+      if (code < 0x10000 || code > 0x10ffff) return null;
+    } else {
+      return null;
+    }
+    if (code > 0xffff) {
+      const u = code - 0x10000;
+      out += String.fromCharCode(0xd800 + (u >> 10), 0xdc00 + (u & 0x3ff));
+    } else {
+      out += String.fromCharCode(code);
+    }
+  }
+  return out;
+}
+
+const HEX_BYTE_RE = /^[0-9a-fA-F]{2}$/;
+
+/**
+ * Decode even-length hex to UTF-8. Invalid hex returns null (scan must not throw).
+ * @param {string} hex
+ * @returns {string | null}
+ */
+export function hexToUtf8(hex) {
+  if (typeof hex !== "string") return null;
+  const s = hex.trim();
+  if (!s || s.length % 2 !== 0) return null;
+  const n = s.length / 2;
+  const bytes = new Uint8Array(n);
+  for (let i = 0; i < n; i++) {
+    const pair = s.slice(i * 2, i * 2 + 2);
+    if (!HEX_BYTE_RE.test(pair)) return null;
+    bytes[i] = parseInt(pair, 16);
+  }
+  return utf8FromBytes(bytes);
+}
+
+/**
+ * Encode UTF-8 as lowercase hex.
+ * @param {string} str
+ * @returns {string | null}
+ */
+export function utf8ToHex(str) {
+  if (typeof str !== "string") return null;
+  const bytes = utf8Bytes(str);
+  let hex = "";
+  for (let i = 0; i < bytes.length; i++) {
+    hex += bytes[i].toString(16).padStart(2, "0");
+  }
+  return hex;
+}
+
+/**
+ * Decode Cursor `meta.value` (lowercase hex of JSON) for scan.
+ * Returns only listing fields — never `blobEncryptionKey`.
+ * @param {string} value
+ * @returns {{
+ *   name: any,
+ *   subagentInfo: any,
+ *   latestRootBlobId: any,
+ *   createdAt: any,
+ * } | null}
+ */
+export function parseCursorStoreMeta(value) {
+  const text = hexToUtf8(value);
+  if (!text) return null;
+  try {
+    const data = JSON.parse(text);
+    if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+    return {
+      name: data.name,
+      subagentInfo: data.subagentInfo,
+      latestRootBlobId: data.latestRootBlobId,
+      createdAt: data.createdAt,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Encode Cursor store meta as lowercase hex of compact JSON.
+ * Accepts a full object (caller mutates `name`) or existing hex; keeps unknown
+ * keys including `blobEncryptionKey` on the write path.
+ * @param {object | string} meta
+ * @returns {string | null}
+ */
+export function encodeCursorStoreMeta(meta) {
+  let obj = meta;
+  if (typeof meta === "string") {
+    const text = hexToUtf8(meta);
+    if (!text) return null;
+    try {
+      obj = JSON.parse(text);
+    } catch {
+      return null;
+    }
+  }
+  if (!obj || typeof obj !== "object") return null;
+  try {
+    return utf8ToHex(JSON.stringify(obj));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Title from a Cursor blobs.data JSON user message (possibly dump-wrapped).
+ * @param {string} text
+ * @returns {string | null}
+ */
+export function cursorTitleFromUserBlob(text) {
+  if (typeof text !== "string" || !text) return null;
+  let rec;
+  try {
+    rec = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (!rec || typeof rec !== "object") return null;
+  const role = String(rec.role || "").toLowerCase();
+  if (role !== "user") return null;
+
+  let content = rec.content;
+  if (Array.isArray(content)) {
+    const parts = [];
+    for (const part of content) {
+      if (typeof part === "string") parts.push(part);
+      else if (part && typeof part === "object" && part.text != null) {
+        parts.push(String(part.text));
+      }
+    }
+    content = parts.join(" ");
+  }
+  if (typeof content !== "string") return null;
+  let body = content.trim();
+  if (!body) return null;
+
+  if (
+    body.startsWith("<user_info>") ||
+    body.startsWith("<system_reminder>") ||
+    body.startsWith("<manually_attached_skills>")
+  ) {
+    const m = body.match(/<user_query>([\s\S]*?)<\/user_query>/i);
+    if (!m) return null;
+    body = m[1].trim();
+    if (!body) return null;
+  }
+
+  if (/^You are (running as a subagent|the \*?[\w-]+)/i.test(body)) {
+    return null;
+  }
+  return oneLine(body, 120) || null;
+}
+
+/**
+ * True when Cursor `latestRootBlobId` means no conversation.
+ * @param {*} id
+ */
+export function isEmptyCursorRootBlob(id) {
+  if (id == null) return true;
+  if (Array.isArray(id) && id.length === 0) return true;
+  if (typeof id === "string" && !id.trim()) return true;
+  return false;
+}
+
+/**
  * Match Python urllib.parse.quote(s, safe="") for path segments.
  * Unquoted: A-Za-z0-9_.-
  * @param {string} str
@@ -292,6 +499,13 @@ export function isWeakTitle(value, sid) {
   if (UUID_RE.test(text)) return true;
   if (/^[0-9a-fA-F]{16,}$/.test(text)) return true;
   return false;
+}
+
+/** Cursor default untitled (`iq()` treats `New Agent` as no title). Not in WEAK_TITLES — Copilot may use that name. */
+export function isWeakCursorTitle(value, sid) {
+  if (isWeakTitle(value, sid)) return true;
+  const text = String(value).replace(/\s+/g, " ").trim().toLowerCase();
+  return text === "new agent";
 }
 
 export function shortId(sid) {
