@@ -219,6 +219,16 @@ async function main() {
         <div class="hint">${t("set.agentHint")}</div>
       </div>
 
+      <div class="field">
+        <span class="label">${t("set.issueOpenMode")}</span>
+        <select id="issue_open_mode">
+          <option value="tab" ${config.issue_open_mode === "tab" ? "selected" : ""}>${t("set.openModeTab")}</option>
+          <option value="modal" ${config.issue_open_mode === "modal" ? "selected" : ""}>${t("set.openModeModal")}</option>
+          <option value="split" ${config.issue_open_mode === "split" ? "selected" : ""}>${t("set.openModeSplit")}</option>
+        </select>
+        <div class="hint">${t("set.issueOpenModeHint")}</div>
+      </div>
+
       <hr class="sep" />
       <h3 class="sec-title">${t("set.listShow")}</h3>
       <label class="checkbox field"><input type="checkbox" id="list_show_state" ${config.list_show_state ? "checked" : ""} /> ${t("set.showState")}</label>
@@ -550,6 +560,7 @@ async function main() {
       branch_name_template: val("branch_name_template"),
       worktree_name_template: val("worktree_name_template"),
       agent_command: val("agent_command") || "claude",
+      issue_open_mode: val("issue_open_mode") || "tab",
       list_show_state: checked("list_show_state"),
       list_show_priority: checked("list_show_priority"),
       list_show_labels: checked("list_show_labels"),

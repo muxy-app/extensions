@@ -886,7 +886,34 @@ async function openIssue(issue) {
   const config = await loadConfig();
   // 실효 토큰 + 액션(글로벌+프로젝트 병합)을 상세 화면에 전달.
   const eff = { ...applyProjectSettings(config, projectCfg), actions: mergeActions(config.actions, projectCfg?.actions) };
-  // KNK-71: 이슈 상세를 좁은 모달 대신 풀 탭 웹뷰로 연다(같은 issue.js 컴포넌트 재사용).
+  // KNK-109: 이슈 상세를 여는 방식을 설정값(issue_open_mode)으로 고른다 — tab / modal / split.
+  const mode = config.issue_open_mode || "tab";
+
+  // split: 내장 브라우저를 오른쪽 split 으로 열어 실제 Linear 페이지를 표시한다.
+  // (익스텐션 웹뷰는 split API 가 없어 muxy.browser.open 으로 URL 을 split 표시한다.)
+  // muxy.browser 미지원 구버전이거나 URL 이 없으면 아래 탭 경로로 폴백한다.
+  if (mode === "split" && issue?.url && muxy.browser?.open) {
+    try {
+      await muxy.browser.open(issue.url, { split: true });
+      return;
+    } catch (e) {
+      console.warn("[linear] split 브라우저 열기 실패 → 탭으로 폴백:", e?.message || e);
+    }
+  }
+
+  // modal: 가운데 웹뷰 모달로 연다(같은 issue.js 컴포넌트 재사용).
+  if (mode === "modal") {
+    const result = await muxy.modal.openWebview({
+      entry: "modals/issue.html",
+      width: 820,
+      height: 760,
+      data: { issue, config: eff },
+    });
+    if (result?.changed) render();
+    return;
+  }
+
+  // tab(기본): KNK-71 이후 기본 동작. 이슈 상세를 풀 탭 웹뷰로 연다(같은 issue.js 재사용).
   // 탭 안에서 상태가 바뀌면 패널 폴링(3초)이 목록을 자동 갱신하므로 결과 처리가 따로 필요 없다.
   // extensionWebView 를 지원하지 않는 구버전 muxy 에서는 예외를 잡아 기존 모달로 폴백한다.
   try {
@@ -942,17 +969,24 @@ async function openSettings() {
 }
 
 async function openCreate() {
-  // KNK-88: 새 이슈 생성을 좁은 모달 대신 풀 탭 웹뷰로 연다(같은 create.js 재사용).
-  // 생성되면 create 쪽에서 탭을 닫고, 목록은 패널 폴링(3초)이 자동 갱신한다.
-  // extensionWebView 를 지원하지 않는 구버전 muxy 에서는 예외를 잡아 기존 모달로 폴백한다.
-  try {
-    await muxy.tabs.open({
-      kind: "extensionWebView",
-      extension: { id: "linear", tabType: "create", data: { mode: "tab" } },
-    });
-    return;
-  } catch (e) {
-    console.warn("[linear] 새 이슈를 탭으로 열기 실패 → 모달로 폴백:", e?.message || e);
+  // KNK-109: 여는 방식 설정(issue_open_mode)을 새 이슈 생성에도 적용한다.
+  // 단 생성 화면은 아직 이슈 URL 이 없어 "split" 은 만들 수 없으므로 탭으로 취급하고,
+  // "modal" 일 때만 모달로 연다(그 외에는 아래 탭 경로).
+  const config = await loadConfig();
+  const mode = config.issue_open_mode || "tab";
+  if (mode !== "modal") {
+    // KNK-88: 새 이슈 생성을 좁은 모달 대신 풀 탭 웹뷰로 연다(같은 create.js 재사용).
+    // 생성되면 create 쪽에서 탭을 닫고, 목록은 패널 폴링(3초)이 자동 갱신한다.
+    // extensionWebView 를 지원하지 않는 구버전 muxy 에서는 예외를 잡아 기존 모달로 폴백한다.
+    try {
+      await muxy.tabs.open({
+        kind: "extensionWebView",
+        extension: { id: "linear", tabType: "create", data: { mode: "tab" } },
+      });
+      return;
+    } catch (e) {
+      console.warn("[linear] 새 이슈를 탭으로 열기 실패 → 모달로 폴백:", e?.message || e);
+    }
   }
   const result = await muxy.modal.openWebview({ entry: "modals/create.html", width: 460, height: 640 });
   // KNK-98: 생성되면 방금 만든 이슈의 상세를 바로 연다(모달 폴백 경로).
