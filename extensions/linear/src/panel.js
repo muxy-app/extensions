@@ -65,6 +65,7 @@ function applyStaticI18n() {
   setTitle("display", "panel.displayTitle");
   setTitle("new", "panel.newIssueTitle");
   setTitle("refresh", "panel.refreshTitle");
+  setTitle("actions", "panel.actionsTitle");
   setTitle("settings", "panel.settingsTitle");
   const gl = document.getElementById("group-by-label");
   if (gl) gl.textContent = t("panel.grouping");
@@ -968,6 +969,11 @@ async function openSettings() {
   render();
 }
 
+// KNK-108: 액션 편집을 설정 모달 안이 아니라 패널 툴바에서 바로 연다.
+async function openActions() {
+  await muxy.modal.openWebview({ entry: "modals/actions.html", width: 560, height: 640 });
+}
+
 async function openCreate() {
   // KNK-109: 여는 방식 설정(issue_open_mode)을 새 이슈 생성에도 적용한다.
   // 단 생성 화면은 아직 이슈 URL 이 없어 "split" 은 만들 수 없으므로 탭으로 취급하고,
@@ -1068,6 +1074,7 @@ bindSeg("who", (d) => { who = d.who; });
 // 수동 새로고침: 스피너를 표시하며 갱신(버튼을 누른 것을 시각적으로 알림).
 document.getElementById("refresh").addEventListener("click", manualRefresh);
 document.getElementById("new").addEventListener("click", openCreate);
+document.getElementById("actions").addEventListener("click", openActions);
 document.getElementById("settings").addEventListener("click", openSettings);
 
 // 그룹/정렬(Display) 팝오버: 버튼으로 토글, 바깥 클릭 시 닫기.
