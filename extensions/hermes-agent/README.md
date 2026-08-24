@@ -18,14 +18,14 @@ Open the Hermes panel to start a request and follow the response and tool activi
 
 ## Kanban boards
 
-Run **Hermes: Open Project Board** to open one of the boards available in your Hermes Dashboard. Hermes stores these cards and dispatches their work; they are not a second view of requests from the Agent panel.
+Run **Hermes: Open Project Board** to open one of the boards available in your Hermes Dashboard. Each Muxy project can explicitly map one board. Hermes stores these cards and dispatches their work; they are not a second view of requests from the Agent panel.
 
 - Add a card with instructions and assign it to the Hermes profile that should handle it
 - Move an assigned card to Ready; Hermes starts a worker, links its run to the card, and moves the card to Running
 - Keep the board open to watch the card move to Review, Blocked, or Done as the work progresses
 - Move cards yourself when needed; Muxy asks for confirmation before moving one to Blocked or Done
 
-The board refreshes automatically, and you can still refresh it by hand. Closing the board does not stop Kanban work in Hermes; when you reopen it, you will see the latest state. Requests started in the Agent panel stay separate and are not turned into cards.
+Use **View board** to inspect any available board without changing your project. Use **Map to this project** only when the open board should become that project's default. The board selector stays available while a board is open. Worktrees of the same Muxy project share the mapping, while other projects retain their own. The board refreshes automatically, and you can still refresh it by hand. Closing the board does not stop Kanban work in Hermes; when you reopen it, you will see the latest state. Requests started in the Agent panel stay separate and are not turned into cards.
 
 ![Hermes Project Board showing the Launchpad Checklist card in Done](./assets/readme/project-board.png)
 
@@ -83,13 +83,14 @@ Your password is used only to sign in and is then cleared; it is never saved. Li
 | Command execution | Uses `/usr/bin/curl` to talk to the Hermes Dashboard. Request bodies and cookies are passed through stdin, not exposed in command arguments. |
 | Panel control | Opens and updates the Hermes side panel. |
 | Tab control | Opens the Hermes project board. |
-| Isolated storage | Saves the Dashboard address, login provider, selected board, and Hermes session cookies for this extension only. |
+| Project read access | Reads the active Muxy project's stable ID and display name to select its board mapping. It does not read project paths, worktree paths, workspace files, or project contents. |
+| Isolated storage | Saves the Dashboard address, login provider, authenticated session cookies, and each project's mapped board for this extension only. |
 
 The extension cannot read or write your workspace files. It does not request Docker, SSH, background-process, or telemetry access.
 
 ## Privacy
 
-No analytics or telemetry is collected. The extension stores only the Dashboard address, selected login provider, selected board, and the Hermes session cookies needed to restore your sign-in.
+No analytics or telemetry is collected. The extension stores one global Dashboard address, selected login provider, and session cookies needed to restore your sign-in. Separately, each explicit board mapping stores the Muxy stable project ID, Dashboard URL, and board slug. It never reads or stores project paths, worktree paths, workspace files, or board credentials in a mapping.
 
 Prompts and controls you submit are sent directly to the Hermes Dashboard you configured. The extension does not send them anywhere else.
 

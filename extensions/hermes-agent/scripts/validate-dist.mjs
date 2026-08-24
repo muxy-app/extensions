@@ -15,7 +15,7 @@ const allowedPanelKeys = new Set(["entry", "icon", "id", "mode", "position", "ti
 const allowedTabTypeKeys = new Set(["entry", "id", "title"]);
 const allowedCommandKeys = new Set(["id", "title", "action"]);
 const allowedCommandActionKeys = new Set(["kind", "panel", "tabType"]);
-const REQUIRED_PERMISSIONS = ["commands:exec", "panels:write", "storage:read", "storage:write", "tabs:write"];
+const REQUIRED_PERMISSIONS = ["commands:exec", "panels:write", "projects:read", "storage:read", "storage:write", "tabs:write"];
 const REQUIRED_SCREENSHOTS = [
   "assets/screenshots/screenshot-1.png",
   "assets/screenshots/screenshot-2.png",

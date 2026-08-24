@@ -63,6 +63,7 @@
     "permissions" : [
       "commands:exec",
       "panels:write",
+      "projects:read",
       "storage:read",
       "storage:write",
       "tabs:write"

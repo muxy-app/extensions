@@ -26,9 +26,24 @@ Published `hermes-agent@version` pairs are immutable. A correction never rebuild
 
 5. Retain the local output and qualification cleanup result with the review record. Do not retain credentials, disposable keys, or generated qualification data.
 
+## Merge the source release first
+
+The source repository is the release source of truth. Complete the release work on a branch in `gabeosx/muxy-hermes-extension`, push that branch only to the source repository, and open a pull request into its `main` branch. Merge the source pull request only after its tests and validation pass.
+
+Record the exact merged source commit before touching the marketplace fork:
+
+```sh
+git fetch origin main
+git rev-parse origin/main
+```
+
+Use that commit—not an unmerged branch, dirty working tree, or marketplace copy—for every file staged in the extensions repository. Never develop or repair the extension directly in `muxy-app/extensions`; corrections return to the source repository and repeat this source-review step.
+
 ## Submit a draft marketplace pull request
 
-Prepare a clean sparse checkout of the authenticated `gabeosx/extensions` fork. Copy only the reviewed extension source to `extensions/hermes-agent`; keep source fixtures and release documents that reviewers need.
+After the source merge, prepare a clean sparse checkout of the authenticated `gabeosx/extensions` fork. Create or update a branch in that fork, then copy only the reviewed extension source from the exact merged commit to `extensions/hermes-agent`; keep source fixtures and release documents that reviewers need.
+
+The marketplace branch must be pushed to `gabeosx/extensions` and submitted as a pull request to `muxy-app/extensions`. Do not commit or push directly to `muxy-app/extensions`, and do not treat the marketplace copy as a source branch.
 
 Exclude `dist/`, `.planning/`, `.qualification/`, `.agents/`, `.gsd/`, `node_modules/`, receipts, credentials, generated qualification data, local caches/logs, and `skills-lock.json`. Retain the checked-in `fixtures/` data, `qualification/` harness, and `.github/workflows/ci.yml` because the submitted release tests and governance validator exercise them. The nested workflow remains review-only inside `extensions/hermes-agent`; GitHub does not activate workflows outside the repository-root `.github/workflows/` directory. `.qualification/` is the runtime evidence directory that must not cross the repository boundary.
 
@@ -48,6 +63,8 @@ node scripts/pack.mjs --dry-run hermes-agent
 ```
 
 Confirm the resulting artifact has the reviewed version, icon, README, and ordered listing images. Open a draft pull request for review. The current work stops at a draft pull request: no npm publish step, marketplace publication, merge, release, or tag is performed here.
+
+If a draft marketplace pull request already exists for the unpublished version, update its fork branch from the newly merged source commit and rerun every check above. Once a version has been published, corrections require the next immutable patch or minor version instead.
 
 ## After upstream merge
 

@@ -36,6 +36,7 @@ const REQUIRED_NATIVE_CATEGORIES = Object.freeze([
   "native_light",
   "pane_narrow",
   "pane_wide",
+  "per_project_board_mapping",
   "real_marketplace_screenshots",
   "reduced_motion",
   "remote_secret_absent",
@@ -246,6 +247,10 @@ async function seedSupportedSurfaces(state) {
     "exec", "-T", "hermes", "hermes", "kanban", "boards", "create", "marketplace-beta",
     "--name", "Marketplace Beta", "--description", "Disposable qualification board", "--switch",
   ], { label: "kanban_board_seed", timeoutMs: 30_000 });
+  await compose(state, [
+    "exec", "-T", "hermes", "hermes", "kanban", "boards", "create", "marketplace-secondary",
+    "--name", "Marketplace Secondary", "--description", "Disposable secondary qualification board",
+  ], { label: "kanban_secondary_board_seed", timeoutMs: 30_000 });
 
   const tasks = [
     ["Confirm release permissions", "--triage"],

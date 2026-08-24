@@ -3,6 +3,30 @@ import test from "node:test";
 
 import { requestConfirmedStop } from "../src/stop-confirmation.js";
 
+test("stop confirmation makes keeping the run the explicit safe default", async () => {
+  let options = null;
+  let stopped = false;
+  const result = await requestConfirmedStop({
+    confirm: async (value) => {
+      options = value;
+      return null;
+    },
+    canStop: () => true,
+    stop: async () => { stopped = true; },
+  });
+
+  assert.deepEqual(options, {
+    title: "Stop this Hermes run?",
+    message: "Hermes will cancel the active run. Completed output remains visible.",
+    buttons: ["Keep running", "Stop run"],
+    default: "Keep running",
+    cancel: "Keep running",
+    style: "warning",
+  });
+  assert.equal(result, "cancelled");
+  assert.equal(stopped, false);
+});
+
 test("stop confirmation converts native bridge rejection into a bounded result", async () => {
   let stopped = false;
   const result = await requestConfirmedStop({

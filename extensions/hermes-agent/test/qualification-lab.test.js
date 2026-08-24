@@ -35,6 +35,7 @@ test("lab uses task-local secrets, OS-assigned loopback ports, real health check
   assert.match(runner, /"-L", `127\.0\.0\.1:\$\{localPort\}:hermes:9119`/);
   assert.match(runner, /ssh_internal_health/);
   assert.match(runner, /kanban", "boards", "create", "marketplace-beta"/);
+  assert.match(runner, /kanban", "boards", "create", "marketplace-secondary"/);
   assert.match(runner, /"hermes", "cron", "create"/);
   assert.match(runner, /operations\.jobs\.length, 12/);
   assert.match(runner, /kanban\.updateStatus\(task\.id, "done"\)/);
@@ -97,6 +98,7 @@ test("manual native observations require the exact Muxy tuple, claims, categorie
     "muxy_webkit_https", "native_dark", "native_light", "pane_narrow", "pane_wide",
     "real_marketplace_screenshots", "reduced_motion", "remote_secret_absent",
     "remote_workspace_path_absent", "scale_default", "scale_large",
+    "per_project_board_mapping",
   ];
   const state = { taskId: "fixture", challenge: "challenge" };
   const screenshot = (path) => ({ path, sha256: "a".repeat(64), width: 1600, height: 1000 });

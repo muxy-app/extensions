@@ -1,7 +1,9 @@
 import { clear, h } from "@/lib/dom";
 import { DashboardAuthError, DashboardAuthSession } from "@/dashboard-auth";
 import { KANBAN_STATUSES, KanbanClient, KanbanClientError, normalizeHermesDashboardUrl, selectBoardSlug } from "@/kanban-client";
+import { resolveActiveProject } from "@/muxy-tabs";
 import { SessionBrokerClient } from "@/session-broker";
+import { restoreProjectBoardMapping } from "./mapping-restore";
 
 const STATUS_LABELS = Object.freeze({
   triage: "Triage",
@@ -43,6 +45,9 @@ export class HermesProjectBoard {
     this.sessionBroker = new SessionBrokerClient();
     this.urlValue = "";
     this.boardValue = null;
+    this.viewedBoardValue = null;
+    this.mappedBoardValue = null;
+    this.activeProject = null;
     this.catalog = Object.freeze({ boards: Object.freeze([]), current: null });
     this.providerValue = "";
     this.usernameValue = "";
@@ -110,7 +115,7 @@ export class HermesProjectBoard {
       h("header", { class: "board-topbar" },
         h("div", { class: "board-title-group" },
           h("h1", null, "Hermes Project Board"),
-          h("span", { class: `board-connection board-connection-${this.state}` }, this.state === "ready" ? this.boardValue : this.state === "board_picker" ? "choose a board" : this.state.replaceAll("_", " ")),
+          h("span", { class: `board-connection board-connection-${this.state}` }, this.state === "ready" ? this.viewedBoardValue : this.state === "board_picker" ? "choose a board" : this.state.replaceAll("_", " ")),
           h("span", { class: `board-session board-session-${this.authSnapshot.state}`, role: "status" }, sessionLabel),
         ),
         ["ready", "board_picker", "opening_board"].includes(this.state) ? h("div", { class: "board-topbar-actions" },
@@ -210,12 +215,11 @@ export class HermesProjectBoard {
       onchange: (event) => {
         this.boardValue = event.target.value;
         this.message = "";
-        void this.persistSession();
         this.syncForms();
       },
     }, choices);
     select.value = this.boardValue ?? "";
-    const open = h("button", { class: "board-button board-button-primary", type: "submit", disabled: !hasBoards || this.state === "opening_board" }, this.state === "opening_board" ? "Opening…" : "Open board");
+    const open = h("button", { class: "board-button board-button-primary", type: "submit", disabled: !hasBoards || this.state === "opening_board" }, this.state === "opening_board" ? "Opening…" : "View board");
     this.boardPickerInput = select;
     this.openButton = open;
     return h("section", { class: "board-connect-shell" },
@@ -223,6 +227,7 @@ export class HermesProjectBoard {
         h("p", { class: "board-eyebrow" }, "Hermes board"),
         h("h2", null, "Choose a board"),
         h("p", null, hasBoards ? "Choose a board, then open it when you’re ready." : "No boards are available for this Dashboard."),
+        this.projectMappingState(),
       ),
       h("div", { class: "board-auth-stack" },
         h("form", { class: "board-connect-form", onsubmit: (event) => void this.openBoard(event) },
@@ -263,9 +268,23 @@ export class HermesProjectBoard {
     this.createInput = title;
     this.createButton = submit;
     const total = this.board.columns.reduce((sum, column) => sum + column.tasks.length, 0);
+    const choices = this.catalog.boards.map((candidate) => h("option", { value: candidate.slug, selected: candidate.slug === this.boardValue }, candidate.name));
+    const selector = h("select", {
+      id: "board-picker", class: "board-select", "aria-label": "Available boards",
+      onchange: (event) => { this.boardValue = event.target.value; this.message = ""; this.syncForms(); },
+    }, choices);
+    selector.value = this.boardValue ?? "";
     return h("section", { class: "board-workspace" },
       h("div", { class: "board-toolbar" },
-        h("div", null, h("strong", null, `${total} ${total === 1 ? "card" : "cards"}`)),
+        h("div", null,
+          h("strong", null, `${total} ${total === 1 ? "card" : "cards"}`),
+          this.projectMappingState(),
+        ),
+        h("form", { class: "board-create-form", onsubmit: (event) => void this.openBoard(event) },
+          selector,
+          h("button", { class: "board-button board-button-secondary", type: "submit", disabled: !this.boardValue }, "View board"),
+          h("button", { class: "board-button board-button-primary", type: "button", disabled: !this.viewedBoardValue, onclick: () => void this.mapViewedBoard() }, "Map to this project"),
+        ),
         h("form", { class: "board-create-form", onsubmit: (event) => void this.createCard(event) }, title, assignee, triage, submit, body),
       ),
       h("p", { class: "board-message", role: this.message ? "alert" : null, "aria-live": "polite" }, this.message),
@@ -360,12 +379,19 @@ export class HermesProjectBoard {
       const client = new KanbanClient({ baseUrl: this.urlValue, session: this.authSession });
       this.client?.release();
       this.client = client;
+      const project = await this.resolveProject();
       await this.loadBoardCatalog();
+      const mappedBoard = await this.restoreProjectMapping(project);
       this.board = null;
       this.state = "board_picker";
       this.message = "";
       await this.persistSession();
       await window.muxy?.tabs?.setTitle?.("Hermes Board");
+      if (mappedBoard) {
+        this.boardValue = mappedBoard;
+        await this.openBoard();
+        return;
+      }
     } catch (error) {
       this.client?.release();
       this.client = null;
@@ -388,7 +414,7 @@ export class HermesProjectBoard {
   }
 
   async openBoard(event) {
-    event.preventDefault();
+    event?.preventDefault();
     if (!this.client || !this.boardValue || this.state === "opening_board") return;
     this.state = "opening_board";
     this.message = "Opening board…";
@@ -396,14 +422,16 @@ export class HermesProjectBoard {
     try {
       this.client.setBoard(this.boardValue);
       this.board = await this.client.loadBoard();
+      this.viewedBoardValue = this.boardValue;
       this.state = "ready";
       this.message = "";
       await this.persistSession();
-      await window.muxy?.tabs?.setTitle?.(`Hermes Board · ${this.boardValue}`);
+      await window.muxy?.tabs?.setTitle?.(`Hermes Board · ${this.viewedBoardValue}`);
     } catch (error) {
       this.board = null;
-      this.handleActionError(error);
-      if (this.state !== "session_expired") this.state = "board_picker";
+      const recovered = await this.recoverMissingMappedBoard(error);
+      if (!recovered) this.handleActionError(error);
+      if (this.state !== "session_expired" && this.state !== "board_picker") this.state = "board_picker";
     }
     this.render();
   }
@@ -414,6 +442,7 @@ export class HermesProjectBoard {
     this.board = null;
     this.catalog = Object.freeze({ boards: Object.freeze([]), current: null });
     this.boardValue = null;
+    this.viewedBoardValue = null;
     try {
       if (this.authSession) this.authSnapshot = await this.authSession.logout();
     } catch {
@@ -448,7 +477,8 @@ export class HermesProjectBoard {
         await this.persistSession();
       }
     } catch (error) {
-      this.handleActionError(error);
+      const recovered = await this.recoverMissingMappedBoard(error);
+      if (!recovered) this.handleActionError(error);
       shouldRender = true;
     } finally {
       this.boardRefreshInFlight = false;
@@ -489,6 +519,9 @@ export class HermesProjectBoard {
         title: `Move card to ${STATUS_LABELS[nextStatus]}?`,
         message: task.title,
         buttons: ["Cancel", "Move"],
+        default: "Cancel",
+        cancel: "Cancel",
+        style: "warning",
       });
       if (confirmed !== "Move") {
         this.render();
@@ -508,6 +541,69 @@ export class HermesProjectBoard {
     }
     this.pendingTaskId = null;
     this.render();
+  }
+
+  async resolveProject() {
+    this.activeProject = await resolveActiveProject(window.muxy);
+    return this.activeProject;
+  }
+
+  projectMappingState() {
+    const projectName = this.activeProject?.name ?? "Current project";
+    const mappedBoard = this.catalog.boards.find((candidate) => candidate.slug === this.mappedBoardValue);
+    const boardName = mappedBoard?.name ?? this.mappedBoardValue;
+    return h("p", { class: "board-project-mapping", role: "status" },
+      h("strong", null, `Project: ${projectName}`),
+      h("span", null, boardName ? `Mapped board: ${boardName}` : "No board mapped to this project"),
+    );
+  }
+
+  async restoreProjectMapping(project) {
+    const restored = await restoreProjectBoardMapping({
+      sessionBroker: this.sessionBroker,
+      projectID: project.id,
+      baseUrl: this.urlValue,
+      boards: this.catalog.boards,
+    });
+    this.mappedBoardValue = restored.board;
+    if (restored.stale) this.message = "That mapped board is no longer available. Choose another board.";
+    return restored.board;
+  }
+
+  async mapViewedBoard() {
+    if (!this.viewedBoardValue || !this.urlValue) return;
+    try {
+      const project = await this.resolveProject();
+      const saved = await this.sessionBroker.saveBoardMapping({
+        projectID: project.id,
+        baseUrl: this.urlValue,
+        board: this.viewedBoardValue,
+      });
+      if (!saved) throw new Error("Could not save this project board mapping.");
+      this.mappedBoardValue = this.viewedBoardValue;
+      this.message = `Mapped ${this.viewedBoardValue} to ${project.name}.`;
+    } catch (error) {
+      this.message = errorCopy(error);
+    }
+    this.render();
+  }
+
+  async recoverMissingMappedBoard(error) {
+    if (!(error instanceof KanbanClientError) || error.status !== 404
+      || !this.activeProject || this.mappedBoardValue !== this.viewedBoardValue) return false;
+    try {
+      await this.loadBoardCatalog();
+      if (this.catalog.boards.some((candidate) => candidate.slug === this.mappedBoardValue)) return false;
+      await this.sessionBroker.clearBoardMapping({ projectID: this.activeProject.id });
+      this.mappedBoardValue = null;
+      this.viewedBoardValue = null;
+      this.board = null;
+      this.boardValue = selectBoardSlug(this.catalog);
+      this.state = "board_picker";
+      this.message = "That mapped board is no longer available. Choose another board.";
+      return true;
+    } catch { /* retain the original request failure when catalog recovery fails */ }
+    return false;
   }
 
   handleActionError(error) {
@@ -530,7 +626,6 @@ export class HermesProjectBoard {
     const saved = await this.sessionBroker.readDashboard();
     if (!saved || this.state === "ready") return;
     this.urlValue = saved.baseUrl;
-    this.boardValue = saved.board;
     this.state = "restoring";
     this.message = "";
     this.render();
@@ -543,11 +638,18 @@ export class HermesProjectBoard {
       const client = new KanbanClient({ baseUrl: saved.baseUrl, session: auth });
       this.client?.release();
       this.client = client;
-      await this.loadBoardCatalog(saved.board);
+      const project = await this.resolveProject();
+      await this.loadBoardCatalog();
+      const mappedBoard = await this.restoreProjectMapping(project);
       this.board = null;
       this.state = "board_picker";
       await this.persistSession();
       await window.muxy?.tabs?.setTitle?.("Hermes Board");
+      if (mappedBoard) {
+        this.boardValue = mappedBoard;
+        await this.openBoard();
+        return;
+      }
     } catch (error) {
       this.client?.release();
       this.client = null;
@@ -563,7 +665,7 @@ export class HermesProjectBoard {
   async persistSession() {
     const auth = this.authSession?.exportSession();
     if (!auth || !this.urlValue) return;
-    await this.sessionBroker.saveDashboard({ baseUrl: this.urlValue, board: this.boardValue, auth });
+    await this.sessionBroker.saveDashboard({ baseUrl: this.urlValue, auth });
   }
 
   async verifySavedSession() {

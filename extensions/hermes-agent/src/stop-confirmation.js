@@ -8,6 +8,9 @@ export async function requestConfirmedStop({ confirm, canStop, stop }) {
       title: "Stop this Hermes run?",
       message: "Hermes will cancel the active run. Completed output remains visible.",
       buttons: ["Keep running", "Stop run"],
+      default: "Keep running",
+      cancel: "Keep running",
+      style: "warning",
     });
   } catch {
     return "confirmation_failed";

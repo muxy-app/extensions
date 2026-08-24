@@ -284,13 +284,17 @@ export class DashboardOperationsClient {
     // Keep authenticated reads sequential. Hermes may rotate Dashboard cookies
     // during any request near expiry; parallel refresh attempts could race and
     // leave the extension persisting an older member of the cookie family.
-    const requests = Object.freeze([
+    const requests = [
       ["health", { url: `${this.baseUrl}/api/status` }],
       ["jobs", { url: `${this.baseUrl}/api/cron/jobs?profile=all` }],
-      ["queue", { url: this.#pluginUrl("/stats") }],
-      ["workers", { url: this.#pluginUrl("/workers/active") }],
-      ["diagnostics", { url: this.#pluginUrl("/diagnostics") }],
-    ]);
+    ];
+    if (this.board) {
+      requests.push(
+        ["queue", { url: this.#pluginUrl("/stats") }],
+        ["workers", { url: this.#pluginUrl("/workers/active") }],
+        ["diagnostics", { url: this.#pluginUrl("/diagnostics") }],
+      );
+    }
     const results = {};
     for (const [key, request] of requests) {
       try {
@@ -322,10 +326,10 @@ export class DashboardOperationsClient {
     } catch { /* cron is optional on older or reduced Dashboard builds */ }
 
     try {
-      if (results.queue.status === "fulfilled") {
+      if (results.queue?.status === "fulfilled") {
         let workers = null;
         try {
-          if (results.workers.status === "fulfilled") {
+          if (results.workers?.status === "fulfilled") {
             workers = responseBody(results.workers.value, "workers_request_failed");
           }
         } catch { /* worker telemetry is optional enrichment for valid queue stats */ }
@@ -335,7 +339,7 @@ export class DashboardOperationsClient {
     } catch { /* Kanban is an optional Dashboard plugin */ }
 
     try {
-      if (results.diagnostics.status === "fulfilled") {
+      if (results.diagnostics?.status === "fulfilled") {
         diagnostics = normalizeDiagnosticCount(responseBody(results.diagnostics.value, "diagnostics_request_failed"));
         available.diagnostics = true;
       }
@@ -349,9 +353,11 @@ export class DashboardOperationsClient {
       failedJobs,
       total: (queue?.blocked ?? 0) + (queue?.review ?? 0) + diagnostics + failedJobs,
     });
-    const availableCount = Object.values(available).filter(Boolean).length;
+    const applicableCount = this.board ? 4 : 2;
+    const availableCount = (available.health ? 1 : 0) + (available.jobs ? 1 : 0)
+      + (this.board && available.queue ? 1 : 0) + (this.board && available.diagnostics ? 1 : 0);
     return Object.freeze({
-      state: availableCount === 0 ? "unavailable" : availableCount === Object.keys(available).length ? "ready" : "partial",
+      state: availableCount === 0 ? "unavailable" : availableCount === applicableCount ? "ready" : "partial",
       updatedAt: this.now(),
       queue,
       jobs,

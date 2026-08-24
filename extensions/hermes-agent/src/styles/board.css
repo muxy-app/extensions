@@ -219,6 +219,8 @@ button:disabled { cursor: default; opacity: 0.6; }
 
 .board-toolbar > div { display: grid; gap: var(--s1); min-width: 0; }
 .board-toolbar span { color: var(--muxy-foreground-muted); font-size: var(--font-footnote); }
+.board-project-mapping { display: grid; gap: var(--s1); margin: 0; color: var(--muxy-foreground-muted); font-size: var(--font-footnote); line-height: 1.35; }
+.board-project-mapping strong { color: var(--muxy-foreground); font-weight: 600; }
 .board-create-form {
   width: min(70vw, 760px);
   margin-left: auto;

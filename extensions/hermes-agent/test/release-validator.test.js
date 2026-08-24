@@ -9,6 +9,7 @@ test("production import graph contains only current Dashboard and Muxy modules",
   assert.deepEqual(graph, [
     "src/board-main.js",
     "src/board/app.js",
+    "src/board/mapping-restore.js",
     "src/curl-relay.js",
     "src/dashboard-agent.js",
     "src/dashboard-auth.js",
@@ -43,7 +44,7 @@ test("release validator owns clean-copy cleanup and never exposes command output
   assert.match(source, /throw new Error\(`\$\{label\}_failed:\$\{exitCode\}\$\{signal\}`\)/);
 });
 
-test("release documents define the immutable draft-only marketplace handoff", async () => {
+test("release documents define the immutable source-first marketplace handoff", async () => {
   const manifest = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
   const [changelog, releasing, readme] = await Promise.all([
     readFile(new URL("../CHANGELOG.md", import.meta.url), "utf8"),
@@ -54,7 +55,7 @@ test("release documents define the immutable draft-only marketplace handoff", as
   assert.match(changelog, /^# Changelog/m);
   assert.match(changelog, /^## \[?Unreleased\]?/m);
   assert.match(changelog, new RegExp(`^## \\[${manifest.version}\\]`, "m"));
-  for (const heading of ["Versioning", "Prepare a release", "Submit a draft marketplace pull request", "After upstream merge", "Rollback"]) {
+  for (const heading of ["Versioning", "Prepare a release", "Merge the source release first", "Submit a draft marketplace pull request", "After upstream merge", "Rollback"]) {
     assert.match(releasing, new RegExp(`^## ${heading}`, "m"));
   }
   assert.match(releasing, /package\.json.*version source/i);
@@ -63,6 +64,10 @@ test("release documents define the immutable draft-only marketplace handoff", as
   assert.match(releasing, /minor.*features.*permission.*deployment/i);
   assert.match(releasing, /hermes-agent@version.*immutable/i);
   assert.match(releasing, /hermes-agent-vX\.Y\.Z/);
+  assert.match(releasing, /source repository is the release source of truth/i);
+  assert.match(releasing, /exact merged source commit/i);
+  assert.match(releasing, /pushed to `gabeosx\/extensions`/i);
+  assert.match(releasing, /Do not commit or push directly to `muxy-app\/extensions`/i);
   assert.match(releasing, /No npm publish step/i);
   assert.match(releasing, /stops at a draft pull request/i);
   for (const command of ["npm test", "npm run validate", "npm run qualify", "npm ci", "node scripts/validate.mjs hermes-agent", "node scripts/pack.mjs --dry-run hermes-agent"]) {

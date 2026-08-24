@@ -150,7 +150,7 @@ export async function validateReleaseGovernance() {
 
   assert.match(changelog, /^## \[?Unreleased\]?/m, "changelog must contain Unreleased notes");
   assert.match(changelog, new RegExp(`^## \\[${manifest.version}\\]`, "m"), "changelog must cover the current package version");
-  for (const heading of ["Versioning", "Prepare a release", "Submit a draft marketplace pull request", "After upstream merge", "Rollback"]) {
+  for (const heading of ["Versioning", "Prepare a release", "Merge the source release first", "Submit a draft marketplace pull request", "After upstream merge", "Rollback"]) {
     assert.match(releasing, new RegExp(`^## ${heading}`, "m"), `release guide must include ${heading}`);
   }
   for (const contract of [
@@ -160,6 +160,10 @@ export async function validateReleaseGovernance() {
     /minor.*features.*permission.*deployment/i,
     /hermes-agent@version.*immutable/i,
     /hermes-agent-vX\.Y\.Z/,
+    /source repository is the release source of truth/i,
+    /exact merged source commit/i,
+    /pushed to `gabeosx\/extensions`/i,
+    /Do not commit or push directly to `muxy-app\/extensions`/i,
     /No npm publish step/i,
     /stops at a draft pull request/i,
     /npm test/,

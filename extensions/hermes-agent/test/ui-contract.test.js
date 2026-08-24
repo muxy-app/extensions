@@ -23,7 +23,7 @@ test("marketplace identity, metadata, and permissions are frozen", async () => {
       "assets/screenshots/screenshot-4.png",
     ],
   });
-  assert.deepEqual(manifest.muxy.permissions, ["commands:exec", "panels:write", "storage:read", "storage:write", "tabs:write"]);
+  assert.deepEqual(manifest.muxy.permissions, ["commands:exec", "panels:write", "projects:read", "storage:read", "storage:write", "tabs:write"]);
   for (const forbidden of ["background", "events", "scripts", "topbarItems", "statusbarItems"]) {
     assert.equal(Object.hasOwn(manifest.muxy, forbidden), false);
   }
@@ -111,4 +111,18 @@ test("native mutation controls provide compact empty states, global pending stat
   assert.match(board, /Add one or move a card here\./);
   assert.match(boardCss, /\.board-column-empty/);
   assert.match(boardCss, /scrollbar-gutter:\s*stable/);
+});
+
+test("the panel projects only the active project's mapped board", async () => {
+  const [panel, operations] = await Promise.all([
+    readFile(new URL("src/panel/app.js", root), "utf8"),
+    readFile(new URL("src/dashboard-operations.js", root), "utf8"),
+  ]);
+  assert.match(panel, /resolveActiveProject/);
+  assert.match(panel, /readBoardMapping/);
+  assert.match(panel, /Choose project board/);
+  assert.match(panel, /this\.operationsSnapshot = emptyOperationsSnapshot\(\)/);
+  assert.match(panel, /setBoard\(this\.boardValue\)/);
+  assert.match(operations, /if \(this\.board\) \{/);
+  assert.match(operations, /if \(this\.board\) \{[\s\S]*?\["queue", \{ url: this\.\#pluginUrl\("\/stats"\) \}\]/);
 });
