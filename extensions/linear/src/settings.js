@@ -230,11 +230,6 @@ async function main() {
       <label class="checkbox field"><input type="checkbox" id="list_show_parent" ${config.list_show_parent ? "checked" : ""} /> ${t("set.showParent")}</label>
       <label class="checkbox field"><input type="checkbox" id="list_show_actions" ${config.list_show_actions ? "checked" : ""} /> ${t("set.showActions")}</label>
       <label class="checkbox field"><input type="checkbox" id="show_branch_bar" ${config.show_branch_bar ? "checked" : ""} /> ${t("set.showBranchBar")}</label>
-
-      <hr class="sep" />
-      <h3 class="sec-title">${t("set.actions")}</h3>
-      <p class="hint" style="margin-top:0">${t("set.actionsHint")}</p>
-      <button id="edit-actions" style="width:100%">${t("set.openActions")}</button>
     `;
 
     // API 키 select
@@ -301,11 +296,6 @@ async function main() {
     });
 
     wireAgent("agent_select", "agent_command", false);
-
-    document.getElementById("edit-actions").addEventListener("click", async () => {
-      await muxy.modal.openWebview({ entry: "modals/actions.html", width: 560, height: 640 });
-      muxy.lifecycle.close();
-    });
   }
 
   function mkNewBranchOption(value) {
@@ -379,11 +369,6 @@ async function main() {
         <button id="link-unlink" class="mini" hidden>${t("link.unlink")}</button>
         <span class="spacer"></span>
       </div>
-
-      <hr class="sep" />
-      <h3 class="sec-title">${t("set.actions")}</h3>
-      <p class="hint" style="margin-top:0">${t("set.projActionsHint")}</p>
-      <button id="edit-actions" style="width:100%">${t("set.openActions")}</button>
     `;
 
     // API 키 선택 초기값
@@ -397,12 +382,6 @@ async function main() {
 
     // 에이전트 오버라이드(상속 옵션에 전역 에이전트 표기)
     wireAgent("p_agent_select", "p_agent_command", true, inheritedText(config.agent_command));
-
-    // 액션 편집(프로젝트 탭에서 전환)
-    document.getElementById("edit-actions").addEventListener("click", async () => {
-      await muxy.modal.openWebview({ entry: "modals/actions.html", width: 560, height: 640 });
-      muxy.lifecycle.close();
-    });
 
     wireProjectLink();
   }
