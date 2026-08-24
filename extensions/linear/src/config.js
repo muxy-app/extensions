@@ -38,6 +38,14 @@ export const CONFIG_DEFAULTS = {
   // Linear 이슈 Done→브랜치 정리)을 그대로 위임한다. 필요하면 수정 가능.
   finish_prompt_template: "/작업완료",
 
+  // 이슈 상세/새 이슈 생성을 여는 방식(설정 모달에서 선택) — KNK-109.
+  //  - "tab":   익스텐션 웹뷰 탭(풀 페이지). 기본값.
+  //  - "modal": 가운데 웹뷰 모달.
+  //  - "split": 내장 브라우저를 오른쪽 split 으로 열어 실제 Linear 페이지를 표시.
+  //             (익스텐션 웹뷰는 split API 가 없어, 상세는 issue.url 을 브라우저 split 으로 연다.
+  //              새 이슈 생성은 아직 URL 이 없어 split 대신 탭으로 폴백한다.)
+  issue_open_mode: "tab",
+
   // 목록 각 행에 무엇을 표시할지(설정에서 토글).
   list_show_state: true, // 상태 배지
   list_show_priority: false, // 우선순위
