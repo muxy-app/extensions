@@ -6,7 +6,8 @@ A per-project todo list for [Muxy](https://muxy.app). Every Muxy project keeps i
 
 - **Per-project data** — each project's tasks are stored under its own namespace (`todos:<projectID>`), persisted across restarts.
 - **Drag to reorder** — grab any row to rearrange; the order is saved. Incomplete tasks stay on top, completed ones sink to the bottom.
-- **Priorities** — right-click a row to set a priority (Highest / High / Medium / Low / Lowest), shown as a colored circle next to the text.
+- **Color tags** — right-click a row to pick any color from a palette (or clear it); shown as a colored circle next to the text. No preset priority levels — use color however you like.
+- **Notes & editing** — attach a multiline note when creating a task (paperclip toggle), and edit any task's title or note inline (pencil button, Enter to save, Esc to cancel).
 - **Fast entry** — type and press Enter (or click **Add**) to create a task; toggle the checkbox to complete, hover the row for delete.
 - **Clear completed** — one-click cleanup from the panel header (with confirmation).
 - **Theme native** — follows the app's light/dark themes and accent color; no hardcoded chrome colors.
