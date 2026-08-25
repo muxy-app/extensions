@@ -38,7 +38,7 @@ export async function buildGsdSnapshot(source, opts = {}) {
   const names = new Set(rootEntries.filter((e) => !e.isDirectory).map((e) => e.name));
   const dirs = new Set(rootEntries.filter((e) => e.isDirectory).map((e) => e.name));
   // `dated` marks timestamps read from artifact content; entries without one
-  // record when WE read the file ("now") and must never feed staleness math.
+  // record when WE read the file ("now") and must not masquerade as a file-change timestamp.
   const addEvidence = (path, observedAt) => {
     const iso = normalizeDateish(observedAt);
     evidence.push({ path, observedAt: iso ?? now, dated: !!iso });
@@ -93,7 +93,7 @@ export async function buildGsdSnapshot(source, opts = {}) {
     }
   }
 
-  // --- paused-handoff signals ----------------------------------------------
+  // --- paused-handoff markers ----------------------------------------------
   let paused = false;
   let nextAction;
   /** @type {string|undefined} */ let pauseDetail;
@@ -205,7 +205,6 @@ export async function buildGsdSnapshot(source, opts = {}) {
     },
     lastActivity: state?.lastActivity,
     lastActivityDesc: state?.lastActivityDesc,
-    blockers: state?.blockers ?? [],
     concerns: state?.concerns ?? [],
     verification,
     verificationDetail,
@@ -279,8 +278,6 @@ function compareNumbers(a, b) {
 function deriveNextAction(ctx) {
   const { state, paused, pauseDetail, phaseQueue, roadmap, verification } = ctx;
   if (paused) return pauseDetail ? `Resume paused work (${pauseDetail})` : "Resume paused work (.continue-here)";
-  if (state?.frontmatterStatus === "complete" || /^(complete|done)\b/i.test(state?.statusLine ?? ""))
-    return "Milestone complete — plan the next milestone";
   if (verification === "failed")
     return "Address the failed verification before proceeding";
   if (phaseQueue && phaseQueue.plansTotal > phaseQueue.plansSummarized) {
@@ -288,7 +285,6 @@ function deriveNextAction(ctx) {
   }
   const open = nextOpenPhase(roadmap.phases);
   if (open) return `Start Phase ${open.number}: ${open.name}`;
-  if (state?.planLabel && /^not started/i.test(state.planLabel)) return "Start the queued plan";
   return undefined;
 }
 
@@ -296,7 +292,6 @@ function deriveNextAction(ctx) {
 function emptySnapshot(extra, now) {
   return {
     recognized: false,
-    blockers: [],
     concerns: [],
     verification: "unknown",
     paused: false,

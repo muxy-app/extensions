@@ -13,7 +13,7 @@ const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 
 const PERMISSIONS = [
   "projects:read", "worktrees:read", "agents:read", "files:read", "git:read",
-  "panels:write", "storage:read", "storage:write", "projects:write", "worktrees:write",
+  "panels:write", "storage:read", "storage:write",
 ];
 const EVENTS = [
   "agent.status", "file.changed", "projects.changed", "project.switched",
@@ -23,18 +23,23 @@ const SCREENSHOTS = [
   "assets/screenshots/screenshot-1.png",
   "assets/screenshots/screenshot-2.png",
 ];
+const README_IMAGES = [
+  "assets/readme/active-project.png",
+  "assets/readme/phase-details.png",
+];
 
 function expectedMuxy() {
   return {
     $schema: "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
-    description: "See what every GSD workstream is doing, which agent needs you, and where to go next — without leaving Muxy.",
-    background: "background.js",
+    description: "Read GSD next steps, roadmap progress, and live agent activity across Muxy projects.",
     permissions: PERMISSIONS,
     events: EVENTS,
     marketplace: {
       author: "Gabe",
       categories: ["developer-tools", "productivity"],
       github: "gabeosx",
+      homepage: "https://github.com/gabeosx/muxy-gsd-control-tower",
+      repository: "https://github.com/gabeosx/muxy-gsd-control-tower",
       icon: "assets/icon.svg",
       screenshots: SCREENSHOTS,
     },
@@ -47,14 +52,13 @@ function expectedMuxy() {
       ],
     }],
     statusBarItems: [{
-      id: "attention", icon: { symbol: "circle.dashed" }, text: "",
-      tooltip: "GSD Control Tower — workstreams needing attention", side: "right", command: "toggle-tower",
+      id: "tower", icon: { symbol: "circle.dashed" }, text: "",
+      tooltip: "GSD Control Tower", side: "right", command: "toggle-tower",
     }],
     commands: [
       { id: "toggle-tower", title: "Control Tower: Toggle Panel", defaultShortcut: "cmd+shift+g", action: { kind: "togglePanel", panel: "control-tower" } },
       { id: "refresh-tower", title: "Control Tower: Refresh All Workstreams" },
       { id: "toggle-diagnostics", title: "Control Tower: Toggle Diagnostics View" },
-      { id: "focus-top-attention", title: "Control Tower: Reveal Top Attention Item", subtitle: "Highlights the highest-priority workstream in the open panel" },
     ],
   };
 }
@@ -118,6 +122,16 @@ async function validateListingAssets(base, declared = null) {
     );
     declared?.add(screenshot);
   }
+  for (const image of README_IMAGES) {
+    const path = resolve(base, image);
+    assert.ok(inside(base, path), `${image} escapes package`);
+    assert.deepEqual(
+      { width: pngInfo(await readFile(path)).width, height: pngInfo(await readFile(path)).height },
+      { width: 760, height: 475 },
+      `${image} must be exactly 760×475`,
+    );
+    declared?.add(image);
+  }
 }
 
 async function validateSchema(manifest) {
@@ -149,7 +163,7 @@ async function validateBuilt() {
   await validateSchema(source);
   await validateListingAssets(root);
 
-  const declared = new Set(["package.json", "background.js"]);
+  const declared = new Set(["package.json"]);
   await validateListingAssets(dist, declared);
   const panelEntry = resolve(dist, source.muxy.panels[0].entry);
   assert.ok(inside(dist, panelEntry) && (await stat(panelEntry)).isFile(), "panel entry missing");
@@ -160,7 +174,6 @@ async function validateBuilt() {
     assert.ok(inside(dist, assetPath) && (await stat(assetPath)).isFile(), `panel asset missing: ${asset}`);
     declared.add(relative(dist, assetPath));
   }
-  assert.ok((await stat(resolve(dist, source.muxy.background))).isFile(), "background entry missing");
   const files = await filesUnder(dist);
   assert.deepEqual(files, [...declared].sort(), "dist contains undeclared, missing, or exploratory files");
 

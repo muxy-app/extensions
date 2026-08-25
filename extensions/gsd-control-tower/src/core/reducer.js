@@ -90,7 +90,6 @@ function ensureWorkstream(state, project, worktree, isActive) {
     gsd: undefined,
     git: undefined,
     agent: { runtimeState: "unavailable" },
-    controlState: "idle",
     refreshedAt: new Date(0).toISOString(),
     freshness: "stale",
   };

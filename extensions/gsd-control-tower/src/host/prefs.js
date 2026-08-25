@@ -7,6 +7,7 @@ import { DEFAULT_PREFS } from "../core/selectors.js";
 
 const KEY = "prefs.v1";
 const MAX_HIDDEN_PROJECTS = 200;
+export const REFRESH_INTERVAL_OPTIONS = [0, 1, 5, 15, 30];
 
 /** @returns {Promise<typeof DEFAULT_PREFS>} */
 export async function loadPrefs() {
@@ -40,8 +41,8 @@ export async function resetPrefs() {
 /** Validate + clamp an arbitrary object into a safe prefs shape. */
 export function sanitizePrefs(raw) {
   const out = structuredClone(DEFAULT_PREFS);
-  if (Number.isFinite(raw.staleThresholdMinutes)) {
-    out.staleThresholdMinutes = Math.min(24 * 60, Math.max(5, Math.round(raw.staleThresholdMinutes)));
+  if (REFRESH_INTERVAL_OPTIONS.includes(raw.refreshIntervalMinutes)) {
+    out.refreshIntervalMinutes = raw.refreshIntervalMinutes;
   }
   if (typeof raw.openOnActiveProject === "boolean") out.openOnActiveProject = raw.openOnActiveProject;
   if (typeof raw.showNonGsd === "boolean") out.showNonGsd = raw.showNonGsd;
@@ -52,12 +53,16 @@ export function sanitizePrefs(raw) {
   }
   if (raw.filters && typeof raw.filters === "object") {
     if (typeof raw.filters.query === "string") out.filters.query = raw.filters.query.slice(0, 200);
-    if (Array.isArray(raw.filters.statuses))
-      out.filters.statuses = raw.filters.statuses.filter((s) => typeof s === "string").slice(0, 12);
-    if (Array.isArray(raw.filters.providers))
-      out.filters.providers = raw.filters.providers.filter((s) => typeof s === "string").slice(0, 20);
   }
   return out;
+}
+
+/** Whether the bounded cross-project planning/Git refresh interval has elapsed. */
+export function refreshDue(lastRefresh, intervalMinutes, now = Date.now()) {
+  if (!REFRESH_INTERVAL_OPTIONS.includes(intervalMinutes) || intervalMinutes === 0) return false;
+  const last = Date.parse(lastRefresh ?? "");
+  if (!Number.isFinite(last)) return true;
+  return now - last >= intervalMinutes * 60_000;
 }
 
 /**

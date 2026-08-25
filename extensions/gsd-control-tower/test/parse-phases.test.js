@@ -128,7 +128,7 @@ test("end-to-end: executing snapshot carries concerns, fresh activity, and the p
   // The decorative 100% bar must not read as complete…
   assert.notEqual(gsd.frontmatterStatus, "complete");
   // …the future-tense concern must not read as blocked…
-  assert.deepEqual(gsd.blockers, []);
+  assert.ok(Array.isArray(gsd.concerns));
   assert.equal(gsd.concerns.length, 1);
   // …and last_activity's midnight must lose to last_updated's full timestamp.
   assert.equal(gsd.lastActivity, "2026-08-22T23:16:40.159Z");

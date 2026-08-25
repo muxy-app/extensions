@@ -20,15 +20,9 @@ export default defineConfig({
     rollupOptions: {
       input: {
         panel: resolve(__dirname, "panel/index.html"),
-        // Emitted under a stable, un-hashed name so the manifest can point at it.
-        background: resolve(__dirname, "src/background/main.js"),
       },
       output: {
-        entryFileNames(chunk) {
-          return chunk.name === "background"
-            ? "background.js"
-            : "assets/[name]-[hash].js";
-        },
+        entryFileNames: "assets/[name]-[hash].js",
         chunkFileNames: "assets/[name]-[hash].js",
         assetFileNames: "assets/[name]-[hash][extname]",
       },

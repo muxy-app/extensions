@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "GSD Control Tower — read-first Muxy dashboard combining .planning/ workflow state with live, provider-neutral agent activity.",
+  "description": "Read-only Muxy panel for GSD next steps, roadmap progress, and agent activity.",
   "engines": {
     "node": ">=20"
   },
@@ -20,8 +20,7 @@
   },
   "muxy": {
     "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
-    "description": "See what every GSD workstream is doing, which agent needs you, and where to go next — without leaving Muxy.",
-    "background": "background.js",
+    "description": "Read GSD next steps, roadmap progress, and live agent activity across Muxy projects.",
     "permissions": [
       "projects:read",
       "worktrees:read",
@@ -30,9 +29,7 @@
       "git:read",
       "panels:write",
       "storage:read",
-      "storage:write",
-      "projects:write",
-      "worktrees:write"
+      "storage:write"
     ],
     "events": [
       "agent.status",
@@ -49,6 +46,8 @@
         "productivity"
       ],
       "github": "gabeosx",
+      "homepage": "https://github.com/gabeosx/muxy-gsd-control-tower",
+      "repository": "https://github.com/gabeosx/muxy-gsd-control-tower",
       "icon": "assets/icon.svg",
       "screenshots": [
         "assets/screenshots/screenshot-1.png",
@@ -81,10 +80,10 @@
     ],
     "statusBarItems": [
       {
-        "id": "attention",
+        "id": "tower",
         "icon": { "symbol": "circle.dashed" },
         "text": "",
-        "tooltip": "GSD Control Tower — workstreams needing attention",
+        "tooltip": "GSD Control Tower",
         "side": "right",
         "command": "toggle-tower"
       }
@@ -103,11 +102,6 @@
       {
         "id": "toggle-diagnostics",
         "title": "Control Tower: Toggle Diagnostics View"
-      },
-      {
-        "id": "focus-top-attention",
-        "title": "Control Tower: Reveal Top Attention Item",
-        "subtitle": "Highlights the highest-priority workstream in the open panel"
       }
     ]
   }

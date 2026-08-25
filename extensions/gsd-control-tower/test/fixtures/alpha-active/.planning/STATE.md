@@ -20,11 +20,11 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-18)
 
 **Core value:** Ship a trustworthy marketplace extension without expanding authority.
-**Current focus:** Phase 3 — Attention Queue Polish
+**Current focus:** Phase 3 — Status Queue Polish
 
 ## Current Position
 
-Phase: 3 of 4 — Attention Queue Polish
+Phase: 3 of 4 — Status Queue Polish
 Plan: Not started
 Status: Ready — Phase 2 passed verification; filters persisted
 Last activity: 2026-08-22 — Completed quick task 260822-lsk
@@ -52,4 +52,4 @@ None.
 ## Session Continuity
 
 Last session: 2026-08-22
-Resume file: `.planning/phases/03-attention-queue-polish/.continue-here.md`
+Resume file: `.planning/phases/03-status-queue-polish/.continue-here.md`

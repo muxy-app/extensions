@@ -68,13 +68,13 @@ const ROADMAP = `# Roadmap: demo
 - [x] **Phase 1: Inventory Foundation** - List projects and worktrees.
 - [x] **Phase 2: Parser Core** - Parse artifacts tolerantly.
 - [ ] **Phase 2.1: Urgent Fixture Fix** - Repair the decimal-phase gap.
-- [ ] **Phase 3: Attention Queue Polish** - Rank waiting first.
+- [ ] **Phase 3: Status Queue Polish** - Make waiting state clear.
 - [ ] **Phase 4: Ship** - Validate and document.
 
 ## Phase Details
 
-### Phase 3: Attention Queue Polish
-**Goal:** Rank waiting and blocked work first with explainable reasons.
+### Phase 3: Status Queue Polish
+**Goal:** Show waiting and failed-verification states with clear reasons.
 
 ### Phase 9: Detail-only phase
 **Goal:** Present only in details.
@@ -86,7 +86,7 @@ test("roadmap checklist parses integer + decimal phases", () => {
   assert.deepEqual(r.phases.map((p) => p.number), ["1", "2", "2.1", "3", "4"]);
   const p3 = r.phases.find((p) => p.number === "3");
   assert.equal(p3.done, false);
-  assert.match(p3.goal ?? "", /Rank waiting/);
+  assert.match(p3.goal ?? "", /Make waiting/);
 });
 
 test("nextOpenPhase returns first not-done in numeric order (decimal after int)", () => {

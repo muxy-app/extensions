@@ -6,28 +6,39 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+- Established `gabeosx/muxy-gsd-control-tower` as the project repository.
+- Rewrote the README around the current-project and All projects workflows.
+- Replaced synthetic listing artwork with genuine, sanitized native Muxy captures.
+- Tightened the marketplace description to the extension's actual read-only scope.
+
 ### Changed
-- No unreleased changes yet.
+- Simplified the panel and documentation around project progress, agent activity, permissions, and limitations.
+- Shows one alphabetical workstream list without Control Tower-derived priority or status signals.
+- Added a configurable cross-project planning/Git refresh interval (Manual, 1, 5, 15, or 30 minutes; 5 minutes by default). Agent status remains event-driven.
+- Raw GSD status text remains display-only; runtime, verification, next action, and parser errors remain separate recorded fields.
+- Phase rows now show optional workflow artifacts only when present and expanded; missing stages are never treated as incomplete.
+- Phase directories that contain artifacts but are not selected by `STATE.md` now show **Not current** instead of a blank status.
+- Progress display now uses roadmap checkboxes or declared phase counts instead of raw percentages.
 
 ## [0.1.0] - 2026-08-23
 
 ### Added
-- Control Tower panel with a ranked attention queue (waiting > blocked > unknown > stale > ready > working > idle), per-workstream detail, search + status/provider filters, diagnostics, and preferences.
-- Panel now **opens inside the active project** by default (Preferences > Open on active project) and shows a per-project view: milestone progress, next action, blockers vs concerns, agent activity, git context, provenance.
-- **Phase pipeline**: every phase from .planning/phases/ + ROADMAP with rollup status (Complete / In progress / Underway / Queued / Paused / Blocked) and stage chips - discuss / research / ui spec / patterns / plan / execute n/m / verify / review / security / validation; rows expand for goal and details.
+- Control Tower panel with project details, search, diagnostics, and preferences.
+- Panel opens inside the active project by default and shows milestone progress, next action, planning notes, agent activity, repository context, and source files.
+- **Phase evidence view**: phases from `.planning/phases/` and ROADMAP with explicit Current / Planned / Complete / Paused / Verification failed labels; optional artifact chips appear only in expanded rows.
 - Breadcrumb navigation with explicit Back affordances on every non-list surface.
-- GSD parsers: STATE.md (blockers-vs-concerns classification, freshest-timestamp activity), ROADMAP checklist + decimal phases, phase directories, VERIFICATION/HANDOFF/.continue-here/MILESTONES layouts.
-- Status-bar attention item + background hub; palette commands and Cmd+Shift+G.
+- GSD parsers: STATE.md (display-only Blockers/Concerns notes, freshest-timestamp activity), ROADMAP checklist + decimal phases, phase directories, VERIFICATION/HANDOFF/.continue-here/MILESTONES layouts.
+- Static status-bar launcher, palette commands, and Cmd+Shift+G.
 
 ### Fixed
-- Project detail view crashed on projects with evidence entries (spread of a number), leaving the panel blank with no way back; render is now fail-safe.
-- Deferred concern notes under Blockers/Concerns no longer mark a workstream Blocked; only an explicit blocked status or failed verification does.
-- Activity timestamps prefer full ISO last_updated over date-only values; undated evidence no longer resets staleness.
-- Mid-flight workflows (executing/planning/...) no longer surface as Ready merely because a next action exists.
+- Fixed a blank project detail view when planning sources were present.
+- Blockers/Concerns prose and raw STATE status text are never interpreted as priority or completion.
+- Activity timestamps prefer full ISO `last_updated` over date-only values; undated evidence is never shown as a file-change time.
+- Next-action and completion displays use structured next actions, phase checklists, and counts instead of status words.
 
 ### Changed
-- Agent activity is now explicitly labeled as covering **Muxy-hosted agents only**; external terminal CLIs (Codex CLI outside Muxy, DeepSeek Harness, plain Claude Code in Terminal) are invisible to Muxy's agent APIs, and the panel says so instead of showing an unexplained empty block.
+- Agent activity now clearly indicates when no session is active in Muxy.
 
 ### Security
-- Read-first permission posture enforced by build validation; forbidden permissions fail the build.
-- Release validation now freezes the marketplace surface, rejects secrets and personal paths, proves clean-copy deterministic builds, and requires zero high/critical dependency vulnerabilities.
+- Build validation enforces the extension's permission policy.
+- Automated release checks cover credentials, private paths, vulnerable dependencies, and reproducible builds.

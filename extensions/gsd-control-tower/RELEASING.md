@@ -2,6 +2,8 @@
 
 This guide prepares a reviewable Muxy marketplace contribution. It does not publish to npm or publish an extension to the Muxy store.
 
+The canonical standalone source repository is `https://github.com/gabeosx/muxy-gsd-control-tower`. Keep the reviewed extension source at its repository root; the upstream marketplace fork is only a submission transport.
+
 ## Versioning
 
 `package.json` is the version source. The root package version in `package-lock.json` must match it before release preparation starts.
@@ -29,7 +31,7 @@ Published `gsd-control-tower@version` pairs are immutable. Never rebuild an exis
 
 ## Prepare the marketplace source
 
-Use a partial sparse checkout of the authenticated `gabeosx/extensions` fork, based on current `muxy-app/extensions/main`. Copy the reviewed source to `extensions/gsd-control-tower`.
+Start from a clean, tagged commit in `gabeosx/muxy-gsd-control-tower`. Use a partial sparse checkout of the authenticated `gabeosx/extensions` fork, based on current `muxy-app/extensions/main`, and copy that reviewed source to `extensions/gsd-control-tower`.
 
 Retain `panel/`, `assets/`, `src/`, `scripts/`, `test/fixtures/`, reviewer-useful tests, `package.json`, `package-lock.json`, Vite configuration, documentation, `.gitignore`, and the nested `.github/workflows/ci.yml`. The nested workflow is review evidence only; GitHub does not activate it from below the repository-root workflow directory.
 

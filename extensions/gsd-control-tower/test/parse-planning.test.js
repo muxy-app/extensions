@@ -12,7 +12,7 @@ test("alpha-active: full snapshot with phase dir, queue, and explicit next actio
   assert.equal(gsd.milestone, "v1.1");
   assert.equal(gsd.milestoneName, "Marketplace Beta Hardening");
   assert.equal(gsd.phaseNumber, "3");
-  assert.equal(gsd.phaseDir, "03-attention-queue-polish");
+  assert.equal(gsd.phaseDir, "03-status-queue-polish");
   assert.deepEqual(gsd.phaseQueue, { plansTotal: 1, plansSummarized: 0 });
   assert.equal(gsd.verification, "unknown"); // phase 3 has no verification file yet
   assert.equal(gsd.paused, false);
@@ -39,14 +39,12 @@ test("alpha-active: phase pipeline merges dirs with roadmap and flags the curren
   assert.equal(gsd.phases.find((p) => p.number === "4").dir, "");
 });
 
-test("beta-complete: complete milestone keeps blockers and derives milestone-complete action", async () => {
+test("beta-complete: raw complete status is display-only and prose remains notes", async () => {
   const { recognized, gsd } = await buildGsdSnapshot(fsSource(join(FIXTURES, "beta-complete")));
   assert.equal(recognized, true);
   assert.equal(gsd.frontmatterStatus, "complete");
-  // Status says complete → bullets are concerns, not active blockers.
-  assert.deepEqual(gsd.blockers, []);
   assert.equal(gsd.concerns.length, 2);
-  assert.match(gsd.nextAction ?? "", /next milestone/i);
+  assert.equal(gsd.nextAction, undefined);
 });
 
 test("gamma-broken: .planning present without STATE.md → recognized but errors recorded", async () => {
@@ -84,7 +82,7 @@ test("paused continue-here at root drives nextAction", async () => {
   assert.match(gsd.nextAction ?? "", /Resume paused work \(task 2 of 4\)/);
 });
 
-test("failed verification outranks plan execution in nextAction", async () => {
+test("failed verification becomes the recorded next action before plan execution", async () => {
   const files = new Map([
     [".planning/STATE.md", "---\nstatus: active\n---\n\n## Current Position\n\nPhase: 1 of 2 — Core\n"],
     [".planning/phases/01-core/01-01-PLAN.md", "# Plan\n"],

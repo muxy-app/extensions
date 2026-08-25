@@ -3,11 +3,8 @@
  * Tolerant of unknown headings/fields (FR-013); every claim records its
  * source path (FR-012); problems become warnings, never thrown (FR-014).
  *
- * Blocker semantics (validated on real projects): the GSD heading is
- * "Blockers/Concerns" and it accumulates long-lived *notes* ("needs a Windows
- * machine later") that must not read as an active blocker. Bullets are
- * therefore surfaced as `concerns`; they only become `blockers` when the
- * artifact's own status text says blocked.
+ * The GSD heading is "Blockers/Concerns", but its bullets are untyped prose.
+ * They are surfaced as notes and never used to derive criticality.
  */
 import { splitFrontmatter } from "../frontmatter.js";
 import { BOUNDS } from "../types.js";
@@ -23,8 +20,6 @@ import { BOUNDS } from "../types.js";
  * @property {string} [lastActivity]       Freshest date across body/frontmatter
  * @property {string} [lastActivityDesc]   Free-text tail after the em dash
  * @property {number} [percent]
- * @property {boolean} explicitlyBlocked   Status text explicitly says blocked
- * @property {string[]} blockers           Only when explicitlyBlocked
  * @property {string[]} concerns           Every bullet under Blockers/Concerns
  * @property {Record<string, any>} progress
  * @property {string[]} warnings
@@ -79,10 +74,8 @@ export function parseStateMd(text, sourcePath = ".planning/STATE.md") {
       ? fm.current_phase_name.trim()
       : undefined);
 
-  // --- blockers vs concerns ------------------------------------------------
-  const bullets = parseBlockers(blockersSection);
-  const statusText = `${typeof fm.status === "string" ? fm.status : ""} ${statusLine ?? ""}`;
-  const explicitlyBlocked = /\bblock(?:ed|ing)\b/i.test(statusText);
+  // "Blockers/Concerns" is a prose section, so preserve it for display only.
+  const bullets = parseConcernNotes(blockersSection);
 
   return {
     frontmatter: fm,
@@ -98,8 +91,6 @@ export function parseStateMd(text, sourcePath = ".planning/STATE.md") {
     ]),
     lastActivityDesc,
     percent: typeof fm.progress?.percent === "number" ? fm.progress.percent : percent,
-    explicitlyBlocked,
-    blockers: explicitlyBlocked ? bullets : [],
     concerns: bullets,
     progress: isPlainObject(fm.progress) ? fm.progress : {},
     warnings: warnings.slice(0, BOUNDS.maxWarnings),
@@ -144,7 +135,7 @@ function matchLabeledLine(section, re) {
 }
 
 /** Bullets under a section; "None." ⇒ []. Callers classify blocker vs concern. */
-export function parseBlockers(section) {
+export function parseConcernNotes(section) {
   if (!section) return [];
   const out = [];
   for (const raw of section.split("\n")) {
@@ -157,7 +148,7 @@ export function parseBlockers(section) {
     text = text.replace(/\s+/g, " ");
     out.push(text);
   }
-  return out.slice(0, BOUNDS.maxBlockers);
+  return out.slice(0, BOUNDS.maxNotes);
 }
 
 /** Normalize date-ish strings: ISO timestamps pass through; `YYYY-MM-DD` → midnight UTC ISO. */

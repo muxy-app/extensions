@@ -69,7 +69,6 @@ export function seedWorkstream(state, { projectId = "p1", projectName = "project
     gsd,
     agent: agent ?? { runtimeState: "unavailable" },
     git,
-    controlState: "idle",
     refreshedAt: new Date().toISOString(),
     freshness: "refreshed",
   });

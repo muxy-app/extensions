@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseStateMd, extractSection, parseBlockers, normalizeDateish } from "../src/core/gsd/parse-state.js";
+import { parseStateMd, extractSection, parseConcernNotes, normalizeDateish } from "../src/core/gsd/parse-state.js";
 import { BOUNDS } from "../src/core/types.js";
 
 const ACTIVE = `---
@@ -86,30 +86,34 @@ test("parses the active/milestone STATE.md shape", () => {
   // Freshest timestamp wins: full ISO last_updated beats the date-only body line.
   assert.equal(r.lastActivity, "2026-08-22T19:41:28.892Z");
   assert.equal(r.lastActivityDesc, "Completed quick task");
-  assert.deepEqual(r.blockers, []);
   assert.deepEqual(r.concerns, []);
   assert.equal(r.progress.total_phases, 7);
   assert.equal(r.percent, 75);
 });
 
-test("parses complete state with blockers and progress-bar fallback", () => {
+test("parses complete state with planning notes and progress-bar fallback", () => {
   const r = parseStateMd(COMPLETE_WITH_BLOCKERS);
   assert.equal(r.frontmatter.status, "complete");
   assert.equal(r.phaseNumber, "3");
   assert.equal(r.phaseName, "Owner Review and Terminal Decision");
   assert.equal(r.percent, 100); // frontmatter wins; bar agrees
   // Status says complete → these bullets are concerns, not active blockers.
-  assert.deepEqual(r.blockers, []);
   assert.equal(r.concerns.length, 2);
   assert.match(r.concerns[0], /readability gate failed/);
 });
 
-test("explicit blocked status promotes concern bullets into blockers", () => {
+test("status prose never promotes Blockers/Concerns notes into criticality", () => {
   const r = parseStateMd(BLOCKED_STATE);
-  assert.equal(r.explicitlyBlocked, true);
-  assert.equal(r.blockers.length, 2);
-  assert.match(r.blockers[0], /waiting on API credentials/i);
   assert.equal(r.concerns.length, 2);
+  assert.match(r.concerns[0], /waiting on API credentials/i);
+});
+
+test("all raw status text is display-only", () => {
+  for (const status of ["Blocked", "Not blocked", "Ready — blocking work completed", "Active with blocked tasks resolved"]) {
+    const parsed = parseStateMd(`---\nstatus: active\n---\n\n## Current Position\n\nStatus: ${status}\n\n### Blockers/Concerns\n\n- Historical note only\n`);
+    assert.deepEqual(parsed.concerns, ["Historical note only"], status);
+    assert.equal(parsed.statusLine, status);
+  }
 });
 
 test("missing frontmatter and position section produce warnings, not throws", () => {
@@ -127,10 +131,10 @@ test("extractSection stops at same-or-higher headings", () => {
   assert.doesNotMatch(a, /content-b/);
 });
 
-test("parseBlockers skips None variants and enumerations", () => {
+test("parseConcernNotes skips None variants and accepts bullet styles", () => {
   const section = "- None.\n- Real blocker one\n* Real blocker two\n1. Numbered blocker\nplain line\n";
-  const blockers = parseBlockers(section);
-  assert.deepEqual(blockers, [
+  const notes = parseConcernNotes(section);
+  assert.deepEqual(notes, [
     "Real blocker one",
     "Real blocker two",
     "Numbered blocker",
@@ -161,10 +165,10 @@ Plan: 1 of 8
   assert.equal(r.planLabel, "1 of 8");
 });
 
-test("large artifacts and excessive blocker evidence stay bounded", () => {
-  const bullets = Array.from({ length: BOUNDS.maxBlockers + 30 }, (_, i) => `- blocker ${i}`).join("\n");
+test("large artifacts and excessive prose notes stay bounded", () => {
+  const bullets = Array.from({ length: BOUNDS.maxNotes + 30 }, (_, i) => `- note ${i}`).join("\n");
   const text = `---\nstatus: blocked\n---\n\n## Current Position\n\nStatus: Blocked\n\n### Blockers/Concerns\n\n${bullets}\n${"x".repeat(BOUNDS.maxArtifactChars)}`;
   const parsed = parseStateMd(text);
-  assert.equal(parsed.blockers.length, BOUNDS.maxBlockers);
+  assert.equal(parsed.concerns.length, BOUNDS.maxNotes);
   assert.ok(parsed.warnings.some((warning) => warning.includes("truncated")));
 });

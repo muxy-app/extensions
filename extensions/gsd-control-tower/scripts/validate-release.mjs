@@ -13,7 +13,7 @@ const run = promisify(execFile);
 const root = resolve(import.meta.dirname, "..");
 const dist = resolve(root, "dist");
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
-const ENTRYPOINTS = ["src/main.js", "src/background/main.js"];
+const ENTRYPOINTS = ["src/main.js"];
 const EXCLUDED_COPY_ROOTS = new Set([
   ".git", ".research", ".agents", ".planning", ".qualification", ".gsd", "dist", "node_modules", ".npm-cache",
 ]);
@@ -131,6 +131,8 @@ export async function validateReleaseGovernance() {
   assert.equal(lock.packages?.[""]?.version, manifest.version, "root lockfile version must match package.json");
   assert.equal(Object.keys(manifest.dependencies ?? {}).length, 0, "runtime dependencies are forbidden");
   assert.equal(Object.keys(manifest.scripts ?? {}).some((name) => /^(?:prepublish|prepublishOnly|publish|postpublish)$/.test(name)), false, "npm publication lifecycle scripts are forbidden");
+  assert.equal(manifest.muxy?.marketplace?.repository, "https://github.com/gabeosx/muxy-gsd-control-tower", "marketplace source repository changed");
+  assert.equal(manifest.muxy?.marketplace?.homepage, "https://github.com/gabeosx/muxy-gsd-control-tower", "marketplace homepage changed");
   assert.match(changelog, /^## \[?Unreleased\]?/m);
   assert.match(changelog, new RegExp(`^## \\[${manifest.version}\\]`, "m"));
   for (const heading of ["Versioning", "Prepare a release", "Prepare the marketplace source", "After upstream merge", "Rollback"]) {
@@ -148,14 +150,14 @@ export async function validateReleaseGovernance() {
   ]) assert.match(releasing, contract, "release guide lacks a required immutable-release contract");
   assert.match(readme, /Muxy 1\.5\.0 \(945\)/);
   assert.match(readme, /gsd_state_version: 1\.0/);
-  assert.match(readme, /SSH workspaces are not qualified/);
+  assert.match(readme, /Remote workspaces are not supported/);
 
   const workflows = (await readdir(resolve(root, ".github/workflows"))).filter((file) => /\.ya?ml$/.test(file));
   assert.deepEqual(workflows, ["ci.yml"], "one bounded CI workflow is allowed");
   assert.match(workflow, /^permissions:\n  contents: read$/m);
   assert.equal([...workflow.matchAll(/^\s*permissions:/gm)].length, 1, "job-level permissions are forbidden");
-  assert.match(workflow, /actions\/checkout@11bd71901bbe5b1630ceea73d27597364c9af683\s+# v4/);
-  assert.match(workflow, /actions\/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020\s+# v4/);
+  assert.match(workflow, /actions\/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09\s+# v5/);
+  assert.match(workflow, /actions\/setup-node@a0853c24544627f65ddf259abe73b1d18a591444\s+# v5/);
   for (const command of ["npm ci", "npm test", "npm run validate"]) assert.ok(workflow.includes(command), `CI must run ${command}`);
   assert.doesNotMatch(workflow, /secrets\.|permissions:\s*write|npm publish|\bdeploy\b/i, "CI must not receive secrets or publication authority");
   return Object.freeze({ version: manifest.version });

@@ -1,15 +1,36 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ControlTowerApp } from "../src/panel/app.js";
+import { ControlTowerApp, countLabel, phaseStatusOf } from "../src/panel/app.js";
 import { initialState } from "../src/core/reducer.js";
 
 function bareApp() {
   const app = new ControlTowerApp(null);
   app.render = () => {};
-  app.publishCounts = () => {};
   app.maybeAutoFocusActiveProject = () => {};
   return app;
 }
+
+test("header counts use singular and plural labels", () => {
+  assert.equal(countLabel(1, "workstream"), "1 workstream");
+  assert.equal(countLabel(0, "workstream"), "0 workstreams");
+});
+
+test("phase labels stay explicit when artifacts and STATE.md disagree", () => {
+  const base = {
+    dir: "03-two-route-mission-spine",
+    done: false,
+    pausedMarker: false,
+    isCurrent: false,
+    verification: "unknown",
+  };
+
+  assert.equal(phaseStatusOf(base).label, "Not current");
+  assert.equal(phaseStatusOf({ ...base, dir: "" }).label, "Planned");
+  assert.equal(phaseStatusOf({ ...base, isCurrent: true }).label, "Current");
+  assert.equal(phaseStatusOf({ ...base, pausedMarker: true, isCurrent: true }).label, "Paused");
+  assert.equal(phaseStatusOf({ ...base, done: true, isCurrent: true }).label, "Complete");
+  assert.equal(phaseStatusOf({ ...base, verification: "failed", done: true }).label, "Verification failed");
+});
 
 test("refresh requests coalesce into one follow-up while a refresh is in flight", async () => {
   const app = bareApp();
@@ -32,21 +53,23 @@ test("refresh requests coalesce into one follow-up while a refresh is in flight"
   assert.equal(app.refreshing, false);
 });
 
-test("extension.snapshot promise rejections become bounded diagnostics", async () => {
+test("automatic cross-project refresh follows the user interval and never polls agents", () => {
   const app = bareApp();
-  app.state = initialState();
-  app.currentRows = () => [];
-  app.updateStatusBar = () => {};
-  const previous = globalThis.muxy;
-  globalThis.muxy = { events: { emit: () => Promise.reject(new Error("background unavailable")) } };
-  try {
-    ControlTowerApp.prototype.publishCounts.call(app);
-    await new Promise((resolve) => setImmediate(resolve));
-    assert.equal(app.state.diagnostics.errors.length, 1);
-    assert.match(app.state.diagnostics.errors[0].message, /extension\.snapshot: background unavailable/);
-  } finally {
-    globalThis.muxy = previous;
-  }
+  let refreshes = 0;
+  app.fullRefresh = () => { refreshes += 1; };
+  app.state.diagnostics.lastFullRefresh = "2026-08-24T00:54:00Z";
+  app.prefs = { refreshIntervalMinutes: 5 };
+  assert.equal(app.maybeAutoRefresh(Date.parse("2026-08-24T01:00:00Z")), true);
+  assert.equal(refreshes, 1);
+
+  app.prefs = { refreshIntervalMinutes: 0 };
+  assert.equal(app.maybeAutoRefresh(Date.parse("2026-08-24T02:00:00Z")), false);
+  assert.equal(refreshes, 1);
+
+  app.prefs = { refreshIntervalMinutes: 5 };
+  app.refreshing = true;
+  assert.equal(app.maybeAutoRefresh(Date.parse("2026-08-24T02:00:00Z")), false);
+  assert.equal(refreshes, 1);
 });
 
 test("worktree permission failures are explicit instead of silent empty inventory", async () => {
@@ -70,7 +93,7 @@ test("worktree permission failures are explicit instead of silent empty inventor
   try {
     assert.equal(await app.performFullRefresh(), true);
     const row = app.state.workstreams.get("p1::root");
-    assert.match(row.inventoryWarning, /Worktree inventory unavailable/);
+    assert.equal(row.inventoryWarning, "Project details unavailable");
     assert.ok(app.state.diagnostics.errors.some((entry) => entry.context === "inventory"));
     assert.equal(app.state.diagnostics.permissionProbes["worktrees.list"], false);
   } finally {
