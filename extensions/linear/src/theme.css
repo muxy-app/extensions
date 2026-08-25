@@ -4,7 +4,8 @@
   --gap: 8px;
   --radius: 8px;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
-  font-size: 13px;
+  /* Muxy 확장 UI 가이드의 본문 기본 크기(12px)에 맞춘다. */
+  font-size: 12px;
 }
 
 * { box-sizing: border-box; }

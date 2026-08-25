@@ -9,7 +9,7 @@ Muxy 안에서 Linear 이슈를 보고, 클릭 한 번으로 브랜치·worktree
 ## 1️⃣ 빌드 & 로드
 
 ```bash
-cd linear
+cd extensions/linear
 npm install
 npm run build     # dist/ 생성 (package.json 자동 복사)
 ```
@@ -18,7 +18,7 @@ npm run build     # dist/ 생성 (package.json 자동 복사)
 
 ![설치와 로드 4단계](./images/setup-load.svg)
 
-1. **Extensions** 모달 → **Load Unpacked** → 빌드된 **`linear/dist`** 폴더 선택 (Muxy가 로드하는 자립형 출력물)
+1. **Extensions** 모달 → **Load Unpacked** → 빌드된 **`extensions/linear/dist`** 폴더 선택 (Muxy가 로드하는 자립형 출력물)
 2. 목록의 `linear`를 **활성화(enable)** — 확장은 기본이 꺼짐 상태입니다
 3. 패널 열기: topbar의 Linear 아이콘 또는 팔레트(`⌘⇧P`)에서 `Linear: Toggle Sidebar`
 
