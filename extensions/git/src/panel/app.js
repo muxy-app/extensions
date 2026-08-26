@@ -10,12 +10,17 @@ import { renderBranchSwitcher, renderBranchTab } from "@/panel/branch";
 import { renderHistoryTab } from "@/panel/history";
 import { renderPrsTab } from "@/panel/prs";
 import { renderActionsTab } from "@/panel/actions";
+import { loadCache } from "@/lib/cache";
 const TAB_KEY = "muxy.git.panel.tab";
 const FILTER_KEY = "muxy.git.prs.filter";
 const PR_CACHE_KEY = "muxy.git.prs.cache";
+const STATUS_CACHE_KEY = "muxy.git.status.cache";
+const GRAPH_CACHE_KEY = "muxy.git.graph.cache";
 const WORKTREE_DIR_KEY = "muxy.git.worktree.dir";
 const RUN_FILTER_KEY = "muxy.git.runs.filter";
 const PAGE = 50;
+const LIST_STEP = 250;
+const PERSIST_FILE_LIMIT = 2000;
 const PR_LIMIT = 50;
 const RUN_LIMIT = 30;
 function emptyCreateForm() {
@@ -110,12 +115,16 @@ export class GitPanelApp {
     baseBranches = [];
     worktreeForm = null;
     refreshId = 0;
-    statusCache = new Map();
+    statusCache = loadCache(STATUS_CACHE_KEY);
     pendingSwitch = false;
     reconcileTimer = null;
+    reconciling = false;
+    reconcileQueued = false;
     graphCommits = [];
     graphLoadId = 0;
-    graphCache = new Map();
+    graphCache = loadCache(GRAPH_CACHE_KEY);
+    listLimits = new Map();
+    renderFrame = 0;
     disposers = [];
     constructor(root) {
         this.root = root;
@@ -128,16 +137,17 @@ export class GitPanelApp {
             void this.hydratePrList();
         if (this.tab === "actions")
             void this.loadRunList(false);
+        const onScopeChange = () => {
+            void this.switchScope();
+            void this.resetGraph(false);
+            this.reloadPrListOnScopeChange();
+        };
         this.disposers = [
-            muxy.events.subscribe("project.switched", () => void this.switchScope()),
-            muxy.events.subscribe("worktree.switched", () => void this.switchScope()),
+            muxy.events.subscribe("project.switched", onScopeChange),
+            muxy.events.subscribe("worktree.switched", onScopeChange),
             muxy.events.subscribe("file.changed", () => this.reconcile()),
             muxy.events.subscribe("command.refresh-scm", () => this.runRefresh()),
             muxy.events.subscribe("command.open-repository", () => void this.openRepoInBrowser()),
-            muxy.events.subscribe("project.switched", () => void this.resetGraph(false)),
-            muxy.events.subscribe("worktree.switched", () => void this.resetGraph(false)),
-            muxy.events.subscribe("project.switched", () => this.reloadPrListOnScopeChange()),
-            muxy.events.subscribe("worktree.switched", () => this.reloadPrListOnScopeChange()),
             onBusyChange((busy) => {
                 if (busy || !this.pendingSwitch)
                     return;
@@ -151,8 +161,18 @@ export class GitPanelApp {
             dispose();
         if (this.reconcileTimer)
             clearTimeout(this.reconcileTimer);
+        if (this.renderFrame)
+            cancelAnimationFrame(this.renderFrame);
     }
     render() {
+        if (this.renderFrame)
+            return;
+        this.renderFrame = requestAnimationFrame(() => {
+            this.renderFrame = 0;
+            this.renderNow();
+        });
+    }
+    renderNow() {
         const active = document.hasFocus() ? document.activeElement : null;
         const focusKey = active?.getAttribute?.("data-focus-key");
         const selStart = focusKey ? active.selectionStart : null;
@@ -252,10 +272,19 @@ export class GitPanelApp {
     }
     async loadLocal(withPr, fresh = false) {
         const id = ++this.refreshId;
+        const statusPromise = scm.status({ fresh });
+        statusPromise.catch(() => undefined);
         const scope = await repoScope();
+        if (this.repo.kind === "loading" && this.refreshId === id) {
+            const cached = scope ? this.statusCache.get(scope) : undefined;
+            if (cached?.kind === "ready") {
+                this.repo = cached;
+                this.render();
+            }
+        }
         let next;
         try {
-            const status = toViewStatus(await scm.status({ fresh }));
+            const status = toViewStatus(await statusPromise);
             const prev = scope ? this.statusCache.get(scope) : undefined;
             if (prev?.kind === "ready" && prev.status.branch === status.branch) {
                 status.pullRequest = prev.status.pullRequest;
@@ -268,13 +297,19 @@ export class GitPanelApp {
         }
         if (this.refreshId !== id)
             return;
-        if (scope)
-            this.statusCache.set(scope, next);
+        this.storeStatus(scope, next);
         this.repo = next;
         this.switching = false;
         this.render();
         if (withPr && next.kind === "ready")
             void this.resolvePr(scope, next.status.branch);
+    }
+    storeStatus(scope, state) {
+        if (!scope)
+            return;
+        const keep = state.kind === "ready"
+            && state.status.staged.length + state.status.unstaged.length <= PERSIST_FILE_LIMIT;
+        this.statusCache.set(scope, state, keep);
     }
     async stage(paths) {
         return this.applyStaging(paths, "unstaged", "staged", () => scm.stage(paths), "stage");
@@ -646,8 +681,7 @@ export class GitPanelApp {
             const next = [...this.graphCommits, ...batch];
             this.graphCommits = next;
             const hasMore = batch.length === PAGE;
-            if (scope)
-                this.graphCache.set(scope, { commits: next, hasMore });
+            this.storeGraph(scope, next, hasMore);
             this.publishGraph(next, hasMore, false);
         }
         catch {
@@ -754,8 +788,7 @@ export class GitPanelApp {
         if (this.repo.kind !== "ready" || this.repo.status.branch !== branch)
             return;
         this.repo = { kind: "ready", status: { ...this.repo.status, pullRequest: pr } };
-        if (scope)
-            this.statusCache.set(scope, this.repo);
+        this.storeStatus(scope, this.repo);
         this.render();
     }
     async refreshCurrentPr() {
@@ -799,6 +832,23 @@ export class GitPanelApp {
         }, 250);
     }
     async reconcileNow() {
+        if (this.reconciling) {
+            this.reconcileQueued = true;
+            return;
+        }
+        this.reconciling = true;
+        try {
+            await this.reconcileFetch();
+        }
+        finally {
+            this.reconciling = false;
+            if (this.reconcileQueued) {
+                this.reconcileQueued = false;
+                this.reconcile();
+            }
+        }
+    }
+    async reconcileFetch() {
         const id = ++this.refreshId;
         const scope = await repoScope();
         let next;
@@ -819,8 +869,7 @@ export class GitPanelApp {
         }
         if (this.refreshId !== id)
             return;
-        if (scope)
-            this.statusCache.set(scope, next);
+        this.storeStatus(scope, next);
         this.repo = next;
         this.render();
         if (branchChanged && next.kind === "ready")
@@ -871,6 +920,18 @@ export class GitPanelApp {
         this.graph = { rows: computeLanes(commits), hasMore, loading };
         this.render();
     }
+    storeGraph(scope, commits, hasMore) {
+        if (!scope)
+            return;
+        this.graphCache.set(scope, { commits, hasMore }, commits.length <= PAGE);
+    }
+    listLimit(id) {
+        return this.listLimits.get(id) ?? LIST_STEP;
+    }
+    raiseListLimit(id) {
+        this.listLimits.set(id, this.listLimit(id) + LIST_STEP);
+        this.render();
+    }
     async fetchGraphPage(skip, fresh = false) {
         const batch = await scm.log({ maxCount: PAGE, skip, fresh });
         return batch.map(toCommitNode);
@@ -879,8 +940,10 @@ export class GitPanelApp {
         const id = ++this.graphLoadId;
         const scope = await repoScope();
         const cached = scope ? this.graphCache.get(scope) : undefined;
-        if (cached)
+        if (cached) {
+            this.graphCommits = cached.commits;
             this.publishGraph(cached.commits, cached.hasMore, true);
+        }
         else {
             this.graphCommits = [];
             this.publishGraph([], false, true);
@@ -891,15 +954,13 @@ export class GitPanelApp {
                 return;
             this.graphCommits = batch;
             const hasMore = batch.length === PAGE;
-            if (scope)
-                this.graphCache.set(scope, { commits: batch, hasMore });
+            this.storeGraph(scope, batch, hasMore);
             this.publishGraph(batch, hasMore, false);
         }
         catch {
             if (this.graphLoadId !== id)
                 return;
-            this.graphCommits = [];
-            this.publishGraph([], false, false);
+            this.publishGraph(this.graphCommits, false, false);
         }
     }
 }

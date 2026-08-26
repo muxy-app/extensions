@@ -222,15 +222,25 @@ function renderFolderActions(opts, files) {
 function renderFileList(app, entries, opts) {
     if (entries.length === 0)
         return h("div", { class: "px-4 py-4 text-center text-[12px] text-muted-foreground" }, "No matching files.");
+    const limit = app.listLimit(opts.id);
+    const visible = entries.length > limit ? entries.slice(0, limit) : entries;
+    const hidden = entries.length - visible.length;
+    const more = hidden > 0
+        ? button(`Show ${hidden} more`, {
+            variant: "ghost",
+            className: "m-1 h-7 justify-center text-[12px]",
+            onClick: () => app.raiseListLimit(opts.id),
+        })
+        : null;
     if (changesView() === "tree") {
-        return h("ul", { class: "divide-y divide-transparent" }, treeRows(entries, {
-            prefix: `${TREE_PREFIX}${opts.id}.`,
-            onToggle: () => app.render(),
-            folderActions: (files) => renderFolderActions(opts, files),
-            renderLeaf: (file, depth) => renderLeafRow(file, opts, treeIndent(depth)),
-        }));
+        return [h("ul", { class: "divide-y divide-transparent" }, treeRows(visible, {
+                prefix: `${TREE_PREFIX}${opts.id}.`,
+                onToggle: () => app.render(),
+                folderActions: (files) => renderFolderActions(opts, files),
+                renderLeaf: (file, depth) => renderLeafRow(file, opts, treeIndent(depth)),
+            })), more];
     }
-    return h("ul", { class: "divide-y divide-border" }, entries.map((entry) => renderLeafRow(entry, opts)));
+    return [h("ul", { class: "divide-y divide-border" }, visible.map((entry) => renderLeafRow(entry, opts))), more];
 }
 function filterEntries(app, opts) {
     if (!opts.searchable || !app.changesFilterOpen)
