@@ -161,6 +161,16 @@ async function main() {
       .join("");
 
     body.innerHTML = `
+      <h3 class="sec-title">${t("set.overrideTitle")} <span class="hint">${t("set.inheritNote")}</span></h3>
+
+      <div class="field">
+        <span class="label">${t("set.projApiKey")}</span>
+        <select id="p_api_key">${keyOptions}</select>
+        <div class="hint">${t("set.projApiKeyHint")}</div>
+      </div>
+
+      <hr class="sep" />
+
       <div class="field">
         <span class="label">${t("set.connectStatus")}</span>
         <p class="hint" id="link-status" style="margin-top:0">${t("set.linkLoading")}</p>
@@ -181,15 +191,6 @@ async function main() {
           <button type="button" id="proj-new-cancel" class="mini">${t("common.cancel")}</button>
         </div>
         <div class="hint">${t("set.newProjectHint")}</div>
-      </div>
-
-      <hr class="sep" />
-      <h3 class="sec-title">${t("set.overrideTitle")} <span class="hint">${t("set.inheritNote")}</span></h3>
-
-      <div class="field">
-        <span class="label">${t("set.projApiKey")}</span>
-        <select id="p_api_key">${keyOptions}</select>
-        <div class="hint">${t("set.projApiKeyHint")}</div>
       </div>
 
       <div class="row">
