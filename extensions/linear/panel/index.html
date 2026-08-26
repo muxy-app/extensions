@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>Linear</title>
+  </head>
+  <body>
+    <div id="app">
+      <header class="topbar">
+        <button id="state-filter" class="icon-btn state-filter" title="Status filter">⚑</button>
+        <div id="state-filter-menu" class="popover popover--check" hidden></div>
+        <span class="spacer"></span>
+        <span id="topbar-spinner" class="topbar-spinner" hidden aria-label="Loading" title="Loading…"></span>
+        <button id="display" class="icon-btn" title="Grouping / ordering">☰</button>
+        <button id="new" class="icon-btn" title="New issue">＋</button>
+        <button id="refresh" class="icon-btn" title="Refresh">↻</button>
+        <button id="settings" class="icon-btn" title="Settings">⚙</button>
+      </header>
+      <div id="display-menu" class="popover" hidden>
+        <div class="popover-row">
+          <span class="popover-label" id="group-by-label">Grouping</span>
+          <select id="group-by" class="popover-select"></select>
+        </div>
+        <div class="popover-row">
+          <span class="popover-label" id="sort-by-label">Ordering</span>
+          <select id="sort-by" class="popover-select"></select>
+        </div>
+      </div>
+      <div id="searchbar" class="searchbar">
+        <input id="search" type="text" placeholder="🔍 Search number/title (Enter: open exact)" />
+      </div>
+      <div id="branchbar" class="branchbar" hidden></div>
+      <div id="subbar" class="subbar" hidden>
+        <span id="linked" class="linked"></span>
+        <span class="spacer"></span>
+        <div class="seg" id="who" role="tablist">
+          <button class="seg-btn is-active" data-who="mine">My issues</button>
+          <button class="seg-btn" data-who="all">Whole project</button>
+        </div>
+      </div>
+      <main id="content" class="content"></main>
+    </div>
+    <script type="module" src="../src/panel.js"></script>
+  </body>
+</html>

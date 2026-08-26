@@ -1,0 +1,137 @@
+{
+  "name": "linear",
+  "version": "0.7.6",
+  "private": true,
+  "type": "module",
+  "description": "Muxy extension: browse your assigned Linear issues in a side panel, open an issue's detail in a tab to view and edit it, and create issues — without leaving Muxy.",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && node scripts/copy-manifest.mjs"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  },
+  "muxy": {
+    "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
+    "description": "Browse your Linear issues, view and edit an issue in a tab, and create issues — without leaving Muxy.",
+    "permissions": [
+      "panels:write",
+      "tabs:write",
+      "commands:exec",
+      "git:read",
+      "projects:read",
+      "worktrees:read",
+      "files:read",
+      "files:write",
+      "notifications:write",
+      "storage:read",
+      "storage:write"
+    ],
+    "events": [
+      "project.switched",
+      "worktree.headChanged"
+    ],
+    "panels": [
+      {
+        "id": "issues",
+        "title": "Linear",
+        "icon": {
+          "svg": "assets/icon.svg"
+        },
+        "entry": "panel/index.html",
+        "position": "right",
+        "mode": "pinned"
+      }
+    ],
+    "tabTypes": [
+      {
+        "id": "issue",
+        "title": "Linear",
+        "entry": "tab/issue.html"
+      },
+      {
+        "id": "create",
+        "title": "Linear",
+        "entry": "tab/create.html"
+      }
+    ],
+    "commands": [
+      {
+        "id": "toggle-panel",
+        "title": "Linear: Toggle Sidebar",
+        "action": {
+          "kind": "togglePanel",
+          "panel": "issues"
+        }
+      },
+      {
+        "id": "create-issue",
+        "title": "Linear: New Issue",
+        "action": {
+          "kind": "openTab",
+          "tabType": "create"
+        }
+      },
+      {
+        "id": "open-settings",
+        "title": "Linear: Settings",
+        "action": {
+          "kind": "openModal",
+          "entry": "modals/settings.html",
+          "width": 460,
+          "height": 520
+        }
+      },
+      {
+        "id": "link-project",
+        "title": "Linear: Link Current Project",
+        "action": {
+          "kind": "openModal",
+          "entry": "modals/link.html",
+          "width": 460,
+          "height": 460
+        }
+      }
+    ],
+    "topbarItems": [
+      {
+        "id": "issues-panel",
+        "icon": {
+          "svg": "assets/icon.svg"
+        },
+        "tooltip": "Toggle Linear sidebar",
+        "command": "toggle-panel"
+      }
+    ],
+    "marketplace": {
+      "author": "namgyung",
+      "github": "NamgyungKim",
+      "homepage": "https://github.com/NamgyungKim/muxy-linear-extension",
+      "repository": "https://github.com/NamgyungKim/muxy-linear-extension",
+      "categories": [
+        "productivity",
+        "git"
+      ],
+      "icon": "assets/icon.svg",
+      "screenshots": [
+        "assets/screenshot-1.png"
+      ]
+    }
+  },
+  "dependencies": {
+    "@tiptap/core": "^3.30.2",
+    "@tiptap/extension-image": "^3.30.2",
+    "@tiptap/extension-link": "^3.30.2",
+    "@tiptap/extension-placeholder": "^3.30.2",
+    "@tiptap/extension-task-item": "^3.30.2",
+    "@tiptap/extension-task-list": "^3.30.2",
+    "@tiptap/pm": "^3.30.2",
+    "@tiptap/starter-kit": "^3.30.2",
+    "@tiptap/suggestion": "^3.30.2",
+    "dompurify": "^3.4.13",
+    "marked": "^18.0.9",
+    "tiptap-markdown": "^0.9.0",
+    "unicode-emoji-json": "^0.9.0"
+  }
+}

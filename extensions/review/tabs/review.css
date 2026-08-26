@@ -1,0 +1,746 @@
+* { box-sizing: border-box; }
+
+/* The [hidden] attribute must win over component display rules below
+   (e.g. .empty { display: flex }), otherwise toggling .hidden does nothing. */
+[hidden] { display: none !important; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  font: 13px -apple-system, "SF Pro", system-ui, sans-serif;
+  background: var(--muxy-background);
+  color: var(--muxy-foreground);
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* ---- Top bar ---------------------------------------------------------- */
+#topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--muxy-border);
+  background: var(--muxy-background);
+  flex: 0 0 auto;
+}
+
+#topbar-spacer { flex: 1 1 auto; }
+
+/* Segmented control */
+#segmented, #view-segmented {
+  display: inline-flex;
+  background: var(--muxy-surface);
+  border: 1px solid var(--muxy-border);
+  border-radius: 7px;
+  padding: 2px;
+}
+/* The scope (All | Changed) control lives in the sidebar header and spans its
+   full width, so the two segments split the available space evenly. */
+#segmented { display: flex; width: 100%; }
+#segmented .seg { flex: 1 1 0; text-align: center; }
+/* The view-mode (Source | Preview) variant is a touch more compact. */
+.vseg { padding: 3px 12px; font-size: 12px; }
+.seg {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--muxy-foreground-muted);
+  font: inherit;
+  font-weight: 500;
+  padding: 4px 14px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 80ms ease, color 80ms ease;
+}
+.seg:hover { color: var(--muxy-foreground); }
+.seg[aria-selected="true"] {
+  background: var(--muxy-accent);
+  color: var(--muxy-background);
+}
+
+.action {
+  appearance: none;
+  background: var(--muxy-surface);
+  color: var(--muxy-foreground);
+  border: 1px solid var(--muxy-border);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.action:hover { background: var(--muxy-hover); border-color: var(--muxy-accent); }
+.action:active { transform: translateY(1px); }
+.action.icon-only { padding: 5px 9px; font-size: 14px; line-height: 1; }
+
+/* The file-browser toggle lights up (like the Comments toggle) while the
+   sidebar is shown, so its pressed state mirrors the pane's visibility. */
+#sidebar-toggle[aria-pressed="true"] {
+  background: var(--muxy-accent-soft);
+  border-color: var(--muxy-accent);
+}
+/* Wrapper hosts the right-click "move sidebar" menu; the menu itself is
+   fixed-positioned (see .tb-menu), so the wrap only needs to anchor the
+   outside-click / .menu-open machinery. */
+#sidebar-toggle-wrap { position: relative; display: inline-flex; }
+
+/* ---- Split layout ----------------------------------------------------- */
+#split {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+/* Sidebar-on-the-right: reverse the row so the order becomes content | divider
+   | sidebar. The sidebar's separating border flips to its left edge, and the
+   divider's overlap margins swap so the handle still straddles the seam. The
+   drag/arrow-key math is mirrored in JS (see wireDivider). The class lives on
+   #app (not #split) so the topbar — a sibling of #split — can react too. */
+#app.sidebar-right #split { flex-direction: row-reverse; }
+#app.sidebar-right #sidebar {
+  border-right: 0;
+  border-left: 1px solid var(--muxy-border);
+}
+#app.sidebar-right #divider { margin-left: -2px; margin-right: -3px; }
+/* …and send the file-browser toggle past the reload icon (default flex order is
+   0; a high order floats it to the end of the topbar, after #refresh). */
+#app.sidebar-right #sidebar-toggle-wrap { order: 10; }
+
+#sidebar {
+  width: 280px;
+  min-width: 140px;
+  max-width: 70%;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--muxy-border);
+  background: var(--muxy-background);
+  overflow: hidden;
+}
+/* The scope (All | Changed) control now lives at the top of the sidebar so it
+   hides with the pane. Height matches #view-toolbar (49px) so the scope-head's
+   bottom border and the content-side view-toolbar border form one continuous
+   line across the split. */
+#sidebar-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  height: 49px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--muxy-border);
+  background: var(--muxy-background);
+}
+#tree-mount { flex: 1 1 auto; min-height: 0; overflow: hidden; }
+
+#divider {
+  flex: 0 0 auto;
+  width: 5px;
+  margin-left: -3px;
+  margin-right: -2px;
+  cursor: col-resize;
+  position: relative;
+  z-index: 2;
+}
+#divider:hover::after, #divider:focus-visible::after {
+  content: "";
+  position: absolute;
+  inset: 0 2px;
+  background: var(--muxy-accent);
+  opacity: 0.6;
+}
+
+#content {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* Per-file view-mode bar (Source | Preview). Shown only for renderable
+   types (markdown / HTML); hidden otherwise so code files look unchanged. */
+#view-toolbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  /* Height matches the sidebar scope-head (#sidebar-head, also 49px) so the two
+     bottom borders form one continuous line across the split. align-items:center
+     then centers the segmented control in the extra space — the top/bottom
+     breathing room. */
+  height: 49px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--muxy-border);
+  background: var(--muxy-background);
+}
+/* Diff-hunk navigation (↑/↓) lives at the LEFT of the toolbar; margin-right:auto
+   pushes the Source|Preview segmented control to the right edge (the toolbar is
+   justify-content:flex-end). The whole group hides when the file has no diffs. */
+#diff-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: auto;
+}
+#diff-nav .action.icon-only { padding: 4px 8px; font-size: 13px; }
+.diff-nav-count {
+  margin-left: 4px;
+  font-size: 12px;
+  color: var(--muxy-foreground-muted);
+}
+
+/* The viewer holds the editor, the preview iframe, and the overlays. It is the
+   positioning context for the absolutely-filled placeholder/binary states. */
+#viewer {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  position: relative;
+  display: flex;
+}
+#editor-mount {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+/* Absolute overlay (like the placeholder/binary panels) so it covers the
+   editor when active without stealing flex space from it. */
+#preview-mount {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  /* White backdrop so authored HTML pages render as a browser would; the
+     markdown preview paints its own theme-matched background over this. */
+  background: #fff;
+}
+
+/* CodeMirror fills the pane */
+.cm-editor { height: 100%; }
+.cm-scroller { overflow: auto; }
+
+/* ---- Empty / placeholder states -------------------------------------- */
+.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: var(--muxy-foreground-muted);
+}
+#placeholder, #binary-notice {
+  position: absolute;
+  inset: 0;
+  background: var(--muxy-background);
+}
+.placeholder-inner { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.placeholder-icon { font-size: 28px; opacity: 0.4; }
+.fatal-detail {
+  max-width: min(90%, 640px);
+  max-height: 40vh;
+  overflow: auto;
+  margin: 0;
+  padding: 10px 12px;
+  text-align: left;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 11px;
+  line-height: 1.5;
+  border-radius: 6px;
+  background: var(--muxy-background-elevated, rgba(127, 127, 127, 0.12));
+  color: var(--muxy-foreground-muted);
+}
+#tree-empty { padding: 20px; }
+
+/* ---- @pierre/trees theming via override variables --------------------- */
+/* These custom properties inherit into the tree's shadow root. */
+#tree-mount {
+  --trees-bg-override: var(--muxy-background);
+  --trees-bg-muted-override: var(--muxy-surface);
+  --trees-fg-override: var(--muxy-foreground);
+  --trees-fg-muted-override: var(--muxy-foreground-muted);
+  --trees-accent-override: var(--muxy-accent);
+  --trees-border-color-override: var(--muxy-border);
+  --trees-selected-bg-override: var(--muxy-accent-soft);
+  --trees-selected-fg-override: var(--muxy-foreground);
+  --trees-selected-focused-border-color-override: var(--muxy-accent);
+  --trees-focus-ring-color-override: var(--muxy-accent);
+  --trees-search-bg-override: var(--muxy-surface);
+  --trees-search-fg-override: var(--muxy-foreground);
+  --trees-input-bg-override: var(--muxy-surface);
+  --trees-indent-guide-bg-override: var(--muxy-border);
+  --trees-scrollbar-thumb-override: var(--muxy-border);
+  --trees-font-family-override: -apple-system, "SF Pro", system-ui, sans-serif;
+  --trees-font-size-override: 13px;
+  --trees-git-modified-color-override: var(--muxy-diff-hunk);
+  --trees-git-added-color-override: var(--muxy-diff-add);
+  --trees-git-untracked-color-override: var(--muxy-diff-add);
+  --trees-git-deleted-color-override: var(--muxy-diff-remove);
+  background: var(--muxy-background);
+}
+
+/* ---- Comments: topbar toggle ----------------------------------------- */
+#comments-toggle { display: inline-flex; align-items: center; gap: 6px; }
+#comments-toggle[aria-expanded="true"] {
+  background: var(--muxy-accent-soft);
+  border-color: var(--muxy-accent);
+}
+.ct-icon { font-size: 13px; line-height: 1; }
+.count:empty { display: none; }
+.count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--muxy-accent);
+  color: var(--muxy-background);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Comments: bottom drawer ----------------------------------------- */
+#comments-drawer {
+  flex: 0 0 auto;
+  height: min(45vh, 360px);
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--muxy-border);
+  background: var(--muxy-background);
+}
+#cd-divider {
+  flex: 0 0 auto;
+  height: 5px;
+  margin-top: -3px;
+  margin-bottom: -2px;
+  cursor: row-resize;
+  position: relative;
+  z-index: 2;
+}
+#cd-divider:hover::after, #cd-divider:focus-visible::after {
+  content: "";
+  position: absolute;
+  inset: 2px 0;
+  background: var(--muxy-accent);
+  opacity: 0.6;
+}
+#cd-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--muxy-border);
+}
+#cd-title { font-weight: 600; }
+#cd-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+#cd-body { flex: 1 1 auto; min-height: 0; overflow: auto; position: relative; }
+#cd-empty { position: absolute; inset: 0; padding: 20px; }
+
+.cd-group { padding: 4px 0; }
+.cd-file {
+  position: sticky;
+  top: 0;
+  padding: 6px 12px;
+  background: var(--muxy-surface);
+  border-bottom: 1px solid var(--muxy-border);
+  color: var(--muxy-foreground-muted);
+  font-family: "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  z-index: 1;
+}
+.cd-item {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--muxy-border);
+}
+.cd-item.resolved { opacity: 0.6; }
+.cd-head { display: flex; align-items: center; gap: 8px; }
+.cd-spacer { flex: 1 1 auto; }
+.cd-line {
+  flex: 0 0 auto;
+  appearance: none;
+  border: 1px solid var(--muxy-border);
+  background: var(--muxy-surface);
+  color: var(--muxy-accent);
+  border-radius: 5px;
+  padding: 2px 7px;
+  font-family: "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  cursor: pointer;
+}
+.cd-line:hover { background: var(--muxy-hover); border-color: var(--muxy-accent); }
+.cd-status {
+  flex: 0 0 auto;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 1px 7px;
+  border-radius: 9px;
+  border: 1px solid var(--muxy-border);
+}
+.cd-status.open { color: var(--muxy-accent); border-color: var(--muxy-accent); }
+.cd-status.in-progress { color: var(--muxy-diff-hunk); border-color: var(--muxy-diff-hunk); }
+.cd-status.resolved { color: var(--muxy-diff-add); border-color: var(--muxy-diff-add); }
+.cd-snip {
+  font-family: "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  color: var(--muxy-foreground-muted);
+  background: var(--muxy-surface);
+  border: 1px solid var(--muxy-border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cd-sent { flex: 0 0 auto; font-size: 11px; color: var(--muxy-foreground-muted); }
+
+/* Per-row "Send ▾": hidden until the row is hovered (or its menu is open). */
+.cd-send-wrap { flex: 0 0 auto; position: relative; }
+.cd-send {
+  appearance: none;
+  border: 1px solid var(--muxy-border);
+  background: var(--muxy-surface);
+  color: var(--muxy-accent);
+  border-radius: 5px;
+  padding: 2px 7px;
+  font-size: 11px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+.cd-item:hover .cd-send,
+.cd-send:focus-visible,
+.cd-send-wrap.menu-open .cd-send { opacity: 1; }
+.cd-send:hover { background: var(--muxy-hover); border-color: var(--muxy-accent); }
+/* Anchored to a row button and positioned via JS (position: fixed escapes the
+   scrolling drawer's overflow clip); left/top are set inline at open time.
+   NOTE: must out-specify the shared `.menu { position: absolute }` rule, which
+   is declared later in this file — a bare `.cd-menu` ties on specificity and
+   loses on source order, leaving the menu `absolute` and rendered off-screen.
+   The two-class selector wins regardless of order. */
+.menu.cd-menu { position: fixed; right: auto; bottom: auto; }
+.cd-del {
+  flex: 0 0 auto;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--muxy-foreground-muted);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+.cd-del:hover { color: var(--muxy-diff-remove); background: var(--muxy-hover); }
+
+/* Drawer body: just the initial comment + a reply-count hint. */
+.cd-text { white-space: pre-wrap; word-break: break-word; }
+.cd-more { font-size: 11px; color: var(--muxy-foreground-muted); }
+
+/* ---- Comments: send split-button + menu ------------------------------ */
+#send-wrap { position: relative; }
+.action.send[disabled] { opacity: 0.5; cursor: default; }
+.action.send:not([disabled]) { border-color: var(--muxy-accent); color: var(--muxy-accent); }
+.menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  min-width: 240px;
+  max-height: 320px;
+  overflow: auto;
+  padding: 4px;
+  /* Opaque: paint surface over a solid base so code never shows through, even
+     if the theme's --muxy-surface carries alpha. */
+  background-color: var(--muxy-background);
+  background-image: linear-gradient(var(--muxy-surface), var(--muxy-surface));
+  border: 1px solid var(--muxy-border);
+  border-radius: 8px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+  z-index: 20;
+}
+/* Topbar "move sidebar" menu — fixed-positioned via JS (positionFixedMenu), same
+   reason as .cd-menu: the bare `.menu` rule is `position: absolute` and declared
+   here, so a two-class selector wins on specificity regardless of source order.
+   Narrower than the send menu — it only holds Left/Right. */
+.menu.tb-menu { position: fixed; right: auto; bottom: auto; min-width: 160px; }
+.menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--muxy-foreground);
+  border-radius: 6px;
+  padding: 7px 9px;
+  font: inherit;
+  cursor: pointer;
+}
+.menu-item:hover { background: var(--muxy-hover); }
+.menu-title { font-weight: 500; }
+.menu-sub {
+  font-size: 11px;
+  color: var(--muxy-foreground-muted);
+  font-family: "SF Mono", Menlo, monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.menu-label {
+  padding: 6px 9px 3px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--muxy-foreground-muted);
+}
+
+/* ---- Review-ref picker (Working tree | git-log commit) --------------- */
+#ref-picker-wrap { position: relative; display: inline-flex; }
+#ref-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 320px;
+}
+/* Lit while a commit (not the working tree) is being reviewed, so it's obvious
+   you're off the default — and while its menu is open. */
+#ref-picker[aria-expanded="true"],
+#ref-picker-wrap.reviewing #ref-picker {
+  background: var(--muxy-accent-soft);
+  border-color: var(--muxy-accent);
+}
+.rp-icon { font-size: 12px; line-height: 1; opacity: 0.8; }
+#ref-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 240px;
+}
+.rp-caret { font-size: 10px; opacity: 0.7; }
+
+/* The commit dropdown: a search field over a scrollable list. Wider than the
+   other menus and capped so a 500-commit log scrolls rather than overflowing. */
+.menu.ref-menu { min-width: 340px; max-width: 460px; max-height: 60vh; padding: 6px; }
+.ref-search {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--muxy-border);
+  border-radius: 6px;
+  background: var(--muxy-background);
+  color: var(--muxy-foreground);
+  font: inherit;
+}
+.ref-search::placeholder { color: var(--muxy-foreground-muted); }
+.ref-search:focus { outline: none; border-color: var(--muxy-accent); }
+.ref-list { display: flex; flex-direction: column; }
+.ref-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--muxy-foreground);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font: inherit;
+  cursor: pointer;
+}
+.ref-row:hover { background: var(--muxy-hover); }
+.ref-row.selected { background: var(--muxy-accent-soft); }
+.ref-tick {
+  flex: 0 0 auto;
+  width: 12px;
+  color: var(--muxy-accent);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.ref-main { min-width: 0; flex: 1 1 auto; }
+.ref-top { display: flex; align-items: baseline; gap: 7px; }
+.ref-sha {
+  flex: 0 0 auto;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: var(--muxy-accent);
+}
+.ref-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.ref-sub {
+  font-size: 11px;
+  color: var(--muxy-foreground-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A drawer thread anchored to a historical commit carries a small SHA badge. */
+.cd-ref {
+  flex: 0 0 auto;
+  font-family: "SF Mono", Menlo, monospace;
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--muxy-accent-soft);
+  color: var(--muxy-accent);
+}
+
+/* ---- Comments: line highlight, 💬 gutter, hover tooltip, composer ---- */
+/* Commented lines get a soft, theme-independent yellow wash. */
+.cm-commented-line { background-color: rgba(255, 209, 71, 0.16); }
+/* In-progress threads (sent to an agent): swap the yellow for a faint blue wash. */
+.cm-commented-line.cm-inprogress-line {
+  background-color: color-mix(in srgb, var(--muxy-diff-hunk) 14%, transparent);
+}
+/* Resolved threads: drop the yellow, use a faint green wash instead. */
+.cm-commented-line.cm-resolved-line {
+  background-color: color-mix(in srgb, var(--muxy-diff-add) 12%, transparent);
+}
+/* Live preview while click-dragging the line-number gutter to select a range. */
+.cm-drag-range-line {
+  background-color: color-mix(in srgb, var(--muxy-accent) 22%, transparent);
+}
+/* No text selection while a gutter drag is happening. */
+.cm-lineNumbers .cm-gutterElement { user-select: none; }
+/* ---- Git diff line backgrounds (added green / removed red) ----------- */
+/* Added/changed working-tree lines get a soft green wash + a green edge bar so
+   they read as diff additions without fighting the comment/active-line washes. */
+.cm-diff-add-line {
+  background-color: color-mix(in srgb, var(--muxy-diff-add) 14%, transparent);
+  box-shadow: inset 2px 0 0 0 var(--muxy-diff-add);
+}
+/* Removed lines have no working-tree line. By DEFAULT a removed run shows nothing
+   in the body — only the diff gutter wedge below marks it; clicking the wedge
+   expands the red text. The wedge: ▸ collapsed, ▾ expanded, click toggles. */
+.cm-diff-gutter { min-width: 13px; }
+.cm-diff-wedge {
+  cursor: pointer;
+  font-size: 9px;
+  line-height: 1;
+  opacity: 0.7;
+  color: var(--muxy-diff-remove);
+}
+.cm-diff-wedge:hover { opacity: 1; }
+/* EXPANDED removed run: a stack of red rows. The font matches the editor so the
+   removed text lines up with surrounding code. */
+.cm-diff-deleted {
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.cm-diff-deleted-line {
+  background-color: color-mix(in srgb, var(--muxy-diff-remove) 16%, transparent);
+  box-shadow: inset 2px 0 0 0 var(--muxy-diff-remove);
+  color: color-mix(in srgb, var(--muxy-diff-remove) 55%, var(--muxy-foreground));
+  padding-left: 6px;
+  white-space: pre;
+  overflow-x: hidden;
+  text-overflow: ellipsis;
+}
+.cm-comment-gutter { min-width: 20px; }
+.cm-comment-dot { cursor: pointer; font-size: 11px; line-height: 1; opacity: 0.95; }
+.cm-comment-dot:hover { opacity: 1; }
+/* 💬 is shown in every status now (the ⟳/✓ glyphs were too thin to read at gutter
+   size); status reads from the line wash, not the marker. color: is a no-op on the
+   emoji, so there are no per-status marker rules. */
+/* The hover "add a comment here" hint: a faint 💬 on the hovered line, brightening
+   on direct hover so it reads as a clickable affordance (grayscale keeps it from
+   competing with real open/in-progress/resolved markers). */
+.cm-comment-dot.hint { opacity: 0.28; filter: grayscale(1); transition: opacity 0.1s ease; }
+.cm-comment-dot.hint:hover { opacity: 0.7; filter: grayscale(0.4); }
+
+/* Thread popover — an overlay (never reflows the doc). Transient on hover,
+   interactive when pinned (click). */
+.comment-pop {
+  position: fixed;
+  z-index: 9999;
+  width: 320px;
+  max-height: 60vh;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* Opaque even if --muxy-surface carries alpha. */
+  background-color: var(--muxy-background);
+  background-image: linear-gradient(var(--muxy-surface), var(--muxy-surface));
+  color: var(--muxy-foreground);
+  border: 1px solid var(--muxy-border);
+  border-left: 3px solid var(--muxy-accent);
+  border-radius: 6px;
+  padding: 9px 11px;
+  font: 12px -apple-system, "SF Pro", system-ui, sans-serif;
+  line-height: 1.45;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+}
+.comment-pop.preview { pointer-events: none; }     /* hover: don't steal the hover */
+.comment-pop.in-progress { border-left-color: var(--muxy-diff-hunk); }
+.comment-pop.resolved { border-left-color: var(--muxy-diff-add); }
+
+.pop-head { display: flex; align-items: center; gap: 8px; }
+.pop-where { font-family: "SF Mono", Menlo, monospace; font-size: 11px; color: var(--muxy-foreground-muted); }
+.pop-spacer { flex: 1 1 auto; }
+.pop-status {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;
+  padding: 1px 7px; border-radius: 9px; border: 1px solid var(--muxy-border);
+}
+.pop-status.open { color: var(--muxy-accent); border-color: var(--muxy-accent); }
+.pop-status.in-progress { color: var(--muxy-diff-hunk); border-color: var(--muxy-diff-hunk); }
+.pop-status.resolved { color: var(--muxy-diff-add); border-color: var(--muxy-diff-add); }
+.pop-status.closed { color: var(--muxy-foreground-muted); border-color: var(--muxy-border); }
+
+.pop-thread { display: flex; flex-direction: column; gap: 7px; }
+.pop-msg { display: flex; flex-direction: column; gap: 2px; }
+.pop-who { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muxy-foreground-muted); }
+.pop-msg.agent .pop-who { color: var(--muxy-accent); }
+.pop-text { white-space: pre-wrap; word-break: break-word; }
+
+.pop-reply {
+  /* Native auto-grow: the control sizes to its content (the `rows=2` attr is the
+     floor, max-height the ceiling — then it scrolls). No JS. Supported in the
+     current WebKit/Chromium this webview runs on. */
+  field-sizing: content;
+  width: 100%; box-sizing: border-box; resize: none;
+  max-height: 40vh; overflow-y: auto;
+  border: 1px solid var(--muxy-border); border-radius: 5px;
+  background: var(--muxy-background); color: var(--muxy-foreground);
+  font: inherit; font-size: 12px; padding: 5px 7px;
+}
+.pop-reply:focus { outline: none; border-color: var(--muxy-accent); }
+.pop-bar { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.mini {
+  appearance: none;
+  border: 1px solid var(--muxy-border);
+  background: var(--muxy-background);
+  color: var(--muxy-foreground);
+  border-radius: 5px;
+  padding: 3px 9px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.mini:hover { background: var(--muxy-hover); border-color: var(--muxy-accent); }
+.mini.primary { background: var(--muxy-accent); color: var(--muxy-background); border-color: var(--muxy-accent); }
+.mini.primary:hover { filter: brightness(1.05); }
+
+@media (prefers-reduced-motion: reduce) {
+  .seg, .action { transition: none; }
+}

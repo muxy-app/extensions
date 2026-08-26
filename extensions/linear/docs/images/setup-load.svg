@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 150" width="860" height="150" font-family="-apple-system, system-ui, sans-serif">
+  <!-- 설치·로드 4단계 흐름 -->
+  <defs>
+    <marker id="arr" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#8b93a7"/>
+    </marker>
+  </defs>
+  <rect x="0.5" y="0.5" width="859" height="149" rx="12" fill="#ffffff" stroke="#e3e6eb"/>
+  <g stroke="#8b93a7">
+    <line x1="206" y1="78" x2="232" y2="78" marker-end="url(#arr)"/>
+    <line x1="412" y1="78" x2="438" y2="78" marker-end="url(#arr)"/>
+    <line x1="618" y1="78" x2="644" y2="78" marker-end="url(#arr)"/>
+  </g>
+  <g>
+    <rect x="24"  y="50" width="182" height="56" rx="10" fill="#eef0f5" stroke="#e3e6eb"/>
+    <rect x="232" y="50" width="180" height="56" rx="10" fill="#eef0f5" stroke="#e3e6eb"/>
+    <rect x="438" y="50" width="180" height="56" rx="10" fill="#eef0f5" stroke="#e3e6eb"/>
+    <rect x="644" y="50" width="192" height="56" rx="10" fill="#5e6ad2"/>
+  </g>
+  <g text-anchor="middle" fill="#1c1f26">
+    <text x="115" y="74" font-size="13" font-weight="700">1. 빌드</text>
+    <text x="115" y="93" font-size="11" fill="#5b616e">npm install · npm run build</text>
+    <text x="322" y="74" font-size="13" font-weight="700">2. Load Unpacked</text>
+    <text x="322" y="93" font-size="11" fill="#5b616e">linear 폴더 선택</text>
+    <text x="528" y="74" font-size="13" font-weight="700">3. 활성화(enable)</text>
+    <text x="528" y="93" font-size="11" fill="#5b616e">확장은 기본이 꺼짐</text>
+    <text x="740" y="74" font-size="13" font-weight="700" fill="#ffffff">4. 패널 열기</text>
+    <text x="740" y="93" font-size="11" fill="#dfe2f7">Toggle Sidebar</text>
+  </g>
+  <text x="24" y="132" font-size="12" fill="#5b616e">매니페스트(권한/명령)를 바꿨을 땐 Reload 대신 Remove → Load Unpacked 로 다시 올리세요.</text>
+</svg>

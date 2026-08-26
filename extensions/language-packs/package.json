@@ -1,6 +1,6 @@
 {
   "name": "language-packs",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "private": true,
   "type": "module",
   "description": "Community app language packs for Muxy",
@@ -28,6 +28,12 @@
         "language": "fa",
         "title": "فارسی",
         "bundle": "localization/Persian.bundle"
+      },
+      {
+        "id": "zh-Hans",
+        "language": "zh-Hans",
+        "title": "简体中文",
+        "bundle": "localization/SimplifiedChinese.bundle"
       }
     ],
     "marketplace": {

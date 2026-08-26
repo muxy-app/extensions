@@ -81,6 +81,108 @@ describe("manage rename/delete", () => {
     assert.equal(JSON.parse(readFileSync(meta, "utf8")).title, "Cursor New");
   });
 
+  it("rename cursor updates store.db name and sidecar title", async () => {
+    const session = join(home, ".cursor", "chats", "projhash", SID);
+    mkdirSync(session, { recursive: true });
+    const metaPath = join(session, "meta.json");
+    writeFileSync(
+      metaPath,
+      JSON.stringify({
+        title: "Old",
+        schemaVersion: 1,
+        cwd: "/tmp/p",
+        hasConversation: true,
+        isSubagent: false,
+      }),
+    );
+    const dummyKey = "ab".repeat(32);
+    const storeMeta = {
+      name: "Old",
+      agentId: "agent-1",
+      blobEncryptionKey: dummyKey,
+      subagentInfo: null,
+      latestRootBlobId: "blob-root",
+    };
+    const hex = Buffer.from(JSON.stringify(storeMeta), "utf8").toString("hex");
+    const db = join(session, "store.db");
+    const created = spawnSync(
+      "/usr/bin/sqlite3",
+      [
+        db,
+        `CREATE TABLE blobs (id TEXT PRIMARY KEY, data BLOB);
+         CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);
+         INSERT INTO meta VALUES ('0', '${hex}');`,
+      ],
+      { encoding: "utf8" },
+    );
+    assert.equal(created.status, 0, created.stderr || created.stdout);
+    const fs = createHostFs(realExec);
+    await renameSessionJs(fs, "cursor", SID, "Cursor New");
+    const sidecar = JSON.parse(readFileSync(metaPath, "utf8"));
+    assert.equal(sidecar.title, "Cursor New");
+    assert.equal(sidecar.schemaVersion, 1);
+    assert.equal(sidecar.cwd, "/tmp/p");
+    assert.equal(sidecar.hasConversation, true);
+    assert.equal(sidecar.isSubagent, false);
+    assert.equal("blobEncryptionKey" in sidecar, false);
+    const out = spawnSync("/usr/bin/sqlite3", [db, `SELECT value FROM meta WHERE key='0'`], {
+      encoding: "utf8",
+    });
+    assert.equal(out.status, 0, out.stderr || out.stdout);
+    const decoded = JSON.parse(Buffer.from(out.stdout.trim(), "hex").toString("utf8"));
+    assert.equal(decoded.name, "Cursor New");
+    assert.equal(decoded.blobEncryptionKey, dummyKey);
+    assert.equal(decoded.agentId, "agent-1");
+    assert.equal(decoded.latestRootBlobId, "blob-root");
+    assert.equal(decoded.subagentInfo, null);
+  });
+
+  it("rename cursor throws when store.db UPDATE fails", async () => {
+    const session = join(home, ".cursor", "chats", "projhash", SID);
+    mkdirSync(session, { recursive: true });
+    writeFileSync(join(session, "meta.json"), JSON.stringify({ title: "Old" }));
+    const dummyKey = "cd".repeat(32);
+    const hex = Buffer.from(
+      JSON.stringify({ name: "Old", blobEncryptionKey: dummyKey }),
+      "utf8",
+    ).toString("hex");
+    const db = join(session, "store.db");
+    const created = spawnSync(
+      "/usr/bin/sqlite3",
+      [
+        db,
+        `CREATE TABLE blobs (id TEXT PRIMARY KEY, data BLOB);
+         CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);
+         INSERT INTO meta VALUES ('0', '${hex}');`,
+      ],
+      { encoding: "utf8" },
+    );
+    assert.equal(created.status, 0, created.stderr || created.stdout);
+    const base = createHostFs(realExec);
+    const fs = {
+      ...base,
+      sqliteExec(dbPath, sql) {
+        if (String(sql).includes("UPDATE meta")) {
+          return Promise.reject(new Error("simulated UPDATE failure"));
+        }
+        return base.sqliteExec(dbPath, sql);
+      },
+    };
+    await assert.rejects(
+      () => renameSessionJs(fs, "cursor", SID, "Cursor New"),
+      /store was not updated/i,
+    );
+    const sidecar = JSON.parse(readFileSync(join(session, "meta.json"), "utf8"));
+    assert.equal(sidecar.title, "Old");
+    assert.equal("blobEncryptionKey" in sidecar, false);
+    const out = spawnSync("/usr/bin/sqlite3", [db, `SELECT value FROM meta WHERE key='0'`], {
+      encoding: "utf8",
+    });
+    const decoded = JSON.parse(Buffer.from(out.stdout.trim(), "hex").toString("utf8"));
+    assert.equal(decoded.name, "Old");
+    assert.equal(decoded.blobEncryptionKey, dummyKey);
+  });
+
   it("rename codex round-trip", async () => {
     const codex = join(home, ".codex");
     mkdirSync(codex);

@@ -1,0 +1,372 @@
+/* 패널 전용 레이아웃 */
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  position: relative; /* display 팝오버의 절대 위치 기준 */
+}
+
+/* 그룹/정렬(Display) 팝오버 — 상단바 아래 오른쪽에 뜬다. */
+.popover {
+  position: absolute;
+  top: calc(var(--muxy-topbar-height, 28px) + 6px);
+  right: 8px;
+  z-index: 20;
+  min-width: 200px;
+  padding: 8px;
+  border-radius: var(--radius);
+  background: var(--muxy-surface-solid, #2a2a2a);
+  border: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.35));
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+.popover[hidden] { display: none; }
+.popover-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 2px;
+}
+.popover-row + .popover-row { margin-top: 4px; }
+.popover-label {
+  font-size: 12px;
+  opacity: 0.75;
+  flex: 0 0 64px;
+}
+.popover-select {
+  flex: 1;
+  font-size: 12px;
+  padding: 3px 6px;
+}
+
+/* 이슈 우클릭 컨텍스트 메뉴(빠른 상태 변경) */
+.ctx-menu {
+  position: fixed;
+  z-index: 60;
+  min-width: 180px;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 4px;
+  border-radius: var(--radius);
+  background: var(--muxy-surface-solid, #2a2a2a);
+  border: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.35));
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+.ctx-header {
+  padding: 4px 8px 6px;
+  font-size: 11px;
+  opacity: 0.6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ctx-empty {
+  padding: 6px 8px;
+  font-size: 12px;
+  opacity: 0.6;
+}
+.ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muxy-foreground, #e6e6e6);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.ctx-item:hover { background: var(--muxy-hover, rgba(127, 127, 127, 0.15)); }
+.ctx-item.is-current { font-weight: 600; }
+.ctx-item.is-current::after {
+  content: "✓";
+  margin-left: auto;
+  opacity: 0.7;
+}
+.ctx-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+  background: var(--muxy-foreground-muted, #8a8f98);
+  box-shadow: inset 0 0 0 1px rgba(127, 127, 127, 0.4);
+}
+.ctx-item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar {
+  box-sizing: content-box;
+  height: var(--muxy-topbar-height, 28px);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  background: var(--muxy-background, #1e1e1e);
+  border-bottom: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.25));
+  flex: 0 0 auto;
+}
+
+.state-filter { position: relative; }
+/* 숨긴 상태가 있을 때 필터 버튼에 점을 찍어 '필터 적용 중'을 알린다. */
+.state-filter.is-active { color: var(--muxy-accent, #5e6ad2); }
+.state-filter.is-active::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muxy-accent, #5e6ad2);
+}
+
+/* 상태 필터 체크리스트 팝오버 — 상단바 왼쪽 아래에 뜬다. */
+.popover--check { right: auto; left: 8px; min-width: 180px; max-height: 60vh; overflow-y: auto; }
+.popover--check .popover-actions {
+  display: flex;
+  gap: 6px;
+  padding: 2px 2px 6px;
+  border-bottom: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.25));
+  margin-bottom: 6px;
+}
+.popover--check .popover-actions button {
+  flex: 1;
+  font-size: 11px;
+  padding: 3px 6px;
+  border-radius: var(--radius);
+  border: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.35));
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.popover--check .popover-actions button:hover { background: var(--muxy-hover, rgba(127, 127, 127, 0.15)); }
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 2px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.check-row:hover { background: var(--muxy-hover, rgba(127, 127, 127, 0.12)); }
+.check-row input { margin: 0; cursor: pointer; }
+.check-row .check-count { margin-left: auto; opacity: 0.6; font-variant-numeric: tabular-nums; }
+
+/* 상단바 로딩 표시: 목록을 비우지 않고 이 동그라미만 돌린다. */
+.topbar-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--muxy-foreground, #ddd) 28%, transparent);
+  border-top-color: var(--muxy-accent, #5e6ad2);
+  animation: linear-topbar-spin 0.7s linear infinite;
+  flex: 0 0 auto;
+}
+.topbar-spinner[hidden] { display: none; }
+@keyframes linear-topbar-spin { to { transform: rotate(360deg); } }
+
+/* 설정 톱니 아이콘만 더 크게 */
+#settings { font-size: 18px; }
+
+
+.searchbar {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.18));
+  flex: 0 0 auto;
+}
+.searchbar input {
+  width: 100%;
+  font-size: 12px;
+  padding: 5px 8px;
+}
+
+.branchbar {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--muxy-foreground, #ddd);
+  opacity: 0.75;
+  border-bottom: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.15));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 0 0 auto;
+}
+
+.subbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.2));
+  flex: 0 0 auto;
+}
+.linked {
+  font-size: 12px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.content { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 8px; }
+
+.group { margin-bottom: 12px; }
+.group-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  opacity: 0.7;
+  margin: 4px 4px 6px;
+}
+
+.issue {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  margin-bottom: 4px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  background: var(--muxy-surface, rgba(127, 127, 127, 0.1));
+}
+.issue:hover { background: var(--muxy-surface-solid, rgba(127, 127, 127, 0.2)); }
+.issue.is-current { border-color: var(--muxy-accent, #5e6ad2); }
+
+.issue-top { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+/* 접기/펼치기 caret */
+.caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-left: -4px;
+  font-size: 10px;
+  border-radius: 4px;
+  opacity: 0.7;
+}
+.caret:hover { background: var(--muxy-surface-solid, rgba(127, 127, 127, 0.3)); opacity: 1; }
+.issue-id { font-size: 11px; font-weight: 600; opacity: 0.8; font-variant-numeric: tabular-nums; cursor: pointer; border-radius: 4px; padding: 0 3px; margin: 0 -3px; }
+.issue-id:hover { opacity: 1; background: var(--muxy-surface-solid, rgba(127, 127, 127, 0.3)); }
+.issue-id:focus-visible { outline: 1px solid var(--muxy-accent, #5b8def); outline-offset: 1px; }
+.issue-title { font-size: 13px; line-height: 1.35; }
+
+/* 부모 이슈 브레드크럼 */
+.issue-parent {
+  font-size: 11px;
+  opacity: 0.55;
+  margin-bottom: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 자식 이슈는 들여쓰기 + 왼쪽 가이드선 */
+.issue.is-child {
+  margin-left: 14px;
+  /* width:100% + margin-left 14px 이면 컨테이너를 14px 넘겨 가로 스크롤이 생긴다. 폭에서 뺀다. */
+  width: calc(100% - 14px);
+  border-left: 2px solid var(--muxy-border, rgba(127, 127, 127, 0.35));
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+/* 우선순위 라벨 */
+.issue-prio {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.3));
+  opacity: 0.8;
+}
+/* 행 내 작업 버튼 */
+.issue-acts { margin-left: auto; display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.row-btn {
+  padding: 2px 8px;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+/* 담당자 아바타 */
+.assignee {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  /* 배경색은 담당자별로 panel.js 에서 인라인 지정. 지정 전 기본값만 둔다. */
+  background: var(--muxy-accent, #5e6ad2);
+  color: #fff;
+  overflow: hidden;
+}
+/* 실제 아바타 이미지 */
+.assignee.assignee-img {
+  object-fit: cover;
+  background: var(--muxy-surface-solid, rgba(127, 127, 127, 0.2));
+}
+.assignee.is-empty {
+  background: var(--muxy-surface-solid, rgba(127, 127, 127, 0.3));
+  color: var(--muxy-foreground, #ddd);
+}
+
+/* 마일스톤 칩 */
+.issue-milestone {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  opacity: 0.8;
+  background: color-mix(in srgb, var(--muxy-accent, #5e6ad2) 18%, transparent);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 45%;
+}
+/* 라벨 칩 */
+.issue-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  padding: 1px 8px 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.3));
+  opacity: 0.85;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 45%;
+}
+.issue-label .label-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muxy-foreground, #888);
+}
+/* 프로젝트 칩 */
+.issue-project {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  opacity: 0.7;
+  background: var(--muxy-surface, rgba(127, 127, 127, 0.15));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 45%;
+}
+
+.loading, .empty { padding: 24px 12px; text-align: center; }
+.empty p { margin: 0 0 10px; }

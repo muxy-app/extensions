@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 320" width="560" height="320" font-family="-apple-system, system-ui, sans-serif">
+  <!-- Linear 웹: Personal API keys 발급 화면 목업 -->
+  <rect x="0.5" y="0.5" width="559" height="319" rx="12" fill="#ffffff" stroke="#e3e6eb"/>
+  <!-- 좌측 사이드바 -->
+  <rect x="1" y="1" width="150" height="318" rx="12" fill="#f6f7f9"/>
+  <text x="20" y="34" font-size="12" fill="#5b616e">Settings</text>
+  <text x="20" y="70" font-size="12" fill="#1c1f26">Preferences</text>
+  <text x="20" y="98" font-size="12" fill="#1c1f26">Members</text>
+  <rect x="12" y="112" width="128" height="26" rx="6" fill="#e7e9f5"/>
+  <text x="20" y="130" font-size="12" font-weight="700" fill="#5e6ad2">Security &amp; access</text>
+  <text x="20" y="158" font-size="12" fill="#1c1f26">Integrations</text>
+  <!-- 본문 -->
+  <text x="176" y="36" font-size="15" font-weight="700" fill="#1c1f26">Personal API keys</text>
+  <text x="176" y="58" font-size="11.5" fill="#5b616e">개인 계정으로 Linear API에 접근하는 키입니다.</text>
+  <!-- 기존 키 목록 -->
+  <rect x="176" y="76" width="360" height="44" rx="8" fill="#f6f7f9" stroke="#e3e6eb"/>
+  <text x="192" y="100" font-size="12" font-weight="600" fill="#1c1f26">Muxy 확장용</text>
+  <text x="192" y="114" font-size="10.5" fill="#5b616e">lin_api_••••••••••••••••••••  ·  Created 2026-08</text>
+  <rect x="176" y="128" width="360" height="44" rx="8" fill="#f6f7f9" stroke="#e3e6eb"/>
+  <text x="192" y="152" font-size="12" font-weight="600" fill="#1c1f26">회사 계정</text>
+  <text x="192" y="166" font-size="10.5" fill="#5b616e">lin_api_••••••••••••••••••••  ·  Created 2026-07</text>
+  <!-- Create 버튼 -->
+  <rect x="176" y="196" width="150" height="34" rx="8" fill="#5e6ad2"/>
+  <text x="251" y="218" font-size="12.5" font-weight="700" fill="#ffffff" text-anchor="middle">＋ Create new API key</text>
+  <text x="176" y="256" font-size="11.5" fill="#5b616e">키는 생성 직후 한 번만 전체가 보입니다 — 그때 복사해 두세요.</text>
+  <text x="176" y="278" font-size="11.5" fill="#5b616e">이 키를 확장 설정의 "Personal API Key" 목록에 붙여넣습니다.</text>
+  <text x="176" y="300" font-size="11" fill="#8b93a7">Linear → Settings → Security &amp; access → Personal API keys</text>
+</svg>

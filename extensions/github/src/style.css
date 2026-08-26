@@ -368,6 +368,28 @@ body {
 .btn--danger { color: var(--c-closed); }
 .btn--danger:hover { background: color-mix(in srgb, var(--c-closed) 12%, transparent); border-color: color-mix(in srgb, var(--c-closed) 50%, var(--muxy-border)); }
 
+.toggle {
+  appearance: none;
+  border: 1px solid var(--muxy-border);
+  border-radius: var(--radius-chip);
+  padding: var(--s2) var(--s5);
+  font-family: inherit;
+  font-size: var(--font-footnote);
+  font-weight: 500;
+  color: var(--muxy-foreground-muted);
+  background: transparent;
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.toggle:hover { background: var(--muxy-hover); color: var(--muxy-foreground); }
+.toggle:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--muxy-accent) 35%, transparent); }
+.toggle.is-active {
+  background: color-mix(in srgb, var(--muxy-accent) 15%, transparent);
+  border-color: color-mix(in srgb, var(--muxy-accent) 50%, var(--muxy-border));
+  color: var(--muxy-accent);
+}
+
 /* ============================================================ Detail */
 .detail {
   padding: var(--s6) var(--s7) var(--s10);

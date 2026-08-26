@@ -13,3 +13,6 @@ extensions/demo-*
 .sisyphus/
 .muxy/
 skills-lock.json
+.muxy-linear/
+.linear.json
+scripts/setup-linear-mcp.sh

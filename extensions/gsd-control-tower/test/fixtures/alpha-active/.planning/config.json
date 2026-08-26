@@ -1,0 +1,8 @@
+{
+  "model_profile": "balanced",
+  "commit_docs": true,
+  "workflow": {
+    "research": true,
+    "verifier": true
+  }
+}

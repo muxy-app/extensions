@@ -1,0 +1,15 @@
+.DS_Store
+node_modules/
+dist/
+build/
+*.log
+
+# Build artifacts — bundled from lib/ + npm deps by scripts/build.sh (local dev)
+# and scripts/build.mjs (marketplace). Never committed: the marketplace pipeline
+# regenerates them, and shipping minified bundles in source trips the store's
+# readable-source check. The libraries live in package.json `dependencies`.
+tabs/review.bundle.js
+vendor/
+
+# Generated narrated code-walk for Watchtower (regenerated per change).
+diff.html

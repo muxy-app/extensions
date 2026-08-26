@@ -1,6 +1,12 @@
 import { joinPath, sqlQuote, expandUserPath } from "../../host-fs.js";
 import { isSafeSessionId } from "../../sanitize.js";
-import { slugify, toPromise, resolveTitleLikeColumn } from "../scan/helpers.js";
+import {
+  slugify,
+  toPromise,
+  resolveTitleLikeColumn,
+  hexToUtf8,
+  encodeCursorStoreMeta,
+} from "../scan/helpers.js";
 
 /**
  * @param {*} fs
@@ -106,9 +112,7 @@ async function renameGrok(fs, home, sessionId, newTitle) {
   await writeJsonAtomic(fs, summary, data);
 }
 
-async function renameCursor(fs, home, sessionId, newTitle) {
-  const sessionDir = await findCursorSessionDir(fs, home, sessionId);
-  if (!sessionDir) throw new Error(`Cursor session not found: ${sessionId}`);
+async function upsertCursorSidecar(fs, sessionDir, newTitle) {
   const meta = joinPath(sessionDir, "meta.json");
   let data = {};
   if (await toPromise(fs.isFile(meta))) {
@@ -121,6 +125,57 @@ async function renameCursor(fs, home, sessionId, newTitle) {
   }
   data.title = newTitle;
   await writeJsonAtomic(fs, meta, data);
+}
+
+/**
+ * Mutate store.db meta key='0' JSON `name` only. Never INSERT a stub row.
+ * @param {*} fs
+ * @param {string} storePath
+ * @param {string} newTitle
+ */
+async function renameCursorStoreName(fs, storePath, newTitle) {
+  const rows = await toPromise(
+    fs.sqliteQuery(storePath, `SELECT value FROM meta WHERE key='0' LIMIT 1`),
+  );
+  const raw = rows?.[0]?.value;
+  if (raw == null || raw === "") {
+    throw new Error("Cursor store meta row key='0' missing");
+  }
+  const text = hexToUtf8(String(raw));
+  let data;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = null;
+  }
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    throw new Error("Cursor store meta could not be decoded");
+  }
+  data.name = newTitle;
+  const hex = encodeCursorStoreMeta(data);
+  if (!hex) {
+    throw new Error("Cursor store meta could not be encoded");
+  }
+  await toPromise(
+    fs.sqliteExec(
+      storePath,
+      `PRAGMA busy_timeout=5000; UPDATE meta SET value = ${sqlQuote(hex)} WHERE key='0';`,
+    ),
+  );
+}
+
+async function renameCursor(fs, home, sessionId, newTitle) {
+  const sessionDir = await findCursorSessionDir(fs, home, sessionId);
+  if (!sessionDir) throw new Error(`Cursor session not found: ${sessionId}`);
+  const storePath = joinPath(sessionDir, "store.db");
+  if (await toPromise(fs.isFile(storePath))) {
+    try {
+      await renameCursorStoreName(fs, storePath, newTitle);
+    } catch (e) {
+      throw new Error(`Cursor store was not updated: ${e?.message || e}`);
+    }
+  }
+  await upsertCursorSidecar(fs, sessionDir, newTitle);
 }
 
 async function renameCodex(fs, home, sessionId, newTitle) {

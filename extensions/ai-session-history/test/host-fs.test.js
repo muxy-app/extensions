@@ -153,6 +153,22 @@ describe("host-fs mock argv contracts", () => {
     assert.equal(rows[0].id, "1");
   });
 
+  it("sqliteExec sends SQL on stdin not argv", async () => {
+    const exec = mockExec([
+      {
+        match: (argv) => argv[0] === HOST_BINS.sqlite3,
+        handle: (argv, opts) => {
+          assert.deepEqual(argv, [HOST_BINS.sqlite3, "--", "/tmp/db"]);
+          assert.equal(argv.includes("UPDATE t SET v = 1"), false);
+          assert.equal(opts.stdin, "UPDATE t SET v = 1\n");
+          return { stdout: "", stderr: "", exitCode: 0 };
+        },
+      },
+    ]);
+    const fs = createHostFs(exec);
+    assert.equal(await fs.sqliteExec("/tmp/db", "UPDATE t SET v = 1"), true);
+  });
+
   it("ensureHostTools probes required binaries via ls (incl. printenv)", async () => {
     const probed = [];
     const exec = mockExec([
