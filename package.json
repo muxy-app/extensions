@@ -12,7 +12,7 @@
     "validate": "node scripts/validate.mjs",
     "pack": "node scripts/pack.mjs",
     "publish": "node scripts/publish.mjs",
-    "test": "node --test scripts/lib/*.test.mjs"
+    "test": "node --test scripts/lib/*.test.mjs shared/ui/*.test.mjs"
   },
   "dependencies": {
     "ajv": "^8.17.1",

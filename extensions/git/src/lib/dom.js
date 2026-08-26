@@ -1,6 +1,6 @@
-export function cls(...values) {
-    return values.filter(Boolean).join(" ");
-}
+import { cls, middleTruncate as sharedMiddleTruncate } from "@muxy/ui";
+
+export { cls };
 export function h(tag, attrs = null, ...children) {
     const node = document.createElement(tag);
     if (attrs)
@@ -58,9 +58,5 @@ export function formatNumber(n) {
     return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 }
 export function middleTruncate(path, max = 44) {
-    if (path.length <= max)
-        return path;
-    const keepEnd = Math.ceil((max - 1) / 2);
-    const keepStart = max - 1 - keepEnd;
-    return `${path.slice(0, keepStart)}...${path.slice(path.length - keepEnd)}`;
+    return sharedMiddleTruncate(path, max);
 }

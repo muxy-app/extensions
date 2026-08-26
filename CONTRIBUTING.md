@@ -25,7 +25,7 @@ leading dot).
 > ```bash
 > git clone --filter=blob:none --sparse https://github.com/muxy-app/extensions
 > cd extensions
-> git sparse-checkout set extensions/my-extension scripts
+> git sparse-checkout set extensions/my-extension scripts shared
 > ```
 
 Start from the example in the Muxy app repo
@@ -42,6 +42,18 @@ The Muxy app ignores it.
 
 Follow the [author guide](https://github.com/muxy-app/muxy/tree/main/docs/extensions)
 in the Muxy app repo. CI here enforces the same rules the app does.
+
+### Shared UI (`shared/ui`)
+
+This repo ships a small, framework-free UI package —
+[`shared/ui`](shared/ui/README.md) — with the documented sizing scale as CSS
+tokens, native-looking primitives built on the official `--muxy-*` theme
+variables, and a few DOM helpers. Using it is the fastest way to look native
+and is recommended for new extensions: add the Vite path alias from its README
+and import `@muxy/ui/ui.css`. It is consumed as source and bundled into your
+`dist/` at build time — nothing changes about packaging or review. It is
+entirely optional; compose your own CSS alongside it, override its tokens, or
+skip it.
 
 ### Rules CI enforces
 
