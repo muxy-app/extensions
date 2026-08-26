@@ -1,9 +1,10 @@
 import { basename, error_message, open_externally, reveal_in_finder, same_file, try_action } from "@/lib/files";
-import { is_html, is_image, is_markdown, is_pdf, is_svg } from "@/lib/languages";
+import { is_editable_image, is_html, is_image, is_markdown, is_pdf, is_svg } from "@/lib/languages";
 import { icon_for } from "@/lib/file-icon";
 import { CodeEditor } from "@/editor/code-editor";
 import { MarkdownEditor } from "@/editor/markdown-editor";
 import { ImageViewer } from "@/editor/image-viewer";
+import { PhotoEditor } from "@/photo/photo-editor";
 import { PdfViewer } from "@/editor/pdf-viewer";
 import { HtmlViewer } from "@/editor/html-viewer";
 import { SettingsSheet } from "@/editor/settings-sheet";
@@ -50,6 +51,7 @@ export class EditorApp {
     this.showToc = read_pref(TOC_PREF_KEY, "0") === "1";
     this.svgView = false;
     this.htmlView = false;
+    this.photoMode = false;
     this.config = load_editor_config();
     this.editorStateId = create_editor_state_id();
     this.disposers = [];
@@ -221,6 +223,15 @@ export class EditorApp {
     return this.filePath ? is_svg(this.filePath) : false;
   }
 
+  // Raster images the photo editor can decode, crop and write back.
+  isEditableImage() {
+    return this.filePath ? is_editable_image(this.filePath) : false;
+  }
+
+  isPhotoEditing() {
+    return this.photoMode && this.isEditableImage();
+  }
+
   isHtml() {
     return this.filePath ? is_html(this.filePath) : false;
   }
@@ -257,6 +268,7 @@ export class EditorApp {
     this.mdMode = "preview";
     this.svgView = false;
     this.htmlView = false;
+    this.photoMode = this.data.photo === true && this.isEditableImage();
     this.setDirty(false);
     this.render();
 
@@ -334,6 +346,9 @@ export class EditorApp {
     if (this.conflictPending) return;
 
     if (this.isBinaryViewer()) {
+      // Our own save fires file.changed; the photo editor already holds the
+      // saved bytes, and a re-mount would drop unsaved edits on the floor.
+      if (this.isPhotoEditing() && (this.dirty || this.child?.suppressReload?.())) return;
       // Re-mount binary viewers so they re-fetch the changed bytes.
       this.bodyKey = null;
       this.render();
@@ -471,6 +486,14 @@ export class EditorApp {
 
   async save(deliberate = true) {
     if (!this.filePath || !this.child || this.saving) return false;
+    if (this.isPhotoEditing()) {
+      this.saving = true;
+      this.updateTopbar();
+      const saved = await this.child.save();
+      this.saving = false;
+      this.updateTopbar();
+      return saved;
+    }
     if (typeof this.child.getValue !== "function") return false;
     this.cancelAutoSave();
     const next = this.child.getValue();
@@ -498,7 +521,8 @@ export class EditorApp {
   }
 
   async confirmClose() {
-    if (!this.dirty || !this.filePath || this.isBinaryViewer()) return false;
+    if (!this.dirty || !this.filePath) return false;
+    if (this.isBinaryViewer() && !this.isPhotoEditing()) return false;
     this.cancelAutoSave();
     const name = basename(this.filePath);
     const choice = await muxy.dialog.confirm({
@@ -525,6 +549,8 @@ export class EditorApp {
   }
 
   async discardChanges() {
+    // Photo edits are never auto-saved, so discarding is just dropping them.
+    if (this.isPhotoEditing()) return false;
     if (this.baseline === null) return false;
     let onDisk;
     try {
@@ -563,6 +589,33 @@ export class EditorApp {
     write_pref(TOC_PREF_KEY, this.showToc ? "1" : "0");
     this.child?.setShowToc?.(this.showToc);
     this.updateTopbar();
+  }
+
+  setPhotoMode(enabled) {
+    if (this.photoMode === enabled) return;
+    if (!enabled && this.dirty) {
+      void this.confirmLeavePhoto();
+      return;
+    }
+    this.photoMode = enabled;
+    this.bodyKey = null;
+    this.render();
+  }
+
+  async confirmLeavePhoto() {
+    const choice = await muxy.dialog.confirm({
+      title: "Discard edits",
+      message: `${basename(this.filePath)} has unsaved edits. Leave the editor and discard them?`,
+      buttons: ["Discard", "Keep Editing"],
+      default: "Keep Editing",
+      cancel: "Keep Editing",
+      style: "warning",
+    });
+    if (choice !== "Discard") return;
+    this.photoMode = false;
+    this.setDirty(false);
+    this.bodyKey = null;
+    this.render();
   }
 
   setSvgView(view) {
@@ -638,6 +691,37 @@ export class EditorApp {
     if (this.dirty) title.appendChild(h("span", { class: "editor-dirty", "aria-label": "Unsaved" }));
 
     const actions = h("div", { class: "toolbar-actions" });
+    if (image && this.isEditableImage()) {
+      actions.appendChild(
+        h(
+          "div",
+          { class: "segmented topbar-segmented", role: "tablist" },
+          h(
+            "button",
+            {
+              type: "button",
+              role: "tab",
+              "aria-selected": !this.photoMode,
+              class: cls("segment", !this.photoMode && "segment-active"),
+              onClick: () => this.setPhotoMode(false),
+            },
+            "View",
+          ),
+          h(
+            "button",
+            {
+              type: "button",
+              role: "tab",
+              "aria-selected": this.photoMode,
+              class: cls("segment", this.photoMode && "segment-active"),
+              onClick: () => this.setPhotoMode(true),
+            },
+            "Edit",
+          ),
+        ),
+      );
+      actions.appendChild(h("span", { class: "toolbar-divider" }));
+    }
     if (svg) {
       actions.appendChild(
         h(
@@ -748,7 +832,7 @@ export class EditorApp {
       actions.appendChild(h("span", { class: "toolbar-divider" }));
     }
 
-    if (!binaryViewer) {
+    if (!binaryViewer || this.isPhotoEditing()) {
       actions.append(
         h(
           "button",
@@ -832,12 +916,14 @@ export class EditorApp {
     }
 
     const image = this.isImage();
+    const photo = this.isPhotoEditing();
     const pdf = this.isPdf();
     const svgPreview = this.isSvg() && this.svgView;
     const htmlPreview = this.isHtml() && this.htmlView;
     const markdown = this.isMarkdown();
     let key;
-    if (image) key = `${this.filePath}:image`;
+    if (photo) key = `${this.filePath}:photo`;
+    else if (image) key = `${this.filePath}:image`;
     else if (pdf) key = `${this.filePath}:pdf`;
     else if (svgPreview) key = `${this.filePath}:svg-view`;
     else if (htmlPreview) key = `${this.filePath}:html-view`;
@@ -850,6 +936,14 @@ export class EditorApp {
 
     this.destroyChild();
     this.bodyKey = key;
+    if (photo) {
+      this.child = new PhotoEditor({
+        parent: this.body,
+        filePath: this.filePath,
+        onDirty: (dirty) => this.setDirty(dirty),
+      });
+      return;
+    }
     if (image) {
       this.child = new ImageViewer({ parent: this.body, filePath: this.filePath });
       return;

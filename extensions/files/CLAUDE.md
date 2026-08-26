@@ -10,6 +10,12 @@ Muxy extension scaffolded from a starter kit. This is an npm + Vite project.
 - `vite.config.js` — builds to `dist/`, the directory Muxy installs.
 - `panel/` + `src/` — vanilla JavaScript source for the files panel and
   editor tab.
+- `src/photo/` — the photo editor mounted by the editor tab: `state.js`,
+  `pipeline.js` (mirror → rotate → crop → resize → colour, shared by preview
+  and export), `adjust.js`, `crop-overlay.js`, `controls.js`,
+  `photo-editor.js`. Pure geometry/tone maths lives in `src/lib/photo-math.js`
+  and is unit-tested under `tests/`; binary output goes through
+  `src/lib/image-write.js`.
 
 Add a `"background"` script (e.g. `background.js`) under the `muxy` key
 only if the extension needs to receive pushed workspace events or run

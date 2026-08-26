@@ -28,6 +28,31 @@ export function image_mime(path) {
   return IMAGE_MIME[extname(path)] ?? "application/octet-stream";
 }
 
+// Formats the photo editor can decode into a canvas. `.ico` is skipped: it is a
+// container, and re-encoding one loses its other sizes.
+const EDITABLE_IMAGE_EXT = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".avif", ".apng"]);
+
+// Formats a canvas can encode back out. Anything else is saved as PNG.
+const ENCODABLE_MIME = new Set(["image/png", "image/jpeg", "image/webp"]);
+
+export function is_editable_image(path) {
+  return EDITABLE_IMAGE_EXT.has(extname(path));
+}
+
+export function is_encodable_image(path) {
+  return ENCODABLE_MIME.has(image_mime(path));
+}
+
+export function is_lossy_mime(mime) {
+  return mime === "image/jpeg" || mime === "image/webp";
+}
+
+export function ext_for_mime(mime) {
+  if (mime === "image/jpeg") return ".jpg";
+  if (mime === "image/webp") return ".webp";
+  return ".png";
+}
+
 export function is_svg(path) {
   return extname(path) === ".svg";
 }

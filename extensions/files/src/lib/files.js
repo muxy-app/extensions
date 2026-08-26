@@ -132,6 +132,24 @@ export async function open_in_editor(rel, focusTabId = null) {
   }
 }
 
+// Same editor tab type, opened straight into photo-editing mode.
+export async function open_in_photo_editor(rel) {
+  try {
+    await muxy.tabs.open({
+      kind: "extensionWebView",
+      extension: {
+        id: muxy.extensionID,
+        tabType: "code-editor",
+        data: { filePath: rel, replaceable: false, photo: true },
+      },
+    });
+  } catch (err) {
+    await muxy
+      .toast({ title: "Edit image", body: error_message(err), variant: "error" })
+      .catch(() => undefined);
+  }
+}
+
 export async function open_in_new_tab(rel) {
   try {
     await muxy.tabs.open({

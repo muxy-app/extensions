@@ -6,11 +6,13 @@ import {
   entry_to_rel,
   open_externally,
   open_in_editor,
+  open_in_photo_editor,
   parent_dir,
   reveal_in_finder,
   reveal_paths,
   strip_slash,
 } from "@/lib/files";
+import { is_editable_image } from "@/lib/languages";
 import {
   create_file,
   create_folder,
@@ -138,6 +140,9 @@ function context_menu_actions(item, ops, selection) {
   ];
 
   if (path !== "") {
+    if (item.kind !== "directory" && is_editable_image(path)) {
+      actions.push({ label: "Edit Image…", run: () => void ops.editImage(path) });
+    }
     actions.push(
       { label: "Rename", run: () => ops.rename(path) },
       { label: "Duplicate", run: () => void ops.duplicate(path) },
@@ -218,6 +223,7 @@ export class FilesPanelApp {
       copyPath: (rel) => copy_path(rel),
       copyPaths: (rels) => this.copyPaths(rels),
       openInEditor: (rel) => this.openFile(rel),
+      editImage: (rel) => open_in_photo_editor(rel),
       refresh: () => this.loadRoot(),
     };
   }
