@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="GSD Control Tower">
+  <defs>
+    <linearGradient id="sky" x1="24" y1="18" x2="232" y2="238" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#665cff"/>
+      <stop offset="1" stop-color="#2a2268"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="52" fill="url(#sky)"/>
+  <path d="M128 47 72 83v31c0 7 5 12 12 12h88c7 0 12-5 12-12V83l-56-36Z" fill="#ffffff" fill-opacity=".13" stroke="#fff" stroke-width="8" stroke-linejoin="round"/>
+  <path d="M128 126v75M96 201h64" fill="none" stroke="#fff" stroke-width="10" stroke-linecap="round"/>
+  <circle cx="108" cy="99" r="7" fill="#82f2bc"/>
+  <circle cx="148" cy="99" r="7" fill="#ffd66b"/>
+  <path d="M45 157h38M173 157h38" fill="none" stroke="#b8b3ff" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="38" cy="157" r="8" fill="#82f2bc"/>
+  <circle cx="218" cy="157" r="8" fill="#ff8e98"/>
+</svg>

@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+
+# 민감 데이터 — Linear 프로젝트 연결/전용 API 키가 들어갈 수 있음
+.linear.json
+
+# 툴링 산출물(스크린샷·MCP 캐시 등)
+.claude/

@@ -1,0 +1,571 @@
+/* 웹뷰 모달 공통 레이아웃. 고정 높이 안에서 내용이 스크롤되도록 한다. */
+
+html, body { height: 100%; }
+body.modal {
+  overflow-y: auto;
+  background: var(--muxy-background, #1e1e1e);
+}
+
+#app { max-width: 100%; }
+
+/* 탭으로 열릴 때는 넓은 화면에서 본문을 가운데 정렬하고 폭을 제한한다(모달과 동일 컴포넌트 재사용). */
+body.tab #app { max-width: 760px; margin: 0 auto; }
+
+.m-head { display: flex; align-items: center; gap: 8px; }
+.m-id {
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0.8;
+  font-variant-numeric: tabular-nums;
+}
+.m-head .spacer { flex: 1; }
+/* 제목: 항상 인라인 편집 필드지만 시각적으로는 제목처럼 보이게 한다. */
+textarea.m-title {
+  margin: 4px 0 6px;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.35;
+  min-height: 0;        /* 기본 textarea 의 min-height:60px 무효화 */
+  overflow: hidden;     /* 자동 높이 조절 → 스크롤바 숨김 */
+}
+.issue-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.issue-meta .chip {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--muxy-surface, rgba(127, 127, 127, 0.15));
+  border: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.25));
+}
+
+.sec-title { font-size: 13px; margin: 4px 0 10px; }
+.sep { border: 0; border-top: 1px solid var(--muxy-border, rgba(127,127,127,0.25)); margin: 14px 0; }
+
+/* open-web 아이콘 버튼을 우측으로 밀기 */
+.m-head #open-web { margin-left: auto; }
+
+/* 작은 텍스트 버튼(미리보기 토글 등) */
+.mini { padding: 2px 8px; font-size: 11px; }
+
+/* 이슈 모달 내 액션 버튼 목록 */
+.actions-list { display: flex; flex-direction: column; gap: 8px; }
+.action-item { display: flex; align-items: center; gap: 10px; }
+.action-item > button { flex: 0 0 auto; }
+.action-item .hint { margin: 0; }
+
+/* 액션 실행 중 버튼에 붙는 로딩 스피너("작업 중…" 표기) */
+.action-item button.running { display: inline-flex; align-items: center; }
+.action-spin {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 7px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, currentColor 40%, transparent);
+  border-top-color: currentColor;
+  animation: linear-action-spin 0.7s linear infinite;
+}
+@keyframes linear-action-spin { to { transform: rotate(360deg); } }
+
+/* 글로벌/프로젝트 스코프 배너 */
+.scope-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 12.5px;
+  line-height: 1.4;
+  margin: 8px 0 12px;
+  border: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.3));
+}
+.scope-banner.global { background: color-mix(in srgb, #5e6ad2 16%, transparent); }
+.scope-banner.project { background: color-mix(in srgb, #3fb950 18%, transparent); }
+
+/* 액션 카드 상단 글로벌 기본값 요약 */
+.act-defaults {
+  font-size: 11px;
+  opacity: 0.75;
+  background: var(--muxy-surface, rgba(127, 127, 127, 0.12));
+  border-radius: 6px;
+  padding: 5px 8px;
+  margin-bottom: 8px;
+  word-break: break-word;
+}
+
+/* API 키 목록(설명 + 키, 라디오로 활성 선택) */
+.token-list { display: flex; flex-direction: column; gap: 6px; }
+.token-row { display: flex; align-items: center; gap: 6px; }
+.token-row .token-active { flex: 0 0 auto; width: auto; margin: 0; }
+.token-row .token-label { flex: 0 0 34%; }
+.token-row .token-key { flex: 1 1 auto; }
+.token-row .token-del { flex: 0 0 auto; }
+
+/* 액션 프롬프트 입력칸 — 여러 줄 프롬프트를 넉넉히 볼 수 있게 높게 */
+textarea.prompt-input { min-height: 140px; line-height: 1.5; }
+
+/* 필수값 미입력 표시 — 빨간 테두리 */
+.invalid,
+input.invalid,
+textarea.invalid {
+  border-color: #e5484d !important;
+  box-shadow: 0 0 0 1px #e5484d33;
+}
+
+/* 아이콘(이모지) + 이름 행 */
+.icon-label-row { display: flex; gap: 6px; align-items: stretch; }
+.icon-pick {
+  flex: 0 0 auto;
+  width: 30px;
+  font-size: 15px;
+  line-height: 1;
+  padding: 0;
+  text-align: center;
+}
+.icon-pick.empty { color: var(--muxy-muted, #888); font-size: 14px; }
+
+/* 도움말 ? 아이콘 */
+.help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-left: 5px;
+  border: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.4));
+  border-radius: 50%;
+  font-size: 9px;
+  font-weight: 700;
+  opacity: 0.6;
+  cursor: help;
+  vertical-align: middle;
+}
+.help:hover { opacity: 1; }
+
+/* 커스텀 툴팁 */
+.tip-pop {
+  position: fixed;
+  z-index: 1100;
+  max-width: 250px;
+  background: var(--muxy-surface-solid, #23262e);
+  color: var(--muxy-foreground, #eee);
+  border: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.4));
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+
+/* 프롬프트 만들기 팝업 */
+.prompt-pop {
+  position: fixed;
+  z-index: 1100;
+  width: 340px;
+  max-height: 380px;
+  overflow-y: auto;
+  background: var(--muxy-surface-solid, #23262e);
+  border: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.35));
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
+  padding: 10px;
+}
+.pp-guide { font-size: 12px; line-height: 1.5; opacity: 0.85; margin-bottom: 8px; }
+.pp-sub { font-size: 11px; opacity: 0.6; margin: 8px 0 4px; }
+.pp-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.pp-chip {
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--muxy-surface, rgba(127, 127, 127, 0.15));
+  border: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.3));
+  cursor: pointer;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.pp-presets { display: flex; flex-direction: column; gap: 4px; }
+.pp-preset {
+  text-align: left;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--muxy-surface, rgba(127, 127, 127, 0.12));
+  border: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.28));
+  cursor: pointer;
+}
+.pp-preset:hover { background: var(--muxy-surface-solid, rgba(127, 127, 127, 0.3)); }
+.pp-preset-label { font-size: 12px; font-weight: 600; }
+.pp-preset-tpl {
+  font-size: 11px;
+  opacity: 0.6;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 노션식 이모지 피커 팝업 */
+.emoji-pop {
+  position: fixed;
+  z-index: 1000;
+  width: 280px;
+  max-height: 300px;
+  display: flex;
+  flex-direction: column;
+  background: var(--muxy-surface-solid, #23262e);
+  border: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.35));
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
+  padding: 8px;
+}
+.emoji-pop-head { display: flex; gap: 6px; margin-bottom: 6px; }
+.emoji-search { flex: 1; }
+.emoji-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; overflow-y: auto; }
+/* 노션식 카테고리 헤더 — 그리드 한 줄 전체 차지, 스크롤 시 상단 고정 */
+.emoji-cat {
+  grid-column: 1 / -1;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--muxy-surface-solid, #23262e);
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.7;
+  padding: 6px 2px 2px;
+}
+.emoji-cell {
+  padding: 2px 0;
+  font-size: 18px;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.emoji-cell:hover { background: var(--muxy-surface, rgba(127, 127, 127, 0.28)); }
+
+/* 액션 편집 카드 */
+.act-card {
+  border: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.25));
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  background: var(--muxy-surface, rgba(127, 127, 127, 0.06));
+}
+.act-card .field { margin-bottom: 8px; }
+
+/* 상태 체크박스 목록 */
+.state-checks {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px 10px;
+  max-height: 130px;
+  overflow-y: auto;
+  padding: 6px 8px;
+  border: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.25));
+  border-radius: 6px;
+}
+.check-inline {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.check-inline input { width: auto; }
+
+/* 마크다운 렌더 영역 */
+.md {
+  font-size: 13px;
+  line-height: 1.5;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+.md.muted { opacity: 0.6; }
+.md p { margin: 0 0 8px; }
+.md h1, .md h2, .md h3 { margin: 10px 0 6px; font-size: 14px; }
+.md ul, .md ol { margin: 0 0 8px; padding-left: 20px; }
+.md a { color: var(--muxy-accent, #5e6ad2); }
+.md code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--muxy-surface, rgba(127, 127, 127, 0.18));
+}
+.md pre {
+  background: var(--muxy-surface, rgba(127, 127, 127, 0.18));
+  padding: 8px 10px;
+  border-radius: 6px;
+  overflow-x: auto;
+}
+.md pre code { background: none; padding: 0; }
+.md blockquote {
+  margin: 0 0 8px;
+  padding-left: 10px;
+  border-left: 3px solid var(--muxy-border, rgba(127, 127, 127, 0.4));
+  opacity: 0.85;
+}
+.md img { max-width: 100%; }
+
+/* 코멘트 미리보기는 박스로. */
+#comment-preview {
+  padding: 10px 12px;
+  border: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.25));
+  border-radius: 6px;
+  background: var(--muxy-surface, rgba(127, 127, 127, 0.08));
+  max-height: 260px;
+  overflow-y: auto;
+}
+/* 본문은 노션처럼 문서로 — 테두리/배경 없이, 호버 시 살짝 강조, 클릭하면 편집. */
+#desc.doc {
+  padding: 6px 4px;
+  border-radius: 6px;
+  cursor: text;
+  min-height: 28px;
+}
+#desc.doc:hover { background: var(--muxy-surface, rgba(127, 127, 127, 0.07)); }
+#desc.md { font-size: 14px; line-height: 1.65; }
+
+/* Linear 스타일 인라인 편집: 읽기와 편집의 시각 차이를 없앤다. 하드 테두리/채워진
+   배경 없이, 호버·포커스에만 아주 옅은 배경만 준다 → 클릭해도 박스가 튀지 않는다. */
+.seamless {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 6px 4px;
+  resize: none;                /* 자동 높이 조절을 쓰므로 리사이즈 핸들 숨김 */
+  transition: background 0.12s ease;
+}
+.seamless:hover { background: var(--muxy-surface, rgba(127, 127, 127, 0.07)); }
+.seamless:focus {
+  outline: none;
+  background: var(--muxy-surface, rgba(127, 127, 127, 0.1));
+  border-color: transparent;
+}
+/* 코멘트 입력칸: 비어 있을 때 최소 높이만 확보(플레이스홀더 보이게). */
+#comment { min-height: 40px; }
+
+/* KNK-90: 마크다운 서식 툴바(위지위그식 즉시 서식). 편집 포커스 중에만 노출. */
+.md-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-bottom: 6px;
+  padding: 3px;
+  border: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.25));
+  border-radius: 8px;
+  background: var(--muxy-surface, rgba(127, 127, 127, 0.08));
+}
+.md-tb-btn {
+  min-width: 26px;
+  height: 24px;
+  padding: 0 6px;
+  font-size: 12px;
+  line-height: 1;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+}
+.md-tb-btn[data-cmd="bold"] { font-weight: 700; }
+.md-tb-btn[data-cmd="italic"] { font-style: italic; }
+.md-tb-btn[data-cmd="strike"] { text-decoration: line-through; }
+.md-tb-btn:hover { background: var(--muxy-surface-solid, rgba(127, 127, 127, 0.28)); }
+
+/* KNK-90: 노션식 "/" 슬래시 명령 메뉴 */
+.md-slash-menu {
+  position: fixed;
+  z-index: 1200;
+  width: 220px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 4px;
+  background: var(--muxy-surface-solid, #23262e);
+  border: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.35));
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
+}
+.md-slash-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.md-slash-item.active { background: var(--muxy-accent, #5e6ad2); color: #fff; }
+.md-slash-icon {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  border-radius: 5px;
+  background: var(--muxy-surface, rgba(127, 127, 127, 0.18));
+}
+.md-slash-item.active .md-slash-icon { background: rgba(255, 255, 255, 0.22); }
+.md-slash-label { font-size: 12.5px; }
+.md-slash-empty { padding: 8px; font-size: 12px; opacity: 0.6; }
+.md-tb-btn.is-active { background: var(--muxy-accent, #5e6ad2); color: #fff; }
+
+/* KNK-90: 진짜 위지위그(TipTap/ProseMirror) 본문 에디터 */
+/* KNK-95: 다른 입력칸(input/textarea)과 동일하게 테두리를 둘러 "입력 가능한 칸"임을 드러낸다. */
+.md-wysiwyg {
+  border: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.3));
+  border-radius: 6px;
+  background: var(--muxy-surface-solid, rgba(0, 0, 0, 0.2));
+  padding: 2px;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+/* 포커스 시 강조 테두리(다른 입력칸과 동일한 시각 신호) */
+.md-wysiwyg:focus-within {
+  border-color: var(--muxy-accent, #5e6ad2);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--muxy-accent, #5e6ad2) 40%, transparent);
+}
+.md-wysiwyg .ProseMirror {
+  outline: none;
+  font-size: 14px;
+  line-height: 1.65;
+  min-height: 40px;
+  padding: 6px 6px;
+  border-radius: 6px;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+.md-wysiwyg .ProseMirror > * + * { margin-top: 8px; }
+.md-wysiwyg .ProseMirror p { margin: 0; }
+.md-wysiwyg .ProseMirror h1 { font-size: 20px; font-weight: 600; line-height: 1.3; }
+.md-wysiwyg .ProseMirror h2 { font-size: 17px; font-weight: 600; line-height: 1.3; }
+.md-wysiwyg .ProseMirror h3 { font-size: 15px; font-weight: 600; line-height: 1.3; }
+.md-wysiwyg .ProseMirror ul, .md-wysiwyg .ProseMirror ol { padding-left: 20px; margin: 0; }
+.md-wysiwyg .ProseMirror a { color: var(--muxy-accent, #5e6ad2); }
+.md-wysiwyg .ProseMirror code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--muxy-surface, rgba(127, 127, 127, 0.18));
+}
+.md-wysiwyg .ProseMirror pre {
+  background: var(--muxy-surface, rgba(127, 127, 127, 0.18));
+  padding: 8px 10px;
+  border-radius: 6px;
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.md-wysiwyg .ProseMirror pre code { background: none; padding: 0; }
+.md-wysiwyg .ProseMirror blockquote {
+  padding-left: 10px;
+  border-left: 3px solid var(--muxy-border, rgba(127, 127, 127, 0.4));
+  opacity: 0.85;
+  margin: 0;
+}
+.md-wysiwyg .ProseMirror hr {
+  border: none;
+  border-top: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.4));
+  margin: 12px 0;
+}
+.md-wysiwyg .ProseMirror img { max-width: 100%; border-radius: 6px; }
+/* 체크박스 목록(To-do) */
+.md-wysiwyg ul[data-type="taskList"] { list-style: none; padding-left: 2px; }
+.md-wysiwyg ul[data-type="taskList"] li { display: flex; gap: 8px; align-items: flex-start; }
+.md-wysiwyg ul[data-type="taskList"] li > label { margin-top: 3px; flex: none; }
+.md-wysiwyg ul[data-type="taskList"] li > div { flex: 1; }
+/* 빈 에디터 플레이스홀더 */
+.md-wysiwyg .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+/* KNK-90: 링크/이미지 URL 을 받는 인라인 입력창(브라우저 blocking 다이얼로그 대체) */
+.md-inline-prompt {
+  position: fixed;
+  z-index: 1300;
+  width: 240px;
+  padding: 6px;
+  background: var(--muxy-surface-solid, #23262e);
+  border: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.35));
+  border-radius: 8px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
+}
+.md-inline-prompt input { width: 100%; }
+
+/* 속성(상태/담당자/중요도/프로젝트) — 2열 그리드로 콤팩트하게 */
+.props { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+.props .field { margin-bottom: 8px; }
+
+/* 라벨 토글 칩: 켜진 것만 라벨 색으로 강조, 나머지는 흐리게. */
+.label-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.label-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  font-size: 11px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: transparent;
+  border: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.3));
+  color: var(--muxy-foreground, #e6e6e6);
+  opacity: 0.65;
+}
+.label-chip::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--label-color, #8a8f98);
+}
+.label-chip:hover { opacity: 1; }
+.label-chip.on {
+  opacity: 1;
+  border-color: var(--label-color, #8a8f98);
+  background: color-mix(in srgb, var(--label-color, #8a8f98) 18%, transparent);
+}
+
+/* 위험 동작 버튼(이슈 삭제) */
+button.danger {
+  color: #e5484d;
+  background: transparent;
+  border-color: color-mix(in srgb, #e5484d 40%, transparent);
+}
+button.danger:hover { background: color-mix(in srgb, #e5484d 15%, transparent); }
+
+/* 코멘트 목록 */
+.comments { display: flex; flex-direction: column; gap: 10px; }
+.comment {
+  padding: 8px 10px;
+  border: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.22));
+  border-radius: 8px;
+  background: var(--muxy-surface, rgba(127, 127, 127, 0.08));
+}
+.comment-head { display: flex; gap: 8px; align-items: baseline; margin-bottom: 4px; }
+.comment-who { font-weight: 600; font-size: 12px; }
+.comment-when { font-size: 11px; opacity: 0.55; }
+.comment-body { font-size: 12.5px; }
+.comment-body p:last-child { margin-bottom: 0; }
+
+/* 하위 이슈 목록 */
+.sub-issues { display: flex; flex-direction: column; gap: 4px; }
+.sub-issue {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 6px 8px;
+  border: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.22));
+  border-radius: 8px;
+  background: var(--muxy-surface, rgba(127, 127, 127, 0.08));
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+.sub-issue:hover { border-color: var(--muxy-accent, #5e6ad2); }
+.sub-dot { flex: none; width: 9px; height: 9px; border-radius: 50%; }
+.sub-id { flex: none; font-size: 11px; opacity: 0.65; font-variant-numeric: tabular-nums; }
+.sub-title { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

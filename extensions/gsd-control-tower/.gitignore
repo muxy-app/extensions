@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.npm-cache/
+.qualification/
+.research/
+.agents/
+skills-lock.json
+.DS_Store

@@ -14,6 +14,8 @@ let currentState = "open"; // open | closed | all
 let currentCwd = ""; // Path of the selected project (empty = active project)
 let currentItem = null; // Item currently shown in detail view
 let loading = false;
+let mineOnly = false;
+let currentUser = "";
 
 const LIST_FIELDS = {
   issues: "number,title,state,author,labels,updatedAt,url",
@@ -180,25 +182,49 @@ function matchesQuery(it, q) {
   return hay.includes(q);
 }
 
+function filterList() {
+  let items = listItems;
+  if (mineOnly && currentUser) {
+    items = items.filter((it) => it.author?.login === currentUser);
+  }
+  if (listQuery) {
+    items = items.filter((it) => matchesQuery(it, listQuery));
+  }
+  return items;
+}
+
 function renderList(items) {
   listItems = items;
   listQuery = "";
   const what = mode === "prs" ? "Pull Request" : "Issue";
+  const mineBtn = mode === "prs"
+    ? `<button class="toggle${mineOnly ? " is-active" : ""}" id="mine-only" title="Show only my PRs" aria-pressed="${mineOnly}">Mine</button>`
+    : "";
   const toolbar = `
     <div class="listbar">
       <div class="search">
         <span class="search__icon">${SEARCH_ICON}</span>
         <input class="search__input" id="search" type="text" placeholder="Filter ${what.toLowerCase()}s…" />
       </div>
+      ${mineBtn}
       <button class="btn btn--accent" id="new">+ New ${what}</button>
     </div>`;
   content.innerHTML = `${toolbar}<div class="list" id="list"></div>`;
   wireNewButton();
   document.querySelector("#search").addEventListener("input", (e) => {
     listQuery = e.target.value.trim().toLowerCase();
-    renderRows(listItems.filter((it) => matchesQuery(it, listQuery)));
+    renderRows(filterList());
   });
-  renderRows(items);
+  const mineBtnEl = document.querySelector("#mine-only");
+  if (mineBtnEl) {
+    mineBtnEl.addEventListener("click", () => {
+      mineOnly = !mineOnly;
+      mineBtnEl.classList.toggle("is-active", mineOnly);
+      mineBtnEl.setAttribute("aria-pressed", mineOnly);
+      renderRows(filterList());
+    });
+  }
+  renderRows(filterList());
 }
 
 function renderRows(items) {
@@ -712,6 +738,16 @@ async function loadRepoName() {
   } catch { /* cosmetic only, ignore */ }
 }
 
+async function loadCurrentUser() {
+  if (currentUser) return;
+  try {
+    if (window.muxy?.gh?.user) {
+      const user = await window.muxy.gh.user();
+      if (user?.login) currentUser = user.login;
+    }
+  } catch { /* ignore */ }
+}
+
 async function loadList() {
   openPanelAct = null;
   currentItem = null;
@@ -720,12 +756,27 @@ async function loadList() {
   refreshBtn.classList.add("is-spinning");
   renderLoading();
   try {
-    const argv = ["gh", noun(), "list", "--json", LIST_FIELDS[mode], "--state", currentState, "--limit", "100"];
-    const { stdout, stderr, code } = await run(argv);
-    if (code !== 0) return handleGhError(stderr || stdout);
+    await loadCurrentUser();
     let items;
-    try { items = JSON.parse(stdout || "[]"); }
-    catch { return renderError("Failed to load", "Could not parse gh output."); }
+    if (mode === "prs" && window.muxy?.git?.pr?.list) {
+      items = await window.muxy.git.pr.list({ filter: currentState, limit: 100, checks: true });
+      items = (items || []).map((pr) => ({
+        number: pr.number,
+        title: pr.title,
+        state: pr.state,
+        author: { login: pr.author },
+        labels: [],
+        updatedAt: pr.updatedAt,
+        url: pr.url,
+        isDraft: pr.isDraft,
+      }));
+    } else {
+      const argv = ["gh", noun(), "list", "--json", LIST_FIELDS[mode], "--state", currentState, "--limit", "100"];
+      const { stdout, stderr, code } = await run(argv);
+      if (code !== 0) return handleGhError(stderr || stdout);
+      try { items = JSON.parse(stdout || "[]"); }
+      catch { return renderError("Failed to load", "Could not parse gh output."); }
+    }
     renderList(items);
   } catch (e) {
     renderError("An error occurred", escapeHtml(e.message || String(e)));

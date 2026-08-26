@@ -1,0 +1,114 @@
+/* Muxy 테마 토큰(--muxy-*)에 맞춘 공통 스타일. */
+
+:root {
+  --gap: 8px;
+  --radius: 8px;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  /* Muxy 확장 UI 가이드의 본문 기본 크기(12px)에 맞춘다. */
+  font-size: 12px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  color: var(--muxy-foreground, #e6e6e6);
+  background: var(--muxy-background, #1e1e1e);
+}
+
+/* 모달 페이지는 배경을 화면 폭에 맞춘다. */
+body.modal { padding: 14px; }
+/* 탭 페이지(이슈 상세를 풀 탭 웹뷰로): 넓은 화면에서 본문을 가운데로 모아 읽기 좋게. */
+body.tab { padding: 24px 20px; overflow-y: auto; }
+
+h1, h2, h3 { margin: 0; font-weight: 600; }
+
+button {
+  font: inherit;
+  color: var(--muxy-foreground, #e6e6e6);
+  background: var(--muxy-surface, rgba(127, 127, 127, 0.14));
+  border: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.25));
+  border-radius: 6px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+button:hover { background: var(--muxy-surface-solid, rgba(127, 127, 127, 0.28)); }
+button.primary {
+  background: var(--muxy-accent, #5e6ad2);
+  border-color: transparent;
+  color: #fff;
+  font-weight: 600;
+}
+button.primary:hover { filter: brightness(1.08); }
+button:disabled { opacity: 0.5; cursor: default; }
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+}
+
+input[type="text"],
+input[type="password"],
+textarea,
+select {
+  width: 100%;
+  font: inherit;
+  color: var(--muxy-foreground, #e6e6e6);
+  background: var(--muxy-surface-solid, rgba(0, 0, 0, 0.2));
+  border: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.3));
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+textarea { resize: vertical; min-height: 60px; }
+
+label { display: block; }
+.field { margin-bottom: 10px; }
+.field > .label {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 11px;
+  opacity: 0.7;
+}
+.hint { font-size: 11px; opacity: 0.55; margin-top: 3px; }
+
+.row { display: flex; align-items: center; gap: var(--gap); }
+.spacer { flex: 1; }
+
+/* 세그먼트 토글(글로벌/프로젝트 등) — 패널·모달 공통 */
+.seg { display: inline-flex; border: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.25)); border-radius: 6px; overflow: hidden; }
+.seg-btn { border: 0; border-radius: 0; padding: 4px 12px; background: transparent; font-size: 12px; }
+.seg-btn.is-active { background: var(--muxy-accent, #5e6ad2); color: #fff; }
+.seg-btn:disabled { opacity: 0.5; }
+
+.checkbox { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.checkbox input { width: auto; }
+
+/* 상태/우선순위 배지 */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.3));
+  white-space: nowrap;
+}
+/* 상태 색상을 테두리·배경·텍스트에 반영해 태그가 또렷하게 보이도록 한다. */
+.badge--state {
+  border-color: color-mix(in srgb, var(--state-color) 55%, transparent);
+  background: color-mix(in srgb, var(--state-color) 16%, transparent);
+  color: color-mix(in srgb, var(--state-color) 78%, var(--muxy-foreground, #e6e6e6));
+  font-weight: 600;
+}
+.badge--state .dot { width: 9px; height: 9px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: 0 0 auto; }
+
+.muted { opacity: 0.6; }
+.error { color: #e5534b; font-size: 12px; }
+
+.actions { display: flex; gap: var(--gap); justify-content: flex-end; margin-top: 12px; }
