@@ -1,6 +1,6 @@
 {
   "name": "linear",
-  "version": "0.7.5",
+  "version": "0.7.6",
   "private": true,
   "type": "module",
   "description": "Muxy extension: browse your assigned Linear issues in a side panel, open an issue's detail in a tab to view and edit it, and create issues — without leaving Muxy.",
