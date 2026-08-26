@@ -23,6 +23,27 @@ import { countingExec } from "./helpers/counting-exec.js";
 const PROJ = "/tmp/muxy-budget-proj";
 const N = 40;
 
+function sqlQuote(v) {
+  return `'${String(v).replace(/'/g, "''")}'`;
+}
+
+function writeCursorStore(dbPath, meta, blobs = []) {
+  const hex = Buffer.from(JSON.stringify(meta), "utf8").toString("hex");
+  const stmts = [
+    "CREATE TABLE blobs (id TEXT PRIMARY KEY, data BLOB);",
+    "CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);",
+    `INSERT INTO meta VALUES ('0', ${sqlQuote(hex)});`,
+  ];
+  for (const b of blobs) {
+    const blobHex = Buffer.from(String(b.data), "utf8").toString("hex");
+    stmts.push(`INSERT INTO blobs VALUES (${sqlQuote(b.id)}, X'${blobHex}');`);
+  }
+  const result = spawnSync("/usr/bin/sqlite3", [dbPath, stmts.join("\n")], {
+    encoding: "utf8",
+  });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+}
+
 function realExec(argv, opts = {}) {
   const result = spawnSync(argv[0], argv.slice(1), {
     input: opts.stdin,
@@ -119,14 +140,70 @@ describe("scan exec budgets (amplification)", () => {
     assert.equal(rows.length, PER_GROUP_CAP);
     const catCalls = exec.countWhere((a) => a[0] === "/bin/cat");
     const headCalls = exec.countWhere((a) => a[0] === "/usr/bin/head");
+    const sqliteCalls = exec.countWhere((a) => a[0] === "/usr/bin/sqlite3");
     assert.equal(catCalls, 0, "title metadata must use readHead, not full cat");
     assert.ok(
       headCalls <= PER_GROUP_CAP + ENRICH_SLACK,
       `expected ≤${PER_GROUP_CAP + ENRICH_SLACK} head calls, got ${headCalls}`,
     );
+    assert.equal(
+      sqliteCalls,
+      0,
+      `strong sidecar must not sqlite, got ${sqliteCalls}`,
+    );
     assert.ok(
       exec.calls.length <= 50,
       `expected ≤50 execs, got ${exec.calls.length}`,
+    );
+  });
+
+  it("listCursor store-only mixed stays under honest sqlite cap", async () => {
+    const hash = md5Hex(PROJ);
+    const root = join(home, ".cursor", "chats", hash);
+    for (let i = 0; i < N; i++) {
+      const sid = uuidAt(i);
+      const sess = join(root, sid);
+      mkdirSync(sess, { recursive: true });
+      const t = new Date(2026, 0, 1, 0, 0, i);
+      utimesSync(sess, t, t);
+      if (i % 5 === 0) {
+        writeFileSync(
+          join(sess, "meta.json"),
+          JSON.stringify({
+            title: `Sidecar ${i}`,
+            updatedAtMs: Date.UTC(2026, 0, 1, 0, 0, i),
+          }),
+        );
+      } else if (i % 5 === 1) {
+        writeCursorStore(join(sess, "store.db"), {
+          name: "New Agent",
+          latestRootBlobId: "ab".repeat(32),
+          subagentInfo: { parentAgentId: uuidAt(0) },
+          createdAt: Date.UTC(2026, 0, 1, 0, 0, i),
+        });
+      } else {
+        writeCursorStore(join(sess, "store.db"), {
+          name: `Store ${i}`,
+          latestRootBlobId: "ab".repeat(32),
+          createdAt: Date.UTC(2026, 0, 1, 0, 0, i),
+        });
+      }
+    }
+
+    const exec = countingExec(realExec);
+    const fs = createHostFs(exec);
+    const rows = await listCursor(fs, PROJ, { home, sqliteAvailable: true });
+    assert.ok(rows.length > 0);
+    assert.ok(rows.every((r) => !/New Agent/i.test(r.title)));
+    const sqliteCalls = exec.countWhere((a) => a[0] === "/usr/bin/sqlite3");
+    assert.ok(sqliteCalls > 0, "store-only dirs must query sqlite");
+    assert.ok(
+      exec.calls.length <= 90,
+      `expected ≤90 execs for store-only mix, got ${exec.calls.length}`,
+    );
+    assert.ok(
+      sqliteCalls <= 40,
+      `expected bounded sqlite, got ${sqliteCalls}`,
     );
   });
 

@@ -13,7 +13,7 @@ import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { createHostFs } from "../src/lib/host-fs.js";
 import { listGrok } from "../src/lib/sessions/scan/grok.js";
-import { listCursor } from "../src/lib/sessions/scan/cursor.js";
+import { listCursor, CURSOR_SQLITE_SOFT_ERROR } from "../src/lib/sessions/scan/cursor.js";
 import { listClaude } from "../src/lib/sessions/scan/claude.js";
 import { listCodex } from "../src/lib/sessions/scan/codex.js";
 import {
@@ -37,6 +37,28 @@ const SID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
 const SID2 = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
 const PROJ = "/tmp/muxy-test-proj";
 const OTHER = "/tmp/muxy-other-proj";
+
+function sqlQuote(v) {
+  return `'${String(v).replace(/'/g, "''")}'`;
+}
+
+/** Cursor store.db: meta.value is lowercase hex TEXT, not an X'…' BLOB. */
+function writeCursorStore(dbPath, meta, blobs = []) {
+  const hex = Buffer.from(JSON.stringify(meta), "utf8").toString("hex");
+  const stmts = [
+    "CREATE TABLE blobs (id TEXT PRIMARY KEY, data BLOB);",
+    "CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);",
+    `INSERT INTO meta VALUES ('0', ${sqlQuote(hex)});`,
+  ];
+  for (const b of blobs) {
+    const blobHex = Buffer.from(String(b.data), "utf8").toString("hex");
+    stmts.push(`INSERT INTO blobs VALUES (${sqlQuote(b.id)}, X'${blobHex}');`);
+  }
+  const result = spawnSync("/usr/bin/sqlite3", [dbPath, stmts.join("\n")], {
+    encoding: "utf8",
+  });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+}
 
 function realExec(argv, opts = {}) {
   const result = spawnSync(argv[0], argv.slice(1), {
@@ -293,11 +315,8 @@ describe("listCursor", () => {
     };
     const fs = createHostFs(exec);
     const rows = await listCursor(fs, PROJ, { home });
-    assert.equal(rows.length, 1);
-    assert.equal(rows[0].id, SID);
-    // Truncated head is invalid JSON → fail-open without branch from meta.
-    assert.equal(rows[0].title, "(untitled)");
-    assert.equal(rows[0].branch, null);
+    // Truncated sidecar + no store meta → unconfirmable; do not list as last-resort clutter.
+    assert.equal(rows.length, 0);
     assertReadHeadOnly(calls, { maxBytes: 64_000 });
   });
 
@@ -331,6 +350,176 @@ describe("listCursor", () => {
     assert.equal(rows[0].title, "Still Parses");
     assert.equal(rows[0].branch, "main");
     assertReadHeadOnly(calls, { maxBytes: 64_000 });
+  });
+
+  it("titles the row from store.db hex name", async () => {
+    const hash = createHash("md5").update(PROJ, "utf8").digest("hex");
+    const sess = join(home, ".cursor", "chats", hash, SID);
+    mkdirSync(sess, { recursive: true });
+    writeCursorStore(join(sess, "store.db"), {
+      name: "JWT OAuth Refactor",
+      latestRootBlobId: "ab".repeat(32),
+      createdAt: 1_700_000_000_000,
+      blobEncryptionKey: "cd".repeat(32),
+    });
+    const fs = createHostFs(realExec);
+    const rows = await listCursor(fs, PROJ, { home, sqliteAvailable: true });
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].title, "JWT OAuth Refactor");
+    assert.equal(JSON.stringify(rows[0]).includes("blobEncryptionKey"), false);
+    assert.equal("blobEncryptionKey" in rows[0], false);
+  });
+
+  it("omits dirs with store subagentInfo", async () => {
+    const hash = createHash("md5").update(PROJ, "utf8").digest("hex");
+    const parent = join(home, ".cursor", "chats", hash, SID);
+    const child = join(home, ".cursor", "chats", hash, SID2);
+    mkdirSync(parent, { recursive: true });
+    mkdirSync(child, { recursive: true });
+    writeCursorStore(join(parent, "store.db"), {
+      name: "Parent Chat",
+      latestRootBlobId: "ab".repeat(32),
+      createdAt: 1_700_000_000_000,
+    });
+    writeCursorStore(join(child, "store.db"), {
+      name: "New Agent",
+      latestRootBlobId: "ab".repeat(32),
+      subagentInfo: { parentAgentId: SID, typeName: "generalPurpose" },
+      createdAt: 1_700_000_000_100,
+    });
+    const fs = createHostFs(realExec);
+    const rows = await listCursor(fs, PROJ, { home, sqliteAvailable: true });
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].id, SID);
+    assert.equal(rows[0].title, "Parent Chat");
+  });
+
+  it("omits empty root blob and sidecar hasConversation false", async () => {
+    const hash = createHash("md5").update(PROJ, "utf8").digest("hex");
+    const emptyStore = join(home, ".cursor", "chats", hash, SID);
+    const emptySide = join(home, ".cursor", "chats", hash, SID2);
+    mkdirSync(emptyStore, { recursive: true });
+    mkdirSync(emptySide, { recursive: true });
+    writeCursorStore(join(emptyStore, "store.db"), {
+      name: "Ghost",
+      latestRootBlobId: "",
+      createdAt: 1_700_000_000_000,
+    });
+    writeFileSync(
+      join(emptySide, "meta.json"),
+      JSON.stringify({ title: "Never started", hasConversation: false }),
+    );
+    const fs = createHostFs(realExec);
+    const rows = await listCursor(fs, PROJ, { home, sqliteAvailable: true });
+    assert.equal(rows.length, 0);
+  });
+
+  it("falls back to <user_query> when store name is weak", async () => {
+    const hash = createHash("md5").update(PROJ, "utf8").digest("hex");
+    const sess = join(home, ".cursor", "chats", hash, SID);
+    mkdirSync(sess, { recursive: true });
+    const user = JSON.stringify({
+      role: "user",
+      content:
+        "<user_info>\nOS Version: darwin\n</user_info>\n<user_query>/generate-mc-health-summary 1d</user_query>",
+    });
+    writeCursorStore(
+      join(sess, "store.db"),
+      {
+        name: "New Agent",
+        latestRootBlobId: "ab".repeat(32),
+        createdAt: 1_700_000_000_000,
+      },
+      [{ id: "u1", data: user }],
+    );
+    const fs = createHostFs(realExec);
+    const rows = await listCursor(fs, PROJ, { home, sqliteAvailable: true });
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].title, "/generate-mc-health-summary 1d");
+  });
+
+  it("sidecar title works without sqlite", async () => {
+    const hash = createHash("md5").update(PROJ, "utf8").digest("hex");
+    const sess = join(home, ".cursor", "chats", hash, SID);
+    mkdirSync(sess, { recursive: true });
+    writeFileSync(
+      join(sess, "meta.json"),
+      JSON.stringify({
+        title: "Sidecar Only",
+        hasConversation: true,
+        updatedAtMs: 1_700_000_000_000,
+      }),
+    );
+    const calls = [];
+    const exec = (argv, opts = {}) => {
+      calls.push(argv.slice());
+      return realExec(argv, opts);
+    };
+    const fs = createHostFs(exec);
+    const rows = await listCursor(fs, PROJ, { home, sqliteAvailable: false });
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].title, "Sidecar Only");
+    assert.equal(
+      calls.filter((a) => a[0] === "/usr/bin/sqlite3").length,
+      0,
+    );
+  });
+
+  it("sqliteAvailable false still lists sidecar parents and skips store-only", async () => {
+    const hash = createHash("md5").update(PROJ, "utf8").digest("hex");
+    const side = join(home, ".cursor", "chats", hash, SID);
+    const storeOnly = join(home, ".cursor", "chats", hash, SID2);
+    mkdirSync(side, { recursive: true });
+    mkdirSync(storeOnly, { recursive: true });
+    writeFileSync(
+      join(side, "meta.json"),
+      JSON.stringify({ title: "From Sidecar", hasConversation: true }),
+    );
+    writeCursorStore(join(storeOnly, "store.db"), {
+      name: "Store Only Parent",
+      latestRootBlobId: "ab".repeat(32),
+      createdAt: 1_700_000_000_000,
+    });
+    const calls = [];
+    const exec = (argv, opts = {}) => {
+      calls.push(argv.slice());
+      return realExec(argv, opts);
+    };
+    const fs = createHostFs(exec);
+    const rows = await listCursor(fs, PROJ, { home, sqliteAvailable: false });
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].id, SID);
+    assert.equal(rows[0].title, "From Sidecar");
+    assert.equal(rows.softError, CURSOR_SQLITE_SOFT_ERROR);
+    assert.equal(
+      calls.filter((a) => a[0] === "/usr/bin/sqlite3").length,
+      0,
+    );
+  });
+
+  it("omits dirs with no sidecar and no store meta", async () => {
+    const hash = createHash("md5").update(PROJ, "utf8").digest("hex");
+    const sess = join(home, ".cursor", "chats", hash, SID);
+    mkdirSync(sess, { recursive: true });
+    const fs = createHostFs(realExec);
+    const rows = await listCursor(fs, PROJ, { home, sqliteAvailable: true });
+    assert.equal(rows.length, 0);
+  });
+
+  it("last-resort Cursor · shortId when store name is weak and blobs do not title", async () => {
+    const hash = createHash("md5").update(PROJ, "utf8").digest("hex");
+    const sess = join(home, ".cursor", "chats", hash, SID);
+    mkdirSync(sess, { recursive: true });
+    writeCursorStore(join(sess, "store.db"), {
+      name: "New Agent",
+      latestRootBlobId: "ab".repeat(32),
+      createdAt: 1_700_000_000_000,
+    });
+    const fs = createHostFs(realExec);
+    const rows = await listCursor(fs, PROJ, { home, sqliteAvailable: true });
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].id, SID);
+    assert.equal(rows[0].title, "Cursor · aaaaaaaa…aaaa");
   });
 });
 

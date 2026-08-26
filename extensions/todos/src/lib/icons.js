@@ -16,6 +16,10 @@ const ICONS = {
 		'<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/>',
 	"grip-vertical":
 		'<line x1="9" x2="9" y1="5" y2="19"/><line x1="15" x2="15" y1="5" y2="19"/>',
+	"sticky-note":
+		'<path d="M15.5 3H5a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2V8.5L15.5 3Z"/><path d="M15 3v6h6"/>',
+	"pen-line":
+		'<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
 };
 
 // Parse trusted icon markup into real SVG nodes (no innerHTML on the live tree).

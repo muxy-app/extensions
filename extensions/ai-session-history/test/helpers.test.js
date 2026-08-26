@@ -24,6 +24,16 @@ import {
 } from "../src/lib/sessions/start-cli.js";
 import * as manageApi from "../src/lib/sessions/manage.js";
 import * as storageApi from "../src/lib/storage.js";
+import {
+  hexToUtf8,
+  utf8ToHex,
+  parseCursorStoreMeta,
+  encodeCursorStoreMeta,
+  isWeakTitle,
+  isWeakCursorTitle,
+  cursorTitleFromUserBlob,
+  isEmptyCursorRootBlob,
+} from "../src/lib/sessions/scan/helpers.js";
 
 describe("sanitize", () => {
   it("collapses whitespace and strips control chars", () => {
@@ -188,6 +198,102 @@ describe("providers capabilities", () => {
   });
 });
 
+
+describe("cursor store hex helpers", () => {
+  it("hex round-trips ASCII and emoji", () => {
+    assert.equal(hexToUtf8(utf8ToHex("hello")), "hello");
+    assert.equal(hexToUtf8(utf8ToHex("café 🚀")), "café 🚀");
+    assert.equal(utf8ToHex("AB"), "4142");
+  });
+
+  it("invalid hex returns null", () => {
+    assert.equal(hexToUtf8("abc"), null);
+    assert.equal(hexToUtf8("zz"), null);
+    assert.equal(hexToUtf8("gg"), null);
+    assert.equal(hexToUtf8(""), null);
+    assert.equal(hexToUtf8(null), null);
+  });
+
+  it("parseCursorStoreMeta omits blobEncryptionKey and extra keys", () => {
+    const hex = utf8ToHex(
+      JSON.stringify({
+        name: "JWT OAuth Refactor",
+        subagentInfo: { parentAgentId: "p" },
+        latestRootBlobId: "abc",
+        createdAt: 1700000000000,
+        blobEncryptionKey: "deadbeef".repeat(8),
+        extra: true,
+      }),
+    );
+    const parsed = parseCursorStoreMeta(hex);
+    assert.deepEqual(parsed, {
+      name: "JWT OAuth Refactor",
+      subagentInfo: { parentAgentId: "p" },
+      latestRootBlobId: "abc",
+      createdAt: 1700000000000,
+    });
+    assert.equal("blobEncryptionKey" in parsed, false);
+    assert.equal("extra" in parsed, false);
+  });
+
+  it("encodeCursorStoreMeta keeps unknown keys including blobEncryptionKey", () => {
+    const full = {
+      name: "Old",
+      blobEncryptionKey: "aa".repeat(32),
+      mode: "default",
+    };
+    full.name = "Renamed";
+    const hex = encodeCursorStoreMeta(full);
+    const text = hexToUtf8(hex);
+    const back = JSON.parse(text);
+    assert.equal(back.name, "Renamed");
+    assert.equal(back.blobEncryptionKey, "aa".repeat(32));
+    assert.equal(back.mode, "default");
+  });
+
+  it("New Agent is a Cursor-only weak title", () => {
+    assert.equal(isWeakTitle("New Agent"), false);
+    assert.equal(isWeakTitle("new agent"), false);
+    assert.equal(isWeakCursorTitle("New Agent"), true);
+    assert.equal(isWeakCursorTitle("new agent"), true);
+    assert.equal(isWeakCursorTitle("JWT OAuth Refactor"), false);
+  });
+
+  it("cursorTitleFromUserBlob extracts user_query and skips dump-only", () => {
+    const withQuery = JSON.stringify({
+      role: "user",
+      content:
+        "<user_info>\nOS Version: darwin\n</user_info>\n<user_query>Fix the login flow</user_query>",
+    });
+    assert.equal(cursorTitleFromUserBlob(withQuery), "Fix the login flow");
+
+    const dumpOnly = JSON.stringify({
+      role: "user",
+      content: "<user_info>\nOS Version: darwin\nWorkspace Path: /tmp</user_info>",
+    });
+    assert.equal(cursorTitleFromUserBlob(dumpOnly), null);
+
+    const parts = JSON.stringify({
+      role: "user",
+      content: [{ type: "text", text: "plain user line" }],
+    });
+    assert.equal(cursorTitleFromUserBlob(parts), "plain user line");
+
+    const sub = JSON.stringify({
+      role: "user",
+      content: "You are running as a subagent under a parent agent.",
+    });
+    assert.equal(cursorTitleFromUserBlob(sub), null);
+  });
+
+  it("isEmptyCursorRootBlob treats missing, empty string, and [] as empty", () => {
+    assert.equal(isEmptyCursorRootBlob(undefined), true);
+    assert.equal(isEmptyCursorRootBlob(null), true);
+    assert.equal(isEmptyCursorRootBlob(""), true);
+    assert.equal(isEmptyCursorRootBlob([]), true);
+    assert.equal(isEmptyCursorRootBlob("ab".repeat(32)), false);
+  });
+});
 
 describe("archive API surface removed", () => {
   it("manage/storage no longer export archive APIs", () => {

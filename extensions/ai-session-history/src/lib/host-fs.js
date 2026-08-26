@@ -587,8 +587,10 @@ export function createHostFs(exec) {
   const sqliteExec = (dbPath, sql) => {
     if (!dbPath) throw new Error("sqliteExec: dbPath required");
     if (!sql) throw new Error("sqliteExec: sql required");
+    // SQL on stdin so UPDATE payloads (e.g. Cursor hex including encryption key) stay off argv / ps.
+    const stdin = String(sql).endsWith("\n") ? String(sql) : `${sql}\n`;
     return chain(
-      run(exec, [HOST_BINS.sqlite3, "--", dbPath, sql], { timeoutMs: 20000 }),
+      run(exec, [HOST_BINS.sqlite3, "--", dbPath], { stdin, timeoutMs: 20000 }),
       (r) => {
         if (r.exitCode !== 0) {
           throw new Error(
