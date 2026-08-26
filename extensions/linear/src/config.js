@@ -17,6 +17,11 @@ export const CONFIG_DEFAULTS = {
   // 필터/이슈 생성에 쓰는 기본 팀 키(예: "KYL"). 비우면 모든 팀.
   team_key: "",
 
+  // 이슈 상세를 여는 방식(설정 모달에서 선택).
+  //  - "tab":   익스텐션 웹뷰 탭(풀 페이지). 기본값.
+  //  - "modal": 가운데 웹뷰 모달.
+  issue_open_mode: "tab",
+
   // 목록 각 행에 무엇을 표시할지(설정에서 토글).
   list_show_state: true, // 상태 배지
   list_show_priority: false, // 우선순위

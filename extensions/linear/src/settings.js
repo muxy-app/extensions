@@ -106,6 +106,15 @@ async function main() {
         <div class="hint" id="team_hint">${t("set.teamHintInit")}</div>
       </div>
 
+      <div class="field">
+        <span class="label">${t("set.issueOpenMode")}</span>
+        <select id="issue_open_mode">
+          <option value="tab" ${config.issue_open_mode === "tab" ? "selected" : ""}>${t("set.openModeTab")}</option>
+          <option value="modal" ${config.issue_open_mode === "modal" ? "selected" : ""}>${t("set.openModeModal")}</option>
+        </select>
+        <div class="hint">${t("set.issueOpenModeHint")}</div>
+      </div>
+
       <hr class="sep" />
       <h3 class="sec-title">${t("set.listShow")}</h3>
       <label class="checkbox field"><input type="checkbox" id="list_show_state" ${config.list_show_state ? "checked" : ""} /> ${t("set.showState")}</label>
@@ -325,6 +334,7 @@ async function main() {
       api_token_active: activeId,
       api_token: activeToken, // 하위 호환: 활성 키를 단일 값에도 반영
       team_key: val("team_key"),
+      issue_open_mode: val("issue_open_mode") || "tab",
       list_show_state: checked("list_show_state"),
       list_show_priority: checked("list_show_priority"),
       list_show_labels: checked("list_show_labels"),

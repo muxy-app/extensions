@@ -12,6 +12,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         panel: resolve(__dirname, "panel/index.html"),
+        issue: resolve(__dirname, "modals/issue.html"),
         create: resolve(__dirname, "modals/create.html"),
         settings: resolve(__dirname, "modals/settings.html"),
         link: resolve(__dirname, "modals/link.html"),

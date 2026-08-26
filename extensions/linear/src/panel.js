@@ -962,9 +962,25 @@ async function openIssue(issue) {
   const config = await loadConfig();
   // 실효 토큰을 상세 화면에 전달.
   const eff = { ...applyProjectSettings(config, projectCfg) };
+  // 이슈 상세를 여는 방식을 설정값(issue_open_mode)으로 고른다 — tab(기본) / modal.
+  const mode = config.issue_open_mode || "tab";
 
-  // 이슈 상세는 무조건 풀 탭(페이지)으로만 연다. KNK-71 이후 기본 동작.
+  // modal: 가운데 웹뷰 모달로 연다(탭과 같은 issue.js 컴포넌트 재사용).
+  // 모달 안에서 변경이 있었으면(changed) 목록을 다시 그린다.
+  if (mode === "modal") {
+    const result = await muxy.modal.openWebview({
+      entry: "modals/issue.html",
+      width: 820,
+      height: 760,
+      data: { issue, config: eff },
+    });
+    if (result?.changed) render();
+    return;
+  }
+
+  // tab(기본): 이슈 상세를 풀 탭 웹뷰로 연다. KNK-71 이후 기본 동작.
   // 탭 안에서 상태가 바뀌면 패널 폴링(3초)이 목록을 자동 갱신하므로 결과 처리가 따로 필요 없다.
+  // extensionWebView 미지원 구버전 muxy 에서는 예외를 잡아 모달로 폴백한다.
   try {
     await muxy.tabs.open({
       kind: "extensionWebView",
@@ -972,9 +988,17 @@ async function openIssue(issue) {
       // 새 탭이 쌓여 불편하던 문제 해결). 재사용되면 그 탭이 onDataChange 로 새 이슈를 렌더한다.
       extension: { id: "linear", tabType: "issue", singleton: true, data: { issue, config: eff, mode: "tab" } },
     });
+    return;
   } catch (e) {
-    console.warn("[linear] 이슈를 탭으로 열기 실패:", e?.message || e);
+    console.warn("[linear] 이슈를 탭으로 열기 실패 → 모달로 폴백:", e?.message || e);
   }
+  const result = await muxy.modal.openWebview({
+    entry: "modals/issue.html",
+    width: 820,
+    height: 760,
+    data: { issue, config: eff },
+  });
+  if (result?.changed) render();
 }
 
 // 검색어를 이슈 식별자로 해석해 정확히 그 이슈를 연다(목록에 없으면 서버 조회).
