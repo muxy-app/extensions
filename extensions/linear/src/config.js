@@ -5,8 +5,8 @@
 // 설정 입력 UI 는 설정 모달(modals/settings.html)에서 제공한다.
 
 export const CONFIG_DEFAULTS = {
-  // UI 언어(en / ko / ja / zh). 기본은 영어.
-  language: "en",
+  // UI 언어는 한국어 고정(다국어 기능 제거). 하위 호환용으로 값만 유지한다.
+  language: "ko",
   // 실효 Linear Personal API Key. 아래 api_tokens 목록이 있으면 활성 키에서 자동 유도된다.
   // (하위 호환: 목록을 안 쓰면 이 값이 그대로 단일 키로 쓰인다.)
   api_token: "",
@@ -16,35 +16,6 @@ export const CONFIG_DEFAULTS = {
   api_token_active: "",
   // 필터/이슈 생성에 쓰는 기본 팀 키(예: "KYL"). 비우면 모든 팀.
   team_key: "",
-  // 브랜치를 분기할 기본 베이스 브랜치.
-  default_base_branch: "develop",
-  // 브랜치 이름 규칙(빈 값 = Linear 추천 브랜치명 사용).
-  // 사용 가능한 플레이스홀더: {identifier} {title} {branch}
-  branch_name_template: "",
-  // worktree 폴더 이름 규칙(빈 값 = "<저장소폴더>-<브랜치슬러그>").
-  // 사용 가능한 플레이스홀더: {identifier} {title} {branch} {repo}
-  worktree_name_template: "",
-  // 작업 시작 시 기본으로 worktree 를 만들지 여부.
-  use_worktree: true,
-  // 이슈 클릭 시 터미널에서 실행할 에이전트 CLI.
-  agent_command: "claude",
-  // 작업 시작 시 에이전트에 전달할 초기 프롬프트 템플릿.
-  // 사용 가능한 플레이스홀더: {identifier} {title} {branch} {url} {description}
-  start_prompt_template: "/리니어 {identifier}",
-  // 작업 시작과 함께 이슈 상태를 In Progress(started)로 바꿀지 여부.
-  set_in_progress: true,
-  // 작업 종료 시 에이전트에 전달할 프롬프트 템플릿.
-  // 기본값은 사용자가 Claude에 만들어 둔 "/작업완료" 스킬(커밋→PR→develop 머지→
-  // Linear 이슈 Done→브랜치 정리)을 그대로 위임한다. 필요하면 수정 가능.
-  finish_prompt_template: "/작업완료",
-
-  // 이슈 상세/새 이슈 생성을 여는 방식(설정 모달에서 선택) — KNK-109.
-  //  - "tab":   익스텐션 웹뷰 탭(풀 페이지). 기본값.
-  //  - "modal": 가운데 웹뷰 모달.
-  //  - "split": 내장 브라우저를 오른쪽 split 으로 열어 실제 Linear 페이지를 표시.
-  //             (익스텐션 웹뷰는 split API 가 없어, 상세는 issue.url 을 브라우저 split 으로 연다.
-  //              새 이슈 생성은 아직 URL 이 없어 split 대신 탭으로 폴백한다.)
-  issue_open_mode: "tab",
 
   // 목록 각 행에 무엇을 표시할지(설정에서 토글).
   list_show_state: true, // 상태 배지
@@ -54,7 +25,6 @@ export const CONFIG_DEFAULTS = {
   list_show_milestone: true, // 마일스톤 칩
   list_show_assignee: true, // 담당자 아바타
   list_show_parent: true, // 부모 이슈 브레드크럼
-  list_show_actions: true, // 행에서 상태별 액션 버튼 표시
   show_branch_bar: true, // 검색창 아래 현재 브랜치 표시줄
 
   // 목록 그룹/정렬(리니어의 Display 메뉴처럼 패널에서 바꾼다).
@@ -65,40 +35,6 @@ export const CONFIG_DEFAULTS = {
   // 목록에서 숨길 상태 이름 목록(예: ["Done", "Canceled"]). 상태 필터 체크리스트에서
   // 체크 해제한 상태가 여기에 저장되어 재시작 후에도 유지된다. 빈 배열 = 모두 표시.
   list_hidden_states: [],
-
-  // 상태별 액션(워크플로우). 각 액션은:
-  //  - label: 버튼 이름
-  //  - appliesTo: 이 액션을 보여줄 상태 이름들(빈 배열 = 모든 상태)
-  //  - run: 실행 방식 — "worktree"(새 worktree) | "branch"(새 브랜치) | "current"(현재 위치)
-  //  - base: 분기 베이스 브랜치(빈 값 = 기본 베이스)
-  //  - prompt: 터미널에서 실행할 에이전트 프롬프트(플레이스홀더 사용 가능)
-  //  - toState: 실행 후 바꿀 상태 — 상태 이름 또는 타입(started/unstarted/backlog/completed/canceled), 빈 값 = 변경 안 함
-  //  - confirm: 실행 전 확인 창 표시 여부
-  //  - agent: 이 액션 전용 에이전트 설정 { command, model, effort }(빈/생략 = 전역 상속) — KNK-97
-  actions: [
-    {
-      id: "start",
-      label: "작업 시작",
-      icon: "🚀",
-      appliesTo: [],
-      run: "worktree",
-      base: "",
-      prompt: "/리니어 {identifier}",
-      toState: "started",
-      confirm: false,
-    },
-    {
-      id: "finish",
-      label: "작업 종료",
-      icon: "🏁",
-      appliesTo: [],
-      run: "current",
-      base: "",
-      prompt: "/작업완료",
-      toState: "",
-      confirm: true,
-    },
-  ],
 };
 
 // 등록된 키 목록에서 활성 항목을 고른다(활성 id가 없거나 목록에 없으면 첫 항목).
@@ -149,35 +85,8 @@ export function effectiveToken(config, projectCfg) {
   return config?.api_token || "";
 }
 
-// 프로젝트 스코프의 "핵심 실행값" 오버라이드를 전역 설정 위에 병합한 flat 설정을 만든다.
-// projectCfg.settings 의 비지 않은 값(default_base_branch / agent_command)만 덮어쓰고,
-// api_token 은 effectiveToken 규칙으로 채운다. 액션 병합은 호출부(mergeActions)에서 따로 처리한다.
+// 프로젝트 스코프의 실효 설정을 만든다. 남은 프로젝트 오버라이드는 API 토큰뿐이라
+// effectiveToken 규칙으로 api_token 만 채운 flat 설정을 반환한다.
 export function applyProjectSettings(config, projectCfg) {
-  const eff = { ...config, api_token: effectiveToken(config, projectCfg) };
-  const s = projectCfg?.settings || {};
-  for (const k of ["default_base_branch", "agent_command", "branch_name_template", "worktree_name_template"]) {
-    const v = s[k];
-    if (v !== undefined && v !== null && String(v).trim() !== "") eff[k] = v;
-  }
-  return eff;
-}
-
-// 프롬프트 템플릿에 이슈 값을 채워 렌더링한다.
-export function renderPrompt(template, issue) {
-  return String(template ?? "")
-    .replaceAll("{identifier}", issue.identifier ?? "")
-    .replaceAll("{title}", issue.title ?? "")
-    .replaceAll("{branch}", issue.branchName ?? "")
-    .replaceAll("{url}", issue.url ?? "")
-    .replaceAll("{description}", issue.description ?? "");
-}
-
-// 이름 규칙(브랜치명 / worktree 폴더명) 템플릿에 값을 채워 렌더링한다.
-// 프롬프트와 달리 {repo}(저장소 폴더명)도 지원한다. 브랜치/폴더로 안전화하는 건 호출부(git.js) 담당.
-export function renderNameTemplate(template, vars = {}) {
-  return String(template ?? "")
-    .replaceAll("{identifier}", vars.identifier ?? "")
-    .replaceAll("{title}", vars.title ?? "")
-    .replaceAll("{branch}", vars.branch ?? "")
-    .replaceAll("{repo}", vars.repo ?? "");
+  return { ...config, api_token: effectiveToken(config, projectCfg) };
 }

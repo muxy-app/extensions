@@ -6,9 +6,8 @@ import "./theme.css";
 import "./panel.css";
 import { installFatalHandler } from "./fatal.js";
 import { loadConfig, saveConfig, effectiveToken, applyProjectSettings } from "./config.js";
-import { fetchMyIssues, fetchProjectIssues, fetchIssueById, fetchAllStates } from "./linear.js";
+import { fetchMyIssues, fetchProjectIssues, fetchIssueById, fetchAllStates, fetchTeamStates, updateIssueState } from "./linear.js";
 import { readProjectConfig } from "./project.js";
-import { applicableActions, runAction, mergeActions } from "./actions.js";
 import { setLang, getLang, t } from "./i18n.js";
 
 const muxy = window.muxy;
@@ -65,7 +64,6 @@ function applyStaticI18n() {
   setTitle("display", "panel.displayTitle");
   setTitle("new", "panel.newIssueTitle");
   setTitle("refresh", "panel.refreshTitle");
-  setTitle("actions", "panel.actionsTitle");
   setTitle("settings", "panel.settingsTitle");
   const gl = document.getElementById("group-by-label");
   if (gl) gl.textContent = t("panel.grouping");
@@ -229,6 +227,118 @@ async function copyIssueId(identifier) {
   else muxy.toast?.({ title: t("panel.copyFailToast"), body: identifier });
 }
 
+// ---- 이슈 우클릭 컨텍스트 메뉴(빠른 상태 변경) --------------------------------
+
+// 팀별 워크플로우 상태 캐시(teamId -> [{id,name,type,color}]). 우클릭마다 재요청하지 않는다.
+const teamStatesCache = new Map();
+let ctxMenuEl = null; // 현재 열려 있는 컨텍스트 메뉴 DOM(없으면 null)
+
+// 열려 있는 컨텍스트 메뉴를 닫고 전역 리스너를 해제한다.
+function closeIssueMenu() {
+  if (!ctxMenuEl) return;
+  ctxMenuEl.remove();
+  ctxMenuEl = null;
+  document.removeEventListener("pointerdown", onDocPointerDown, true);
+  document.removeEventListener("keydown", onMenuKeydown, true);
+  window.removeEventListener("blur", closeIssueMenu);
+  content.removeEventListener("scroll", closeIssueMenu, true);
+}
+
+// 메뉴 밖을 누르면 닫는다.
+function onDocPointerDown(e) {
+  if (ctxMenuEl && !ctxMenuEl.contains(e.target)) closeIssueMenu();
+}
+// Esc 로 닫는다.
+function onMenuKeydown(e) {
+  if (e.key === "Escape") { e.preventDefault(); closeIssueMenu(); }
+}
+
+// 해당 팀의 상태 목록을 캐시에서 가져오거나 없으면 API 로 로드해 캐싱한다.
+async function getTeamStates(token, teamId) {
+  if (teamStatesCache.has(teamId)) return teamStatesCache.get(teamId);
+  const states = await fetchTeamStates(token, teamId);
+  teamStatesCache.set(teamId, states);
+  return states;
+}
+
+// 이슈 우클릭 메뉴를 (x, y) 위치에 연다. 현재는 "빠른 상태 변경"을 제공한다.
+async function showIssueMenu(issue, x, y) {
+  closeIssueMenu();
+  const token = displayCfg.api_token;
+
+  const menu = el("div", { className: "ctx-menu" });
+  menu.append(el("div", { className: "ctx-header" }, `${issue.identifier} · ${t("panel.ctxChangeState")}`));
+
+  // API 키가 없으면 상태를 바꿀 수 없으므로 안내만 표시한다.
+  if (!token || !issue.team?.id) {
+    menu.append(el("div", { className: "ctx-empty" }, t("panel.ctxNeedToken")));
+  } else {
+    menu.append(el("div", { className: "ctx-empty" }, t("common.loading")));
+  }
+
+  // 화면 밖으로 넘치지 않도록 위치를 보정한다(우선 커서 위치에 붙이고, 넘치면 안쪽으로).
+  ctxMenuEl = menu;
+  menu.style.left = "0px";
+  menu.style.top = "0px";
+  menu.style.visibility = "hidden";
+  document.body.append(menu);
+  const mw = menu.offsetWidth;
+  const mh = menu.offsetHeight;
+  const px = Math.min(x, window.innerWidth - mw - 8);
+  const py = Math.min(y, window.innerHeight - mh - 8);
+  menu.style.left = `${Math.max(4, px)}px`;
+  menu.style.top = `${Math.max(4, py)}px`;
+  menu.style.visibility = "visible";
+
+  document.addEventListener("pointerdown", onDocPointerDown, true);
+  document.addEventListener("keydown", onMenuKeydown, true);
+  window.addEventListener("blur", closeIssueMenu);
+  content.addEventListener("scroll", closeIssueMenu, true);
+
+  if (!token || !issue.team?.id) return;
+
+  // 상태 목록을 로드해 메뉴를 채운다(로드 중 메뉴가 닫혔으면 중단).
+  try {
+    const states = await getTeamStates(token, issue.team.id);
+    if (ctxMenuEl !== menu) return; // 그새 닫혔거나 다른 메뉴가 열림
+    menu.querySelector(".ctx-empty")?.remove();
+    if (!states.length) {
+      menu.append(el("div", { className: "ctx-empty" }, t("panel.ctxNoStates")));
+      return;
+    }
+    for (const s of states) {
+      const item = el("button", { className: "ctx-item", type: "button" });
+      const dot = el("span", { className: "ctx-dot" });
+      if (s.color) dot.style.background = s.color;
+      item.append(dot, el("span", { className: "ctx-item-name" }, s.name));
+      if (s.id === issue.state?.id) item.classList.add("is-current"); // 현재 상태 표시
+      item.addEventListener("click", () => changeIssueState(issue, s));
+      menu.append(item);
+    }
+  } catch (e) {
+    if (ctxMenuEl !== menu) return;
+    menu.querySelector(".ctx-empty")?.remove();
+    menu.append(el("div", { className: "ctx-empty" }, e.message));
+  }
+}
+
+// 선택한 상태로 이슈를 변경하고, 성공하면 로컬 상태를 갱신해 목록을 다시 그린다.
+async function changeIssueState(issue, state) {
+  const token = displayCfg.api_token;
+  closeIssueMenu();
+  if (!token || state.id === issue.state?.id) return; // 같은 상태면 아무 것도 하지 않음
+  try {
+    await updateIssueState(token, issue.id, state.id);
+    // allIssues 의 동일 이슈 객체를 갱신한다(issueRow 에 넘긴 객체와 같은 참조).
+    const target = allIssues.find((i) => i.id === issue.id) || issue;
+    target.state = { ...(target.state || {}), id: state.id, name: state.name, type: state.type, color: state.color };
+    muxy.toast?.({ title: t("panel.stateChanged"), body: `${issue.identifier} → ${state.name}` });
+    renderList(); // 상태별 그룹핑이면 이슈가 다른 그룹으로 이동하므로 다시 그린다.
+  } catch (e) {
+    muxy.toast?.({ title: t("panel.stateChangeFail"), body: e.message });
+  }
+}
+
 function issueRow(issue, { indent = false, showProject = false } = {}) {
   const row = el("button", { className: "issue" });
   if (issue.identifier === currentIssueId) row.classList.add("is-current");
@@ -279,49 +389,15 @@ function issueRow(issue, { indent = false, showProject = false } = {}) {
   if (displayCfg.list_show_assignee) {
     top.append(assigneeAvatar(issue.assignee));
   }
-  // 현재 상태에 해당하는 액션 버튼들.
-  // API 키와 에이전트가 모두 설정돼 있어야 액션을 쓸 수 있으므로, 없으면 버튼 자체를 숨긴다.
-  const actionsReady = !!displayCfg.api_token && !!displayCfg.agent_command;
-  if (displayCfg.list_show_actions && actionsReady) {
-    const acts = el("span", { className: "issue-acts" });
-    for (const a of applicableActions(displayCfg.actions, issue)) {
-      const b = el("button", { className: "row-btn", title: a.label }, a.icon ? `${a.icon} ${a.label}` : a.label);
-      b.addEventListener("click", (e) => { e.stopPropagation(); runRowAction(a, issue); });
-      acts.append(b);
-    }
-    if (acts.childElementCount) top.append(acts);
-  }
   const title = el("div", { className: "issue-title" }, issue.title);
   row.append(top, title);
   row.addEventListener("click", () => openIssue(issue));
+  // 우클릭 → 빠른 상태 변경 메뉴(기본 브라우저 메뉴는 막는다).
+  row.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    showIssueMenu(issue, e.clientX, e.clientY);
+  });
   return row;
-}
-
-// 행에서 액션 실행.
-async function runRowAction(action, issue) {
-  const config = await loadConfig();
-  try {
-    const res = await runAction(action, issue, config, {
-      confirmFn: (a, prompt) =>
-        muxy.dialog
-          .confirm({
-            title: a.label,
-            message: `${a.label}\n\n${prompt}`,
-            buttons: [t("common.run"), t("common.cancel")],
-            cancel: t("common.cancel"),
-          })
-          .then((c) => c === t("common.run")),
-    });
-    if (res.cancelled) return;
-    muxy.toast?.({ title: action.label, body: issue.identifier });
-    render();
-  } catch (e) {
-    const msg = e?.message || String(e);
-    console.error(`[linear] action '${action.label}' 실패:`, msg);
-    muxy.toast?.({ title: t("action.failed", { label: action.label }), body: msg });
-    // 토스트는 사라지므로 패널 상단에 오류를 남긴다(다음 새로고침 때까지).
-    content.prepend(el("div", { className: "empty error", style: "text-align:left" }, t("panel.actionFailedInline", { label: action.label, msg })));
-  }
 }
 
 // 한 그룹 안에서 부모 → 자식 순으로 정렬(자식은 들여쓰기).
@@ -679,9 +755,8 @@ function issuesSignature(issues) {
     // 표시에 영향 주는 설정/언어. 이게 바뀌면(설정 변경 등) 목록을 다시 그려야 한다.
     view: [
       getLang(), d.list_show_parent, d.list_show_state, d.list_show_priority,
-      d.list_show_project, d.list_show_milestone, d.list_show_assignee, d.list_show_actions,
+      d.list_show_project, d.list_show_milestone, d.list_show_assignee,
       d.list_group_by, d.list_sort_by,
-      !!d.api_token, !!d.agent_command, JSON.stringify(d.actions || null),
     ],
     items: issues.map((i) => [
       i.identifier, i.state?.name, i.state?.color, i.title, i.priority,
@@ -761,8 +836,8 @@ async function render() {
   try {
     projectCfg = await readProjectConfig();
     const token = effectiveToken(config, projectCfg); // 프로젝트 전용 키 우선
-    // 실효 설정: 프로젝트 핵심 실행값 오버라이드 + 액션 병합 + 실효 토큰(모달에도 이 토큰을 넘긴다).
-    displayCfg = { ...applyProjectSettings(config, projectCfg), actions: mergeActions(config.actions, projectCfg?.actions) };
+    // 실효 설정: 프로젝트 오버라이드(실효 토큰) 적용.
+    displayCfg = { ...applyProjectSettings(config, projectCfg) };
     hiddenStates = new Set(Array.isArray(config.list_hidden_states) ? config.list_hidden_states : []); // 저장된 숨김 상태 복원
     populateDisplayMenu(); // 그룹/정렬 팝오버를 현재 값으로 채운다
     await refreshCurrentBranch();
@@ -885,38 +960,11 @@ function errorBox(err) {
 
 async function openIssue(issue) {
   const config = await loadConfig();
-  // 실효 토큰 + 액션(글로벌+프로젝트 병합)을 상세 화면에 전달.
-  const eff = { ...applyProjectSettings(config, projectCfg), actions: mergeActions(config.actions, projectCfg?.actions) };
-  // KNK-109: 이슈 상세를 여는 방식을 설정값(issue_open_mode)으로 고른다 — tab / modal / split.
-  const mode = config.issue_open_mode || "tab";
+  // 실효 토큰을 상세 화면에 전달.
+  const eff = { ...applyProjectSettings(config, projectCfg) };
 
-  // split: 내장 브라우저를 오른쪽 split 으로 열어 실제 Linear 페이지를 표시한다.
-  // (익스텐션 웹뷰는 split API 가 없어 muxy.browser.open 으로 URL 을 split 표시한다.)
-  // muxy.browser 미지원 구버전이거나 URL 이 없으면 아래 탭 경로로 폴백한다.
-  if (mode === "split" && issue?.url && muxy.browser?.open) {
-    try {
-      await muxy.browser.open(issue.url, { split: true });
-      return;
-    } catch (e) {
-      console.warn("[linear] split 브라우저 열기 실패 → 탭으로 폴백:", e?.message || e);
-    }
-  }
-
-  // modal: 가운데 웹뷰 모달로 연다(같은 issue.js 컴포넌트 재사용).
-  if (mode === "modal") {
-    const result = await muxy.modal.openWebview({
-      entry: "modals/issue.html",
-      width: 820,
-      height: 760,
-      data: { issue, config: eff },
-    });
-    if (result?.changed) render();
-    return;
-  }
-
-  // tab(기본): KNK-71 이후 기본 동작. 이슈 상세를 풀 탭 웹뷰로 연다(같은 issue.js 재사용).
+  // 이슈 상세는 무조건 풀 탭(페이지)으로만 연다. KNK-71 이후 기본 동작.
   // 탭 안에서 상태가 바뀌면 패널 폴링(3초)이 목록을 자동 갱신하므로 결과 처리가 따로 필요 없다.
-  // extensionWebView 를 지원하지 않는 구버전 muxy 에서는 예외를 잡아 기존 모달로 폴백한다.
   try {
     await muxy.tabs.open({
       kind: "extensionWebView",
@@ -924,17 +972,9 @@ async function openIssue(issue) {
       // 새 탭이 쌓여 불편하던 문제 해결). 재사용되면 그 탭이 onDataChange 로 새 이슈를 렌더한다.
       extension: { id: "linear", tabType: "issue", singleton: true, data: { issue, config: eff, mode: "tab" } },
     });
-    return;
   } catch (e) {
-    console.warn("[linear] 이슈를 탭으로 열기 실패 → 모달로 폴백:", e?.message || e);
+    console.warn("[linear] 이슈를 탭으로 열기 실패:", e?.message || e);
   }
-  const result = await muxy.modal.openWebview({
-    entry: "modals/issue.html",
-    width: 820,
-    height: 760,
-    data: { issue, config: eff },
-  });
-  if (result?.changed) render();
 }
 
 // 검색어를 이슈 식별자로 해석해 정확히 그 이슈를 연다(목록에 없으면 서버 조회).
@@ -969,30 +1009,19 @@ async function openSettings() {
   render();
 }
 
-// KNK-108: 액션 편집을 설정 모달 안이 아니라 패널 툴바에서 바로 연다.
-async function openActions() {
-  await muxy.modal.openWebview({ entry: "modals/actions.html", width: 560, height: 640 });
-}
-
 async function openCreate() {
-  // KNK-109: 여는 방식 설정(issue_open_mode)을 새 이슈 생성에도 적용한다.
-  // 단 생성 화면은 아직 이슈 URL 이 없어 "split" 은 만들 수 없으므로 탭으로 취급하고,
-  // "modal" 일 때만 모달로 연다(그 외에는 아래 탭 경로).
-  const config = await loadConfig();
-  const mode = config.issue_open_mode || "tab";
-  if (mode !== "modal") {
-    // KNK-88: 새 이슈 생성을 좁은 모달 대신 풀 탭 웹뷰로 연다(같은 create.js 재사용).
-    // 생성되면 create 쪽에서 탭을 닫고, 목록은 패널 폴링(3초)이 자동 갱신한다.
-    // extensionWebView 를 지원하지 않는 구버전 muxy 에서는 예외를 잡아 기존 모달로 폴백한다.
-    try {
-      await muxy.tabs.open({
-        kind: "extensionWebView",
-        extension: { id: "linear", tabType: "create", data: { mode: "tab" } },
-      });
-      return;
-    } catch (e) {
-      console.warn("[linear] 새 이슈를 탭으로 열기 실패 → 모달로 폴백:", e?.message || e);
-    }
+  // 새 이슈 생성도 무조건 풀 탭(페이지)으로만 연다.
+  // KNK-88: 새 이슈 생성을 좁은 모달 대신 풀 탭 웹뷰로 연다(같은 create.js 재사용).
+  // 생성되면 create 쪽에서 탭을 닫고, 목록은 패널 폴링(3초)이 자동 갱신한다.
+  // extensionWebView 를 지원하지 않는 구버전 muxy 에서는 예외를 잡아 기존 모달로 폴백한다.
+  try {
+    await muxy.tabs.open({
+      kind: "extensionWebView",
+      extension: { id: "linear", tabType: "create", data: { mode: "tab" } },
+    });
+    return;
+  } catch (e) {
+    console.warn("[linear] 새 이슈를 탭으로 열기 실패 → 모달로 폴백:", e?.message || e);
   }
   const result = await muxy.modal.openWebview({ entry: "modals/create.html", width: 460, height: 640 });
   // KNK-98: 생성되면 방금 만든 이슈의 상세를 바로 연다(모달 폴백 경로).
@@ -1074,7 +1103,6 @@ bindSeg("who", (d) => { who = d.who; });
 // 수동 새로고침: 스피너를 표시하며 갱신(버튼을 누른 것을 시각적으로 알림).
 document.getElementById("refresh").addEventListener("click", manualRefresh);
 document.getElementById("new").addEventListener("click", openCreate);
-document.getElementById("actions").addEventListener("click", openActions);
 document.getElementById("settings").addEventListener("click", openSettings);
 
 // 그룹/정렬(Display) 팝오버: 버튼으로 토글, 바깥 클릭 시 닫기.

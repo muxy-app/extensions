@@ -6,7 +6,6 @@ import "./theme.css";
 import "./modal.css";
 import { run } from "./fatal.js";
 import { loadConfig, effectiveToken, applyProjectSettings } from "./config.js";
-import { mergeActions } from "./actions.js";
 import { readProjectConfig } from "./project.js";
 import {
   resolveTeam, createIssue, fetchIssueById,
@@ -365,7 +364,7 @@ async function main() {
       // 모달: submitWebview 로 결과(열 이슈 포함)를 패널에 전달 → 패널이 상세를 연다.
       if (asTab) {
         try {
-          const eff = { ...applyProjectSettings(config, projectCfg), actions: mergeActions(config.actions, projectCfg?.actions) };
+          const eff = { ...applyProjectSettings(config, projectCfg) };
           await muxy.tabs.open({
             kind: "extensionWebView",
             extension: { id: "linear", tabType: "issue", singleton: true, data: { issue: openedIssue, config: eff, mode: "tab" } },

@@ -39,6 +39,67 @@
   padding: 3px 6px;
 }
 
+/* 이슈 우클릭 컨텍스트 메뉴(빠른 상태 변경) */
+.ctx-menu {
+  position: fixed;
+  z-index: 60;
+  min-width: 180px;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 4px;
+  border-radius: var(--radius);
+  background: var(--muxy-surface-solid, #2a2a2a);
+  border: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.35));
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+.ctx-header {
+  padding: 4px 8px 6px;
+  font-size: 11px;
+  opacity: 0.6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ctx-empty {
+  padding: 6px 8px;
+  font-size: 12px;
+  opacity: 0.6;
+}
+.ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muxy-foreground, #e6e6e6);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.ctx-item:hover { background: var(--muxy-hover, rgba(127, 127, 127, 0.15)); }
+.ctx-item.is-current { font-weight: 600; }
+.ctx-item.is-current::after {
+  content: "✓";
+  margin-left: auto;
+  opacity: 0.7;
+}
+.ctx-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+  background: var(--muxy-foreground-muted, #8a8f98);
+  box-shadow: inset 0 0 0 1px rgba(127, 127, 127, 0.4);
+}
+.ctx-item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .topbar {
   box-sizing: content-box;
   height: var(--muxy-topbar-height, 28px);

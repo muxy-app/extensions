@@ -1,4 +1,4 @@
-// 이슈 상세 모달: 상태 변경 / 본문·코멘트 보기(마크다운) / 상태별 액션 실행.
+// 이슈 상세 화면: 상태 변경 / 본문·코멘트 보기(마크다운) / 하위 이슈·삭제.
 // 열림 데이터: window.muxy.data = { issue, config }
 
 import "./theme.css";
@@ -12,8 +12,6 @@ import {
 } from "./linear.js";
 import { renderMarkdown } from "./markdown.js";
 import { mountMarkdownEditor } from "./mdwysiwyg.js";
-import { listBaseBranchCandidates, defaultBranch } from "./git.js";
-import { applicableActions, runAction } from "./actions.js";
 import { setLang, t } from "./i18n.js";
 
 const muxy = window.muxy;
@@ -54,8 +52,6 @@ async function openIssueUrl(url) {
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 }
-
-const runLabel = (r) => ({ worktree: t("run.worktree"), branch: t("run.branch"), current: t("run.current") }[r]);
 
 async function main() {
   if (!issue) {
@@ -127,22 +123,6 @@ async function main() {
       </div>
     </div>
 
-    <hr class="sep" />
-    <div class="row" style="margin-bottom:6px">
-      <h3 class="sec-title" style="margin:0">${t("issue.actions")}</h3>
-      <span class="spacer"></span>
-      <button id="edit-actions" class="mini">${t("issue.editActions")}</button>
-    </div>
-    <div class="field">
-      <span class="label">${t("issue.branchName")}</span>
-      <input type="text" id="branch" />
-    </div>
-    <div class="field">
-      <span class="label">${t("issue.baseBranch")}</span>
-      <select id="base"></select>
-    </div>
-    <div id="actions" class="actions-list"></div>
-
     <p id="err" class="error" hidden></p>
     <div class="actions">
       <button id="cancel">${t("common.close")}</button>
@@ -190,108 +170,6 @@ async function main() {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); titleEl.blur(); } // Enter 저장, Shift+Enter 줄바꿈
     else if (e.key === "Escape") { titleEl.value = issue.title; autoGrow(titleEl); titleEl.blur(); }
   });
-
-  // 브랜치 기본값
-  $("branch").value = defaultBranch(issue, config);
-
-  // 베이스 브랜치 후보 채우기
-  listBaseBranchCandidates().then((branches) => {
-    const sel = $("base");
-    sel.innerHTML = "";
-    const list = branches.length ? branches : [config.default_base_branch];
-    if (!list.includes(config.default_base_branch)) list.unshift(config.default_base_branch);
-    for (const b of list) {
-      const opt = document.createElement("option");
-      opt.value = b;
-      opt.textContent = b;
-      if (b === config.default_base_branch) opt.selected = true;
-      sel.append(opt);
-    }
-  });
-
-  // 상태별 액션 버튼 렌더
-  function renderActions() {
-    const box = $("actions");
-    box.innerHTML = "";
-    // API 키와 에이전트가 모두 설정돼 있어야 액션 사용 가능.
-    if (!config.api_token || !config.agent_command) {
-      box.append(h(`<div class="muted">${t("issue.actionsNeedSetup")}</div>`));
-      return;
-    }
-    const list = applicableActions(config.actions, issue);
-    if (!list.length) {
-      box.append(h(`<div class="muted">${escapeHtml(t("issue.noActionsForState", { name: issue.state?.name ?? "" }))}</div>`));
-      return;
-    }
-    for (const a of list) {
-      const item = h(`<div class="action-item"></div>`);
-      const btn = h(`<button class="primary"></button>`);
-      btn.textContent = a.icon ? `${a.icon} ${a.label}` : a.label;
-      btn.addEventListener("click", () => runModalAction(a, btn));
-      const meta = h(`<div class="hint"></div>`);
-      meta.textContent = `${runLabel(a.run) ?? a.run}${a.toState ? ` · → ${a.toState}` : ""}`;
-      item.append(btn, meta);
-      box.append(item);
-    }
-  }
-
-  // 한 번에 하나의 액션만 실행(중복 클릭 방지).
-  let actionRunning = false;
-
-  // 액션 실행: 진행 중에는 버튼을 "작업 중…"(스피너)으로 표기하고 나머지 버튼을 잠근다.
-  // 완료되면(터미널 실행 + 상태 변경까지) 그 결과를 UI에 반영한다. 모달은 닫지 않고
-  // 열어 둔 채로 갱신해, 방금 명령한 액션이 끝났고 상태가 바뀐 것을 눈으로 확인하게 한다.
-  async function runModalAction(action, btn) {
-    if (actionRunning) return;
-    actionRunning = true;
-    showErr("");
-    const allBtns = [...$("actions").querySelectorAll("button")];
-    allBtns.forEach((b) => (b.disabled = true));
-    const origHtml = btn.innerHTML;
-    btn.classList.add("running");
-    btn.innerHTML = `<span class="action-spin"></span>${escapeHtml(t("issue.actionRunning"))}`;
-
-    const restore = () => {
-      btn.classList.remove("running");
-      btn.innerHTML = origHtml;
-      allBtns.forEach((b) => (b.disabled = false));
-    };
-
-    try {
-      const res = await runAction(action, issue, config, {
-        branch: $("branch").value.trim(),
-        base: $("base").value,
-        confirmFn: (a, prompt) =>
-          muxy.dialog
-            .confirm({ title: a.label, message: `${a.label}\n\n${prompt}`, buttons: [t("common.run"), t("common.cancel")], cancel: t("common.cancel") })
-            .then((c) => c === t("common.run")),
-      });
-      if (res.cancelled) { restore(); return; }
-      changed = true;
-      // 실행 후 상태가 바뀌었으면 이슈 상태·드롭다운을 갱신하고 액션 목록을 새 상태 기준으로 다시 그린다.
-      if (res.appliedState) {
-        issue.state = { ...(issue.state || {}), id: res.appliedState.id, name: res.appliedState.name };
-        const sel = $("state");
-        if (sel && [...sel.options].some((o) => o.value === res.appliedState.id)) sel.value = res.appliedState.id;
-        toast(t("issue.stateChanged"), `${issue.identifier} → ${res.appliedState.name}`);
-      } else {
-        toast(t("issue.actionStarted"), issue.identifier);
-      }
-      renderActions(); // 버튼이 새로 생성되므로 restore 불필요
-    } catch (e) {
-      showErr(e.message);
-      restore();
-    } finally {
-      actionRunning = false;
-    }
-  }
-
-  // 기본 정보(API Key + 에이전트) 없으면 "액션 편집" 버튼도 숨김.
-  if (!config.api_token || !config.agent_command) {
-    const eb = $("edit-actions");
-    if (eb) eb.style.display = "none";
-  }
-  renderActions();
 
   // 상태 드롭다운 채우기
   fetchTeamStates(config.api_token, issue.team.id)
@@ -622,16 +500,6 @@ async function main() {
     }
   }
   loadDetail();
-
-  // 액션 편집 모달 열기.
-  // - 모달 컨텍스트: 저장됐으면 이슈 모달을 닫으며 changed 를 패널로 전달(목록 새로고침).
-  // - 탭 컨텍스트: 닫을 모달이 없으므로(submitWebview 불가) 탭은 그대로 둔다. 바뀐 액션은
-  //   탭을 다시 열면 반영되고, 패널 목록은 폴링으로 자동 갱신된다.
-  $("edit-actions").addEventListener("click", async () => {
-    const r = await muxy.modal.openWebview({ entry: "modals/actions.html", width: 560, height: 640 });
-    if (r && r.saved) changed = true;
-    if (!asTab) muxy.modal.submitWebview({ changed });
-  });
 
   // Linear에서 열기: 내장 브라우저 대신 외부(앱 또는 기본 브라우저)에서 연다.
   $("open-web").addEventListener("click", async () => {

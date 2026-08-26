@@ -3,7 +3,7 @@
   "version": "0.7.4",
   "private": true,
   "type": "module",
-  "description": "Muxy extension: browse your assigned Linear issues in a side panel and hand one to Claude Code — branch, worktree, and an issue-aware prompt — without leaving Muxy.",
+  "description": "Muxy extension: browse your assigned Linear issues in a side panel, open an issue's detail in a tab to view and edit it, and create issues — without leaving Muxy.",
   "license": "MIT",
   "scripts": {
     "dev": "vite",
@@ -14,19 +14,14 @@
   },
   "muxy": {
     "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
-    "description": "Browse your Linear issues and hand one to Claude Code — branch, worktree, and prompt — without leaving Muxy.",
+    "description": "Browse your Linear issues, view and edit an issue in a tab, and create issues — without leaving Muxy.",
     "permissions": [
       "panels:write",
       "tabs:write",
-      "panes:read",
-      "panes:write",
-      "agents:read",
       "commands:exec",
       "git:read",
-      "git:write",
       "projects:read",
       "worktrees:read",
-      "worktrees:write",
       "files:read",
       "files:write",
       "notifications:write",
@@ -96,16 +91,6 @@
           "entry": "modals/link.html",
           "width": 460,
           "height": 460
-        }
-      },
-      {
-        "id": "edit-actions",
-        "title": "Linear: Edit Actions",
-        "action": {
-          "kind": "openModal",
-          "entry": "modals/actions.html",
-          "width": 560,
-          "height": 640
         }
       }
     ],

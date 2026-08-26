@@ -1,6 +1,6 @@
 // 설정 모달. 🌐 글로벌(muxy.storage) / 📁 이 프로젝트(.linear.json) 스코프를 토글로 전환한다.
-// - 글로벌: API 키 선택 · 기본 팀 키 · 기본 베이스 브랜치 · worktree 위치 · 에이전트 · 목록 표시
-// - 프로젝트: 팀/프로젝트 연결 + 핵심 실행값(API 키 · 베이스 · worktree · 에이전트) 오버라이드(빈 값=전역 상속)
+// - 글로벌: API 키 선택 · 기본 팀 키 · 목록 표시
+// - 프로젝트: 팀/프로젝트 연결 + API 키 오버라이드(빈 값=전역 상속)
 
 import "./theme.css";
 import "./modal.css";
@@ -8,8 +8,7 @@ import { run } from "./fatal.js";
 import { loadConfig, saveConfig } from "./config.js";
 import { fetchTeams, fetchTeamProjects, fetchProjectByName } from "./linear.js";
 import { readProjectConfig, writeProjectConfig, clearProjectConfig } from "./project.js";
-import { AGENTS } from "./agents.js";
-import { setLang, t, LANGS } from "./i18n.js";
+import { setLang, t } from "./i18n.js";
 
 const muxy = window.muxy;
 const app = document.getElementById("app");
@@ -41,59 +40,6 @@ async function main() {
   const body = document.getElementById("scope-body");
   const errEl = document.getElementById("err");
   let scope = "global";
-
-  // ── 공용 로더: 저장소 브랜치 목록(로컬+원격) 한 번만 불러와 캐시 ──
-  let baseBranches = null;
-  async function getBranches() {
-    if (baseBranches) return baseBranches;
-    try {
-      const [loc, rem] = await Promise.all([
-        window.muxy.git.branches().catch(() => []),
-        window.muxy.git.remoteBranches().catch(() => []),
-      ]);
-      baseBranches = [...new Set([...loc, ...rem.map((b) => b.replace(/^origin\//, ""))])];
-    } catch {
-      baseBranches = [];
-    }
-    return baseBranches;
-  }
-
-  // 에이전트 select+input 한 쌍을 채운다. allowInherit 이면 "(전역 설정 사용)" 옵션 추가.
-  function wireAgent(selId, inputId, allowInherit, inheritLabel) {
-    const sel = document.getElementById(selId);
-    const input = document.getElementById(inputId);
-    sel.innerHTML = "";
-    if (allowInherit) {
-      const o = document.createElement("option");
-      o.value = "__inherit";
-      o.textContent = inheritLabel || t("set.inheritGlobal");
-      sel.append(o);
-    }
-    for (const a of AGENTS) {
-      const o = document.createElement("option");
-      o.value = a.v;
-      o.textContent = a.t;
-      sel.append(o);
-    }
-    const custom = document.createElement("option");
-    custom.value = "__custom";
-    custom.textContent = t("common.customInput");
-    sel.append(custom);
-    const sync = () => {
-      const v = input.value.trim();
-      if (allowInherit && !v) { sel.value = "__inherit"; return; }
-      sel.value = AGENTS.some((a) => a.v === v) ? v : "__custom";
-    };
-    sync();
-    sel.addEventListener("change", () => {
-      if (sel.value === "__inherit") { input.value = ""; input.disabled = true; return; }
-      input.disabled = false;
-      if (sel.value !== "__custom") input.value = sel.value;
-      else input.focus();
-    });
-    input.addEventListener("input", sync);
-    if (allowInherit && !input.value.trim()) input.disabled = true;
-  }
 
   // 팀 키 select 를 팀 목록으로 채운다(현재 값 보존).
   function fillTeams(selId, teams, current) {
@@ -137,48 +83,14 @@ async function main() {
     }
   }
 
-  // 상속 표기: 전역값이 있으면 "값 (상속)", 없으면 "(전역 설정 사용)".
-  function inheritedText(v) {
-    return v && String(v).trim() ? t("set.inherited", { v }) : t("set.inheritGlobal");
-  }
-
-  // 베이스 브랜치 select 채우기. allowInherit 이면 상속 옵션(inheritLabel 지정 가능).
-  function fillBaseBranches(selId, all, current, allowInherit, inheritLabel) {
-    const sel = document.getElementById(selId);
-    sel.innerHTML = "";
-    if (allowInherit) {
-      const o = document.createElement("option");
-      o.value = "";
-      o.textContent = inheritLabel || t("set.inheritGlobal");
-      sel.append(o);
-    }
-    const list = [...all];
-    if (current && !list.includes(current)) list.unshift(current);
-    for (const b of list) {
-      const o = document.createElement("option");
-      o.value = b;
-      o.textContent = b;
-      if (b === current) o.selected = true;
-      sel.append(o);
-    }
-    sel.value = current || (allowInherit ? "" : list[0] || "");
-  }
-
   // ── 글로벌 스코프 바디 ─────────────────────────────────────────
   function renderGlobal() {
     // 등록된 키 select 옵션
     const tokenOptions = tokenEntries.length
       ? tokenEntries.map((e) => `<option value="${escapeHtml(e.id)}">${e.label ? escapeHtml(e.label) : "—"}</option>`).join("")
       : `<option value="">${t("set.noKeysRegistered")}</option>`;
-    // 언어 select 옵션
-    const langOptions = LANGS.map((l) => `<option value="${l.v}" ${config.language === l.v ? "selected" : ""}>${l.t}</option>`).join("");
 
     body.innerHTML = `
-      <div class="field">
-        <span class="label">${t("set.language")}</span>
-        <select id="language">${langOptions}</select>
-      </div>
-
       <div class="field">
         <span class="label">${t("set.apiKey")}</span>
         <div class="row" style="gap:6px">
@@ -194,41 +106,6 @@ async function main() {
         <div class="hint" id="team_hint">${t("set.teamHintInit")}</div>
       </div>
 
-      <div class="field">
-        <span class="label">${t("set.baseBranch")}</span>
-        <select id="default_base_branch"></select>
-        <div class="hint" id="base_hint">${t("set.baseLoading")}</div>
-      </div>
-
-      <div class="field">
-        <span class="label">${t("set.branchNameTpl")}</span>
-        <input type="text" id="branch_name_template" value="${escapeHtml(config.branch_name_template || "")}" placeholder="${escapeHtml(t("set.branchNameTplPh"))}" />
-        <div class="hint">${t("set.branchNameTplHint")}</div>
-      </div>
-
-      <div class="field">
-        <span class="label">${t("set.worktreeNameTpl")}</span>
-        <input type="text" id="worktree_name_template" value="${escapeHtml(config.worktree_name_template || "")}" placeholder="${escapeHtml(t("set.worktreeNameTplPh"))}" />
-        <div class="hint">${t("set.worktreeNameTplHint")}</div>
-      </div>
-
-      <div class="field">
-        <span class="label">${t("set.agent")}</span>
-        <select id="agent_select"></select>
-        <input type="text" id="agent_command" value="${escapeHtml(config.agent_command)}" placeholder="${t("set.agentPh")}" style="margin-top:6px" />
-        <div class="hint">${t("set.agentHint")}</div>
-      </div>
-
-      <div class="field">
-        <span class="label">${t("set.issueOpenMode")}</span>
-        <select id="issue_open_mode">
-          <option value="tab" ${config.issue_open_mode === "tab" ? "selected" : ""}>${t("set.openModeTab")}</option>
-          <option value="modal" ${config.issue_open_mode === "modal" ? "selected" : ""}>${t("set.openModeModal")}</option>
-          <option value="split" ${config.issue_open_mode === "split" ? "selected" : ""}>${t("set.openModeSplit")}</option>
-        </select>
-        <div class="hint">${t("set.issueOpenModeHint")}</div>
-      </div>
-
       <hr class="sep" />
       <h3 class="sec-title">${t("set.listShow")}</h3>
       <label class="checkbox field"><input type="checkbox" id="list_show_state" ${config.list_show_state ? "checked" : ""} /> ${t("set.showState")}</label>
@@ -238,7 +115,6 @@ async function main() {
       <label class="checkbox field"><input type="checkbox" id="list_show_milestone" ${config.list_show_milestone ? "checked" : ""} /> ${t("set.showMilestone")}</label>
       <label class="checkbox field"><input type="checkbox" id="list_show_assignee" ${config.list_show_assignee ? "checked" : ""} /> ${t("set.showAssignee")}</label>
       <label class="checkbox field"><input type="checkbox" id="list_show_parent" ${config.list_show_parent ? "checked" : ""} /> ${t("set.showParent")}</label>
-      <label class="checkbox field"><input type="checkbox" id="list_show_actions" ${config.list_show_actions ? "checked" : ""} /> ${t("set.showActions")}</label>
       <label class="checkbox field"><input type="checkbox" id="show_branch_bar" ${config.show_branch_bar ? "checked" : ""} /> ${t("set.showBranchBar")}</label>
     `;
 
@@ -251,13 +127,6 @@ async function main() {
     const globalToken = () => tokenEntries.find((t) => t.id === tokenSel.value)?.token || "";
     tokenSel.addEventListener("change", () => loadTeams("team_key", "team_hint", globalToken(), document.getElementById("team_key").value));
 
-    // 언어 변경: 즉시 반영을 위해 config.language 를 갱신하고 전체 재렌더.
-    document.getElementById("language").addEventListener("change", (e) => {
-      config.language = e.target.value;
-      setLang(config.language);
-      applyScope();
-    });
-
     // 관리 모달
     document.getElementById("manage-keys").addEventListener("click", async () => {
       await muxy.modal.openWebview({ entry: "modals/apikeys.html", width: 480, height: 460 });
@@ -267,57 +136,10 @@ async function main() {
     // 팀
     fillTeams("team_key", [], config.team_key);
     loadTeams("team_key", "team_hint", globalToken(), config.team_key);
-
-    // 베이스 브랜치 + 새 브랜치 만들기
-    const NEW_BRANCH = "__new_branch__";
-    const baseSel = document.getElementById("default_base_branch");
-    fillBaseBranches("default_base_branch", [], config.default_base_branch, false);
-    let lastBase = config.default_base_branch;
-    getBranches().then((br) => {
-      fillBaseBranches("default_base_branch", br, config.default_base_branch, false);
-      const nb = document.createElement("option");
-      nb.value = NEW_BRANCH;
-      nb.textContent = t("set.newBranch");
-      baseSel.append(nb);
-      const hint = document.getElementById("base_hint");
-      hint.textContent = br.length ? t("set.baseCount", { n: br.length }) : t("set.baseFail");
-    });
-    baseSel.addEventListener("change", async () => {
-      if (baseSel.value !== NEW_BRANCH) { lastBase = baseSel.value; return; }
-      baseSel.value = lastBase;
-      let name = null;
-      try {
-        name = await muxy.dialog.prompt?.({ title: t("set.newBranchTitle"), message: t("set.newBranchMsg"), placeholder: t("set.newBranchPh"), confirm: t("set.newBranchConfirm"), cancel: t("common.cancel") });
-      } catch { name = null; }
-      const trimmed = (name || "").trim();
-      if (!trimmed) return;
-      const br = await getBranches();
-      if (br.includes(trimmed)) { fillBaseBranches("default_base_branch", br, trimmed, false); baseSel.append(mkNewBranchOption(NEW_BRANCH)); lastBase = trimmed; return; }
-      try {
-        await window.muxy.git.branch.create({ name: trimmed });
-        br.unshift(trimmed);
-        fillBaseBranches("default_base_branch", br, trimmed, false);
-        baseSel.append(mkNewBranchOption(NEW_BRANCH));
-        lastBase = trimmed;
-        muxy.toast?.({ title: t("set.branchCreated"), body: trimmed });
-      } catch (err) {
-        muxy.toast?.({ title: t("set.branchCreateFail"), body: err.message });
-      }
-    });
-
-    wireAgent("agent_select", "agent_command", false);
-  }
-
-  function mkNewBranchOption(value) {
-    const o = document.createElement("option");
-    o.value = value;
-    o.textContent = t("set.newBranch");
-    return o;
   }
 
   // ── 프로젝트 스코프 바디 ───────────────────────────────────────
   function renderProject() {
-    const s = projectCfg?.settings || {};
     // 상속받는 전역값(상속 옵션/placeholder 표기에 사용).
     const activeGlobal = tokenEntries.find((e) => e.id === config.api_token_active) || tokenEntries[0];
     const globalKeyLabel = activeGlobal ? (activeGlobal.label || "—") : "";
@@ -352,29 +174,6 @@ async function main() {
         <div class="hint">${t("set.projApiKeyHint")}</div>
       </div>
 
-      <div class="field">
-        <span class="label">${t("set.baseBranch")}</span>
-        <select id="p_base"></select>
-      </div>
-
-      <div class="field">
-        <span class="label">${t("set.branchNameTpl")}</span>
-        <input type="text" id="p_branch_name_template" value="${escapeHtml(s.branch_name_template || "")}" placeholder="${escapeHtml(inheritedText(config.branch_name_template))}" />
-        <div class="hint">${t("set.branchNameTplHint")}</div>
-      </div>
-
-      <div class="field">
-        <span class="label">${t("set.worktreeNameTpl")}</span>
-        <input type="text" id="p_worktree_name_template" value="${escapeHtml(s.worktree_name_template || "")}" placeholder="${escapeHtml(inheritedText(config.worktree_name_template))}" />
-        <div class="hint">${t("set.worktreeNameTplHint")}</div>
-      </div>
-
-      <div class="field">
-        <span class="label">${t("set.agent")}</span>
-        <select id="p_agent_select"></select>
-        <input type="text" id="p_agent_command" value="${escapeHtml(s.agent_command || "")}" placeholder="${escapeHtml(inheritedText(config.agent_command))}" style="margin-top:6px" />
-      </div>
-
       <div class="row">
         <button id="link-unlink" class="mini" hidden>${t("link.unlink")}</button>
         <span class="spacer"></span>
@@ -384,14 +183,6 @@ async function main() {
     // API 키 선택 초기값
     const pKey = document.getElementById("p_api_key");
     pKey.value = rawLegacy ? "__raw" : (projectCfg?.apiTokenId || "");
-
-    // 베이스 오버라이드(상속 옵션에 전역 베이스 표기)
-    const baseInherit = inheritedText(config.default_base_branch);
-    fillBaseBranches("p_base", [], s.default_base_branch || "", true, baseInherit);
-    getBranches().then((br) => fillBaseBranches("p_base", br, s.default_base_branch || "", true, baseInherit));
-
-    // 에이전트 오버라이드(상속 옵션에 전역 에이전트 표기)
-    wireAgent("p_agent_select", "p_agent_command", true, inheritedText(config.agent_command));
 
     wireProjectLink();
   }
@@ -531,15 +322,9 @@ async function main() {
     const activeId = tokenSel?.value || "";
     const activeToken = tokenEntries.find((e) => e.id === activeId)?.token || "";
     const next = {
-      language: document.getElementById("language")?.value || config.language,
       api_token_active: activeId,
       api_token: activeToken, // 하위 호환: 활성 키를 단일 값에도 반영
       team_key: val("team_key"),
-      default_base_branch: val("default_base_branch") || "develop",
-      branch_name_template: val("branch_name_template"),
-      worktree_name_template: val("worktree_name_template"),
-      agent_command: val("agent_command") || "claude",
-      issue_open_mode: val("issue_open_mode") || "tab",
       list_show_state: checked("list_show_state"),
       list_show_priority: checked("list_show_priority"),
       list_show_labels: checked("list_show_labels"),
@@ -547,7 +332,6 @@ async function main() {
       list_show_milestone: checked("list_show_milestone"),
       list_show_assignee: checked("list_show_assignee"),
       list_show_parent: checked("list_show_parent"),
-      list_show_actions: checked("list_show_actions"),
       show_branch_bar: checked("show_branch_bar"),
     };
     await saveConfig(next);
@@ -575,18 +359,8 @@ async function main() {
     } else {
       delete cfg.apiToken; // 전역 사용
     }
-    // 핵심 실행값 오버라이드(빈 값은 제외)
-    const settings = {};
-    const base = val("p_base");
-    const agent = val("p_agent_command");
-    const branchTpl = val("p_branch_name_template");
-    const worktreeTpl = val("p_worktree_name_template");
-    if (base) settings.default_base_branch = base;
-    if (agent) settings.agent_command = agent;
-    if (branchTpl) settings.branch_name_template = branchTpl;
-    if (worktreeTpl) settings.worktree_name_template = worktreeTpl;
-    if (Object.keys(settings).length) cfg.settings = settings;
-    else delete cfg.settings;
+    // 프로젝트 오버라이드는 이제 API 키 선택뿐이라 별도 실행값 settings 는 없다.
+    delete cfg.settings;
 
     if (!cfg.teamKey && !cfg.projectId) return; // 연결 대상이 아직 없음 — 저장 보류
     await writeProjectConfig(cfg);
