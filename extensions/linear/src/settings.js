@@ -6,7 +6,7 @@ import "./theme.css";
 import "./modal.css";
 import { run } from "./fatal.js";
 import { loadConfig, saveConfig } from "./config.js";
-import { fetchTeams, fetchTeamProjects, fetchProjectByName } from "./linear.js";
+import { fetchTeams, fetchTeamProjects, fetchProjectByName, createProject } from "./linear.js";
 import { readProjectConfig, writeProjectConfig, clearProjectConfig } from "./project.js";
 import { setLang, t } from "./i18n.js";
 
@@ -171,7 +171,16 @@ async function main() {
       </div>
       <div class="field">
         <span class="label">${t("link.project")}</span>
-        <select id="link-project"><option value="">${t("link.selectTeamFirst")}</option></select>
+        <div class="row" style="gap:6px">
+          <select id="link-project" style="flex:1"><option value="">${t("link.selectTeamFirst")}</option></select>
+          <button type="button" id="proj-new-btn" class="mini">${t("set.newProject")}</button>
+        </div>
+        <div class="row" id="proj-new-row" style="gap:6px; margin-top:6px" hidden>
+          <input type="text" id="proj-new-name" style="flex:1" placeholder="${escapeHtml(t("set.newProjectPh"))}" />
+          <button type="button" id="proj-new-create" class="mini primary">${t("common.create")}</button>
+          <button type="button" id="proj-new-cancel" class="mini">${t("common.cancel")}</button>
+        </div>
+        <div class="hint">${t("set.newProjectHint")}</div>
       </div>
 
       <hr class="sep" />
@@ -234,6 +243,53 @@ async function main() {
     statusEl.textContent = projectCfg
       ? t("set.linked", { name: projectCfg.projectName || projectCfg.teamKey || t("scope.project") })
       : t("set.notLinked");
+
+    // ── 새 프로젝트 생성(연결할 프로젝트가 없을 때) ──────────────────
+    const newBtn = document.getElementById("proj-new-btn");
+    const newRow = document.getElementById("proj-new-row");
+    const newName = document.getElementById("proj-new-name");
+    const newCreate = document.getElementById("proj-new-create");
+    const newCancel = document.getElementById("proj-new-cancel");
+
+    // 인라인 입력 행을 열고 닫는다. (alert/prompt 는 확장을 멈추므로 인라인 입력을 쓴다.)
+    function toggleNewRow(show) {
+      newRow.hidden = !show;
+      newBtn.hidden = show;
+      if (show) { newName.value = ""; newName.focus(); }
+    }
+    newBtn.onclick = () => {
+      // 팀이 선택돼 있어야 프로젝트를 만들 수 있다.
+      if (!teamSel.value) { statusEl.textContent = t("set.newProjectNeedTeam"); return; }
+      toggleNewRow(true);
+    };
+    newCancel.onclick = () => toggleNewRow(false);
+
+    // 실제 생성: 선택된 팀에 프로젝트를 만들고 목록을 다시 불러와 새 프로젝트를 선택한다.
+    async function doCreateProject() {
+      const name = newName.value.trim();
+      if (!name) { newName.focus(); return; }
+      if (!teamSel.value) { statusEl.textContent = t("set.newProjectNeedTeam"); return; }
+      newCreate.disabled = true;
+      statusEl.textContent = t("set.projectCreating");
+      try {
+        const created = await createProject(projToken(), { teamId: teamSel.value, name });
+        newName.value = ""; // 입력창 비우기
+        toggleNewRow(false);
+        await loadProjects(teamSel.value, created.id); // 새 프로젝트를 선택 상태로 목록 갱신
+        statusEl.textContent = t("set.projectCreated", { name: created.name });
+        muxy.toast?.({ title: t("set.projectCreated", { name: created.name }) });
+        await persistProject(); // 연결 정보(.linear.json)에 즉시 반영
+      } catch (e) {
+        statusEl.textContent = t("set.projectCreateFail", { msg: e.message });
+      } finally {
+        newCreate.disabled = false;
+      }
+    }
+    newCreate.onclick = doCreateProject;
+    newName.onkeydown = (ev) => {
+      if (ev.key === "Enter") { ev.preventDefault(); doCreateProject(); }
+      else if (ev.key === "Escape") { ev.preventDefault(); toggleNewRow(false); }
+    };
 
     async function loadProjects(teamId, selectId) {
       projSel.innerHTML = "";

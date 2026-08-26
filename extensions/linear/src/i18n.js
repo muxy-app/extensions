@@ -226,6 +226,13 @@ const DICT = {
     "set.projWhole": "(프로젝트 없이 팀 전체)",
     "set.autoMatched": "📁 폴더명 \"{folder}\" 과 같은 프로젝트를 자동 선택했습니다. (저장해야 연결됨)",
     "set.teamLoadFail2": "팀 로드 실패: {msg}",
+    "set.newProject": "＋ 새 프로젝트",
+    "set.newProjectPh": "새 프로젝트 이름",
+    "set.newProjectHint": "연결할 프로젝트가 없으면 선택한 팀에 새로 만들 수 있습니다.",
+    "set.newProjectNeedTeam": "먼저 팀을 선택하세요.",
+    "set.projectCreating": "프로젝트 생성 중…",
+    "set.projectCreated": "프로젝트 \"{name}\" 생성됨",
+    "set.projectCreateFail": "프로젝트 생성 실패: {msg}",
 };
 
 // 하위 호환용: 언어 셀렉터가 있던 코드가 참조하더라도 한글만 노출한다.

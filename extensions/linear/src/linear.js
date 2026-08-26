@@ -150,6 +150,24 @@ export async function fetchProjectByName(token, name) {
   return data.projects?.nodes?.[0] ?? null;
 }
 
+// 새 프로젝트 생성. 팀에 소속된 프로젝트를 만든다(설정에서 연결할 프로젝트가 없을 때 사용).
+// name 은 필수, teamId 로 소속 팀을 지정한다. 생성된 프로젝트 { id, name } 를 반환.
+export async function createProject(token, { teamId, name }) {
+  const trimmed = (name || "").trim();
+  if (!trimmed) throw new Error("프로젝트 이름을 입력하세요.");
+  if (!teamId) throw new Error("팀을 먼저 선택하세요.");
+  const query = `
+    mutation ProjectCreate($input: ProjectCreateInput!) {
+      projectCreate(input: $input) {
+        success
+        project { id name }
+      }
+    }`;
+  const data = await gql(token, query, { input: { name: trimmed, teamIds: [teamId] } });
+  if (!data.projectCreate?.success) throw new Error("프로젝트 생성에 실패했습니다.");
+  return data.projectCreate.project;
+}
+
 // 특정 팀의 프로젝트 목록.
 export async function fetchTeamProjects(token, teamId) {
   const query = `
