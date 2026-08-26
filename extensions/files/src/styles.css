@@ -125,6 +125,8 @@ textarea {
   flex-direction: column;
   background: var(--muxy-background);
   color: var(--muxy-foreground);
+  cursor: default;
+  user-select: none;
 }
 
 .file-tree-wrap {
@@ -258,6 +260,8 @@ textarea {
 .file-tree-rename-input {
   min-width: 0;
   flex: 1;
+  cursor: text;
+  user-select: text;
   height: 20px;
   padding: 0 var(--s2);
   border: 1px solid var(--muxy-accent);
@@ -363,6 +367,11 @@ textarea {
   flex-direction: column;
   background: var(--muxy-background);
   color: var(--muxy-foreground);
+}
+
+.files-pointer-guard,
+.files-pointer-guard * {
+  cursor: default !important;
 }
 
 .topbar {

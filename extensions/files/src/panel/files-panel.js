@@ -24,6 +24,7 @@ import { material_file_icon, material_folder_icon } from "@/lib/material-icon";
 import { FOLDER_PATHS, icon_paths_for } from "@/lib/file-icon";
 import { load_icon_theme, save_icon_theme, subscribe_icon_theme } from "@/lib/icon-theme";
 import { load_tree_memory, save_tree_memory } from "@/lib/tree-memory";
+import { publish_pointer_over_panel } from "@/lib/pointer-guard";
 import { GitStatusStore } from "@/lib/git-status";
 import { OpenTabsStore } from "@/lib/open-tabs";
 
@@ -88,6 +89,8 @@ function block_ends_within(dirSegs, pathSegs, maxEnd) {
   return false;
 }
 
+const NAME_COLLATOR = new Intl.Collator(undefined, { sensitivity: "base" });
+
 function sorted_rels(entries) {
   return entries
     .map((entry) => entry_to_rel(entry))
@@ -95,7 +98,7 @@ function sorted_rels(entries) {
       const ad = is_dir(a);
       const bd = is_dir(b);
       if (ad !== bd) return ad ? -1 : 1;
-      return basename(a).localeCompare(basename(b), undefined, { sensitivity: "base" });
+      return NAME_COLLATOR.compare(basename(a), basename(b));
     });
 }
 
@@ -295,6 +298,21 @@ export class FilesPanelApp {
     this.handleWindowFocus = () => this.focusList();
     window.addEventListener("focus", this.handleWindowFocus);
 
+    this.pointerOver = false;
+    this.handlePointerMove = () => {
+      if (this.pointerOver) return;
+      this.pointerOver = true;
+      publish_pointer_over_panel(true);
+    };
+    this.handlePointerLeave = () => {
+      if (!this.pointerOver) return;
+      this.pointerOver = false;
+      publish_pointer_over_panel(false);
+    };
+    document.addEventListener("mousemove", this.handlePointerMove);
+    document.documentElement.addEventListener("mouseleave", this.handlePointerLeave);
+    window.addEventListener("pagehide", this.handlePointerLeave);
+
     document.addEventListener("contextmenu", this.preventNativeContextMenu);
     this.disposers.push(
       () => this.openTabs.dispose(),
@@ -326,6 +344,12 @@ export class FilesPanelApp {
       () => this.gitStatus.dispose(),
       () => document.removeEventListener("contextmenu", this.preventNativeContextMenu),
       () => window.removeEventListener("focus", this.handleWindowFocus),
+      () => {
+        document.removeEventListener("mousemove", this.handlePointerMove);
+        document.documentElement.removeEventListener("mouseleave", this.handlePointerLeave);
+        window.removeEventListener("pagehide", this.handlePointerLeave);
+        this.handlePointerLeave();
+      },
     );
 
     void this.loadRoot();
@@ -385,7 +409,8 @@ export class FilesPanelApp {
     this.expandedDirs.clear();
     this.setSelection(null);
     this.closeContextMenu();
-    this.worktreeRoot = await this.resolveRoot();
+    void this.gitStatus.refresh();
+    const rootPromise = this.resolveRoot();
     try {
       const entries = await muxy.files.list("");
       this.recordChildren("", entries);
@@ -399,10 +424,11 @@ export class FilesPanelApp {
         .catch(() => undefined);
       this.children.set("", []);
     }
-    await this.restoreMemory();
+    this.render();
+    const [root] = await Promise.all([rootPromise, this.restoreMemory()]);
+    this.worktreeRoot = root;
     this.render();
     this.maybeInitialFocus();
-    void this.gitStatus.refresh();
     void this.revealActiveOnLoad();
   }
 
@@ -413,14 +439,25 @@ export class FilesPanelApp {
 
   async restoreMemory() {
     const { expanded, selected } = await load_tree_memory();
-    const ordered = expanded.slice().sort((a, b) => depth_of(a) - depth_of(b));
-    for (const dir of ordered) {
-      const parent = parent_dir(dir);
-      if (parent !== "" && !this.expandedDirs.has(parent)) continue;
-      await this.ensureLoaded(parent);
-      if (!this.entries.has(dir)) continue;
-      this.expandedDirs.add(dir);
-      await this.ensureLoaded(dir);
+    const byDepth = new Map();
+    for (const dir of expanded) {
+      const depth = depth_of(dir);
+      if (!byDepth.has(depth)) byDepth.set(depth, []);
+      byDepth.get(depth).push(dir);
+    }
+    const depths = Array.from(byDepth.keys()).sort((a, b) => a - b);
+    for (const depth of depths) {
+      const dirs = byDepth.get(depth).filter((dir) => {
+        const parent = parent_dir(dir);
+        if (parent !== "" && !this.expandedDirs.has(parent)) return false;
+        return this.entries.has(dir);
+      });
+      await Promise.all(
+        dirs.map(async (dir) => {
+          this.expandedDirs.add(dir);
+          await this.ensureLoaded(dir);
+        }),
+      );
     }
     if (selected && this.entries.has(selected)) this.setSelection(selected);
   }
@@ -442,12 +479,11 @@ export class FilesPanelApp {
     if (!this.loadedDirs.has(dirRel)) await this.loadChildren(dirRel);
   }
 
-  async reconcileDir(dirRel) {
+  async refreshDir(dirRel) {
     if (!this.loadedDirs.has(dirRel)) return;
     try {
       const entries = await muxy.files.list(dirRel);
       this.recordChildren(dirRel, entries);
-      this.render();
     } catch {
       return;
     }
@@ -483,11 +519,12 @@ export class FilesPanelApp {
         parent = parent_dir(parent);
       }
     }
-    const ordered = Array.from(dirs).sort((a, b) => a.length - b.length);
-    for (const dir of ordered) {
-      await this.ensureLoaded(dir);
-      this.expandedDirs.add(dir);
-    }
+    await Promise.all(
+      Array.from(dirs, async (dir) => {
+        await this.ensureLoaded(dir);
+        this.expandedDirs.add(dir);
+      }),
+    );
   }
 
   isVisibleInFilter(path, directory) {
@@ -535,28 +572,25 @@ export class FilesPanelApp {
   renderTree() {
     if (!this.list) return;
     this.renderFilterBar();
-    this.list.replaceChildren();
     this.visiblePaths = [];
     this.rowElements = new Map();
+    this.renderTarget = document.createDocumentFragment();
     const rootChildren = this.children.get("") ?? [];
     if (rootChildren.length === 0) {
-      this.list.appendChild(h("div", { class: "files-status" }, "No files"));
-      this.syncActiveDescendant();
-      return;
-    }
-    if (this.dirtyFilter) {
+      this.renderTarget.appendChild(h("div", { class: "files-status" }, "No files"));
+    } else if (this.dirtyFilter) {
       const visible = rootChildren.filter((path) => this.isVisibleInFilter(path, is_dir(path)));
       if (visible.length === 0) {
         const message = this.gitStatus.available ? "No changed files" : "No git changes";
-        this.list.appendChild(h("div", { class: "files-status" }, message));
-        this.syncActiveDescendant();
-        return;
+        this.renderTarget.appendChild(h("div", { class: "files-status" }, message));
+      } else {
+        for (const path of visible) this.renderRow(path, 0);
       }
-      for (const path of visible) this.renderRow(path, 0);
-      this.syncActiveDescendant();
-      return;
+    } else {
+      for (const path of rootChildren) this.renderRow(path, 0);
     }
-    for (const path of rootChildren) this.renderRow(path, 0);
+    this.list.replaceChildren(this.renderTarget);
+    this.renderTarget = null;
     this.syncActiveDescendant();
   }
 
@@ -589,14 +623,14 @@ export class FilesPanelApp {
           if (renaming) return;
           if (event.metaKey || event.ctrlKey) {
             this.toggleSelection(path);
-            this.render();
+            this.applySelection();
             this.persistMemory();
             this.list?.focus({ preventScroll: true });
             return;
           }
           if (event.shiftKey) {
             this.selectRange(path);
-            this.render();
+            this.applySelection();
             this.persistMemory();
             this.list?.focus({ preventScroll: true });
             return;
@@ -609,7 +643,7 @@ export class FilesPanelApp {
           event.stopPropagation();
           if (!this.selectedPaths.has(path)) {
             this.setSelection(path);
-            this.render();
+            this.applySelection();
           }
           this.showContextMenu({ kind: entry.kind, name: basename(path), path }, event.clientX, event.clientY);
         },
@@ -664,7 +698,7 @@ export class FilesPanelApp {
     row.id = `ft-row-${this.visiblePaths.length}`;
     this.rowElements.set(path, row);
     this.visiblePaths.push(path);
-    this.list.appendChild(row);
+    this.renderTarget.appendChild(row);
 
     if (directory && expanded) {
       for (const child of this.children.get(path) ?? []) {
@@ -738,7 +772,7 @@ export class FilesPanelApp {
       await this.toggleDirectory(path);
       return;
     }
-    this.render();
+    this.applySelection();
     this.persistMemory();
     void this.openFile(path);
   }
@@ -765,7 +799,7 @@ export class FilesPanelApp {
   clearSelection() {
     if (!this.selectedPath && this.selectedPaths.size === 0) return;
     this.setSelection(null);
-    this.render();
+    this.applySelection();
     this.persistMemory();
   }
 
@@ -811,6 +845,15 @@ export class FilesPanelApp {
   }
 
   // ---- Keyboard navigation -------------------------------------------------
+
+  applySelection() {
+    for (const [path, el] of this.rowElements) {
+      const selected = this.selectedPaths.has(path);
+      el.classList.toggle("file-tree-row-selected", selected);
+      el.setAttribute("aria-selected", String(selected));
+    }
+    this.syncActiveDescendant();
+  }
 
   syncActiveDescendant() {
     if (!this.list) return;
@@ -952,7 +995,7 @@ export class FilesPanelApp {
         if (this.selectedPaths.size > 1) {
           event.preventDefault();
           this.setSelection(this.selectedPath);
-          this.render();
+          this.applySelection();
         }
         return;
       default:
@@ -1029,7 +1072,7 @@ export class FilesPanelApp {
     if (!rel) return false;
     this.expandedDirs.add(parent);
     await this.ensureLoaded(parent);
-    await this.reconcileDir(parent);
+    await this.refreshDir(parent);
     this.startRename(rel, { removeIfCanceled: true });
     return true;
   }
@@ -1040,7 +1083,7 @@ export class FilesPanelApp {
     if (!rel) return false;
     this.expandedDirs.add(parent);
     await this.ensureLoaded(parent);
-    await this.reconcileDir(parent);
+    await this.refreshDir(parent);
     this.startRename(rel, { removeIfCanceled: true });
     return true;
   }
@@ -1050,7 +1093,7 @@ export class FilesPanelApp {
     const ok = await delete_paths(rels);
     if (!ok) return false;
     for (const rel of rels) this.removeSubtree(rel);
-    for (const parent of parents) await this.reconcileDir(parent);
+    await Promise.all(Array.from(parents, (parent) => this.refreshDir(parent)));
     this.render();
     return true;
   }
@@ -1058,7 +1101,7 @@ export class FilesPanelApp {
   async duplicate(rel) {
     const dest = await duplicate_op(rel);
     if (!dest) return false;
-    await this.reconcileDir(parent_dir(dest));
+    await this.refreshDir(parent_dir(dest));
     this.setSelection(dest);
     this.render();
     return true;
@@ -1089,7 +1132,7 @@ export class FilesPanelApp {
     this.activeRenameInput = null;
     if (ok) {
       this.removeSubtree(path);
-      await this.reconcileDir(parent_dir(dest));
+      await this.refreshDir(parent_dir(dest));
       this.setSelection(dest);
     }
     this.render();
@@ -1102,7 +1145,7 @@ export class FilesPanelApp {
     this.activeRenameInput = null;
     if (state.removeIfCanceled) {
       await muxy.files.delete([state.path]).catch(() => undefined);
-      await this.reconcileDir(parent_dir(state.path));
+      await this.refreshDir(parent_dir(state.path));
     }
     this.render();
   }
@@ -1149,9 +1192,9 @@ export class FilesPanelApp {
     const ok = await move_fs(dragged, target);
     if (ok) {
       for (const path of dragged) this.removeSubtree(path);
-      for (const parent of sourceParents) await this.reconcileDir(parent);
+      await Promise.all(Array.from(sourceParents, (parent) => this.refreshDir(parent)));
       await this.ensureLoaded(target);
-      await this.reconcileDir(target);
+      await this.refreshDir(target);
     }
     this.render();
   }
@@ -1181,7 +1224,7 @@ export class FilesPanelApp {
       this.reconcileTimer = null;
       const dirs = Array.from(this.pendingDirs);
       this.pendingDirs.clear();
-      for (const pendingDir of dirs) void this.reconcileDir(pendingDir);
+      void Promise.all(dirs.map((pendingDir) => this.refreshDir(pendingDir))).then(() => this.render());
     }, RECONCILE_DEBOUNCE_MS);
   }
 
