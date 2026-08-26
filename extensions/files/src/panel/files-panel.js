@@ -25,6 +25,7 @@ import { FOLDER_PATHS, icon_paths_for } from "@/lib/file-icon";
 import { load_icon_theme, save_icon_theme, subscribe_icon_theme } from "@/lib/icon-theme";
 import { load_tree_memory, save_tree_memory } from "@/lib/tree-memory";
 import { publish_pointer_over_panel } from "@/lib/pointer-guard";
+import { reconcile_children } from "@/lib/list-reconcile";
 import { GitStatusStore } from "@/lib/git-status";
 import { OpenTabsStore } from "@/lib/open-tabs";
 
@@ -206,6 +207,11 @@ export class FilesPanelApp {
     // updated without a full re-render.
     this.visiblePaths = [];
     this.rowElements = new Map();
+    // Row nodes are reused across renders, keyed by path and invalidated by a
+    // signature of everything baked into the node.
+    this.rowCache = new Map();
+    this.renderedSelection = new Set();
+    this.renderOrder = null;
     this.typeahead = { buffer: "", timer: null };
     this.didInitialFocus = false;
 
@@ -574,24 +580,43 @@ export class FilesPanelApp {
     this.renderFilterBar();
     this.visiblePaths = [];
     this.rowElements = new Map();
-    this.renderTarget = document.createDocumentFragment();
+    this.renderOrder = [];
     const rootChildren = this.children.get("") ?? [];
     if (rootChildren.length === 0) {
-      this.renderTarget.appendChild(h("div", { class: "files-status" }, "No files"));
+      this.renderOrder.push(h("div", { class: "files-status" }, "No files"));
     } else if (this.dirtyFilter) {
       const visible = rootChildren.filter((path) => this.isVisibleInFilter(path, is_dir(path)));
       if (visible.length === 0) {
         const message = this.gitStatus.available ? "No changed files" : "No git changes";
-        this.renderTarget.appendChild(h("div", { class: "files-status" }, message));
+        this.renderOrder.push(h("div", { class: "files-status" }, message));
       } else {
         for (const path of visible) this.renderRow(path, 0);
       }
     } else {
       for (const path of rootChildren) this.renderRow(path, 0);
     }
-    this.list.replaceChildren(this.renderTarget);
-    this.renderTarget = null;
+    // Rows that didn't change keep their DOM node: rebuilding every row broke
+    // clicks, since a render landing between mousedown and mouseup destroyed
+    // the row and no click event was ever dispatched.
+    reconcile_children(this.list, this.renderOrder);
+    this.renderOrder = null;
+    for (const path of this.rowCache.keys()) {
+      if (!this.rowElements.has(path)) this.rowCache.delete(path);
+    }
+    this.renderedSelection = new Set(this.selectedPaths);
     this.syncActiveDescendant();
+  }
+
+  rowSignature(depth, entry, directory, expanded, renaming, gitStatus) {
+    return [
+      depth,
+      directory ? 1 : 0,
+      expanded ? 1 : 0,
+      renaming ? 1 : 0,
+      gitStatus ?? "",
+      entry.isIgnored ? 1 : 0,
+      this.iconTheme,
+    ].join("|");
   }
 
   renderRow(path, depth) {
@@ -601,20 +626,45 @@ export class FilesPanelApp {
     const expanded = directory && this.expandedDirs.has(path);
     const renaming = this.renameState?.path === path;
     const gitStatus = this.gitStatus.statusFor(path, directory);
+    const signature = this.rowSignature(depth, entry, directory, expanded, renaming, gitStatus);
+    const cached = this.rowCache.get(path);
+    // A row mid-rename is always rebuilt so it re-adopts the live input.
+    const row =
+      cached && cached.signature === signature && !renaming
+        ? cached.element
+        : this.buildRow(path, depth, entry, directory, expanded, renaming, gitStatus);
+    this.rowCache.set(path, { element: row, signature });
+
+    const id = `ft-row-${this.visiblePaths.length}`;
+    if (row.id !== id) row.id = id;
     const selected = this.selectedPaths.has(path);
+    row.classList.toggle("file-tree-row-selected", selected);
+    row.setAttribute("aria-selected", String(selected));
+    row.classList.toggle("file-tree-row-drop", this.dropTarget === path);
+
+    this.rowElements.set(path, row);
+    this.visiblePaths.push(path);
+    this.renderOrder.push(row);
+
+    if (directory && expanded) {
+      for (const child of this.children.get(path) ?? []) {
+        if (this.dirtyFilter && !this.isVisibleInFilter(child, is_dir(child))) continue;
+        this.renderRow(child, depth + 1);
+      }
+    }
+  }
+
+  buildRow(path, depth, entry, directory, expanded, renaming, gitStatus) {
     const row = h(
       "div",
       {
         class: cls(
           "file-tree-row",
-          selected && "file-tree-row-selected",
           entry.isIgnored && "file-tree-row-ignored",
           gitStatus && GIT_STATUS_CLASS[gitStatus],
           gitStatus && directory && "file-tree-row-git-folder",
-          this.dropTarget === path && "file-tree-row-drop",
         ),
         role: "treeitem",
-        "aria-selected": selected,
         "aria-expanded": directory ? expanded : undefined,
         draggable: !renaming,
         dataset: { path, type: "item", itemType: directory ? "directory" : "file", itemPath: path },
@@ -695,17 +745,7 @@ export class FilesPanelApp {
         ? h("span", { class: "file-tree-git-mark", title: GIT_STATUS_LABEL[gitStatus] }, GIT_STATUS_GLYPH[gitStatus])
         : null,
     );
-    row.id = `ft-row-${this.visiblePaths.length}`;
-    this.rowElements.set(path, row);
-    this.visiblePaths.push(path);
-    this.renderTarget.appendChild(row);
-
-    if (directory && expanded) {
-      for (const child of this.children.get(path) ?? []) {
-        if (this.dirtyFilter && !this.isVisibleInFilter(child, is_dir(child))) continue;
-        this.renderRow(child, depth + 1);
-      }
-    }
+    return row;
   }
 
   renderRenameInput(path, directory) {
@@ -847,11 +887,23 @@ export class FilesPanelApp {
   // ---- Keyboard navigation -------------------------------------------------
 
   applySelection() {
-    for (const [path, el] of this.rowElements) {
-      const selected = this.selectedPaths.has(path);
-      el.classList.toggle("file-tree-row-selected", selected);
-      el.setAttribute("aria-selected", String(selected));
+    const next = this.selectedPaths;
+    const previous = this.renderedSelection;
+    for (const path of previous) {
+      if (next.has(path)) continue;
+      const el = this.rowElements.get(path);
+      if (!el) continue;
+      el.classList.remove("file-tree-row-selected");
+      el.setAttribute("aria-selected", "false");
     }
+    for (const path of next) {
+      if (previous.has(path)) continue;
+      const el = this.rowElements.get(path);
+      if (!el) continue;
+      el.classList.add("file-tree-row-selected");
+      el.setAttribute("aria-selected", "true");
+    }
+    this.renderedSelection = new Set(next);
     this.syncActiveDescendant();
   }
 
@@ -864,7 +916,6 @@ export class FilesPanelApp {
 
   moveSelection(path, { reveal = true, extend = false } = {}) {
     if (!path || !this.rowElements.has(path)) return;
-    const previous = this.selectedPaths;
     let next;
     if (extend) {
       const paths = this.visiblePaths;
@@ -882,26 +933,11 @@ export class FilesPanelApp {
       next = new Set([path]);
       this.anchorPath = path;
     }
-    for (const selected of previous) {
-      if (next.has(selected)) continue;
-      const selEl = this.rowElements.get(selected);
-      if (selEl) {
-        selEl.classList.remove("file-tree-row-selected");
-        selEl.setAttribute("aria-selected", "false");
-      }
-    }
-    for (const selected of next) {
-      const selEl = this.rowElements.get(selected);
-      if (selEl) {
-        selEl.classList.add("file-tree-row-selected");
-        selEl.setAttribute("aria-selected", "true");
-      }
-    }
     this.selectedPaths = next;
     this.selectedPath = path;
+    this.applySelection();
     const el = this.rowElements.get(path);
     if (reveal) el.scrollIntoView({ block: "nearest" });
-    this.syncActiveDescendant();
     this.persistMemory();
   }
 
