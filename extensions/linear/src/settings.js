@@ -8,7 +8,7 @@ import { run } from "./fatal.js";
 import { loadConfig, saveConfig } from "./config.js";
 import { fetchTeams, fetchTeamProjects, fetchProjectByName, createProject } from "./linear.js";
 import { readProjectConfig, writeProjectConfig, clearProjectConfig } from "./project.js";
-import { setLang, t } from "./i18n.js";
+import { setLang, t, LANGS } from "./i18n.js";
 
 const muxy = window.muxy;
 const app = document.getElementById("app");
@@ -89,8 +89,15 @@ async function main() {
     const tokenOptions = tokenEntries.length
       ? tokenEntries.map((e) => `<option value="${escapeHtml(e.id)}">${e.label ? escapeHtml(e.label) : "—"}</option>`).join("")
       : `<option value="">${t("set.noKeysRegistered")}</option>`;
+    // 언어 select 옵션
+    const langOptions = LANGS.map((l) => `<option value="${l.v}" ${config.language === l.v ? "selected" : ""}>${l.t}</option>`).join("");
 
     body.innerHTML = `
+      <div class="field">
+        <span class="label">${t("set.language")}</span>
+        <select id="language">${langOptions}</select>
+      </div>
+
       <div class="field">
         <span class="label">${t("set.apiKey")}</span>
         <div class="row" style="gap:6px">
@@ -135,6 +142,13 @@ async function main() {
     }
     const globalToken = () => tokenEntries.find((t) => t.id === tokenSel.value)?.token || "";
     tokenSel.addEventListener("change", () => loadTeams("team_key", "team_hint", globalToken(), document.getElementById("team_key").value));
+
+    // 언어 변경: config.language 를 즉시 갱신·적용하고 전체를 재렌더한다(값 저장은 위임 autoSave 가 처리).
+    document.getElementById("language").addEventListener("change", (e) => {
+      config.language = e.target.value;
+      setLang(config.language);
+      applyScope();
+    });
 
     // 관리 모달
     document.getElementById("manage-keys").addEventListener("click", async () => {
@@ -388,6 +402,7 @@ async function main() {
     const activeId = tokenSel?.value || "";
     const activeToken = tokenEntries.find((e) => e.id === activeId)?.token || "";
     const next = {
+      language: val("language") || config.language,
       api_token_active: activeId,
       api_token: activeToken, // 하위 호환: 활성 키를 단일 값에도 반영
       team_key: val("team_key"),
