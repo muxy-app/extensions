@@ -529,110 +529,112 @@ textarea.invalid {
 .props { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
 .props .field { margin-bottom: 8px; }
 
-/* 라벨 토글 칩: 켜진 것만 라벨 색으로 강조, 나머지는 흐리게. */
-.label-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.label-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  width: auto;
-  font-size: 11px;
-  padding: 3px 9px;
-  border-radius: 999px;
-  background: transparent;
-  border: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.3));
-  color: var(--muxy-foreground, #e6e6e6);
-  opacity: 0.65;
-}
-.label-chip::before {
-  content: "";
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--label-color, #8a8f98);
-}
-.label-chip:hover { opacity: 1; }
-.label-chip.on {
-  opacity: 1;
-  border-color: var(--label-color, #8a8f98);
-  background: color-mix(in srgb, var(--label-color, #8a8f98) 18%, transparent);
-}
-
-/* ── 라벨 다중 선택 컴포넌트(labelselect.js) ── */
-.lblsel { position: relative; width: 100%; }
-/* 컨트롤: input/select 처럼 보이는 박스. 선택된 라벨 칩을 담는다. */
-.lblsel-control {
-  width: 100%;
-  min-height: 34px;
+/* 라벨 다중선택 콤보박스(select box) */
+.labelselect { position: relative; }
+.labelselect-control {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
-  text-align: left;
-  padding: 4px 8px;
-  border: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.3));
+  gap: 5px;
+  min-height: 32px;
+  padding: 4px 6px;
   border-radius: 6px;
   background: var(--muxy-surface-solid, rgba(0, 0, 0, 0.2));
-  cursor: pointer;
+  border: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.3));
+  cursor: text;
 }
-.lblsel-control:hover { border-color: var(--muxy-accent, #5e6ad2); }
-.lblsel-ph { opacity: 0.55; font-size: 13px; }
-.lblsel-chip {
+.labelselect.open .labelselect-control { border-color: var(--muxy-accent, #5e6ad2); }
+.labelselect.disabled .labelselect-control { opacity: 0.6; cursor: default; }
+.labelselect.busy { opacity: 0.7; pointer-events: none; }
+.labelselect .ls-input {
+  flex: 1 1 100%;
+  width: 100%;
+  min-width: 100%;
+  border: none;
+  background: transparent;
+  padding: 2px 2px;
+  font-size: 12px;
+  color: inherit;
+}
+.labelselect .ls-input:focus { outline: none; }
+
+/* 선택된 라벨 칩(제거 버튼 포함) */
+.labelselect .ls-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   font-size: 11px;
-  padding: 1px 8px;
+  padding: 2px 4px 2px 8px;
   border-radius: 999px;
-  border: 1px solid var(--label-color, #8a8f98);
+  border: 1px solid color-mix(in srgb, var(--label-color, #8a8f98) 55%, transparent);
   background: color-mix(in srgb, var(--label-color, #8a8f98) 18%, transparent);
 }
-/* 드롭다운 팝오버 */
-.lblsel-pop {
+.labelselect .ls-chip::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--label-color, #8a8f98);
+}
+.labelselect .ls-x {
+  width: 15px;
+  height: 15px;
+  line-height: 1;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  opacity: 0.6;
+  cursor: pointer;
+  font-size: 13px;
+}
+.labelselect .ls-x:hover { opacity: 1; background: color-mix(in srgb, currentColor 18%, transparent); }
+
+/* 드롭다운 메뉴 */
+.labelselect-menu {
   position: absolute;
-  z-index: 30;
-  top: calc(100% + 4px);
+  z-index: 1200;
   left: 0;
   right: 0;
-  max-height: 260px;
-  display: flex;
-  flex-direction: column;
-  background: var(--muxy-background, #1e1e1e);
-  border: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.35));
+  top: calc(100% + 4px);
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 4px;
+  background: var(--muxy-surface-solid, #23262e);
+  border: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.4));
   border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-  overflow: hidden;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
 }
-.lblsel-search {
-  margin: 6px;
-  width: auto;
-}
-.lblsel-list { overflow-y: auto; padding: 2px 4px; }
-.lblsel-opt {
-  width: 100%;
+.labelselect-menu .ls-opt {
   display: flex;
   align-items: center;
   gap: 8px;
+  width: 100%;
   text-align: left;
   padding: 6px 8px;
   border: none;
-  background: transparent;
   border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
   cursor: pointer;
 }
-.lblsel-opt:hover { background: var(--muxy-surface, rgba(127, 127, 127, 0.15)); }
-.lblsel-dot { flex: none; width: 9px; height: 9px; border-radius: 50%; }
-.lblsel-name { flex: 1; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lblsel-check { flex: none; opacity: 0; color: var(--muxy-accent, #5e6ad2); font-weight: 700; }
-.lblsel-opt.on .lblsel-check { opacity: 1; }
-.lblsel-empty { padding: 8px; font-size: 12px; opacity: 0.6; text-align: center; }
-.lblsel-create {
-  margin: 4px 6px 6px;
-  width: auto;
-  font-size: 12px;
-  text-align: left;
-  border-style: dashed;
+.labelselect-menu .ls-opt:hover,
+.labelselect-menu .ls-opt.active { background: var(--muxy-surface, rgba(127, 127, 127, 0.18)); }
+.labelselect-menu .ls-dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--label-color, #8a8f98);
 }
+.labelselect-menu .ls-opt-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.labelselect-menu .ls-check { flex: none; color: var(--muxy-accent, #5e6ad2); font-weight: 700; }
+.labelselect-menu .ls-create { color: var(--muxy-accent, #5e6ad2); }
+.labelselect-menu .ls-plus { flex: none; width: 9px; text-align: center; font-weight: 700; }
+.labelselect-menu .ls-empty { padding: 8px; font-size: 11px; opacity: 0.55; }
+
 
 /* 위험 동작 버튼(이슈 삭제) */
 button.danger {

@@ -32,12 +32,6 @@ function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 }
 
-function h(html) {
-  const tpl = document.createElement("template");
-  tpl.innerHTML = html.trim();
-  return tpl.content.firstElementChild;
-}
-
 async function main() {
   const config = await loadConfig();
   setLang(config.language);
@@ -106,7 +100,7 @@ async function main() {
 
     <div class="field">
       <span class="label">${t("issue.labels")}</span>
-      <div id="labels" class="label-chips muted">${t("common.loading")}</div>
+      <div id="labels"></div>
     </div>
 
     <div class="field">
@@ -144,30 +138,19 @@ async function main() {
     }
   })();
 
-  // ---- 라벨: 다중 선택 컴포넌트. 선택 집합을 생성 시 함께 등록한다. 새 라벨도 추가 가능. --
+  // ---- 라벨: 팀 라벨을 다중선택 콤보박스로. 목록에 없는 이름은 새 라벨로 만든다.
+  // 선택 집합은 콤보박스가 소유하며, 생성 시 getSelected() 로 읽어 함께 등록한다.
   let teamLabels = [];
-  const selectedLabels = new Set();
-  const labelBox = $("labels");
-  labelBox.classList.remove("muted");
-  labelBox.innerHTML = "";
-  const labelSelect = mountLabelSelect(labelBox, {
-    editable: true,
-    labels: [],
-    selected: [],
-    // 생성 전이므로 서버 저장 없이 로컬 선택 집합만 갱신(생성 시 labelIds 로 전달).
-    onChange: async (ids) => { selectedLabels.clear(); ids.forEach((id) => selectedLabels.add(id)); },
-    // 새 라벨은 즉시 팀에 만든다(teamId 는 팀 로드 후 채워짐).
+  const labelSelect = mountLabelSelect($("labels"), {
+    disabled: true,
+    onError: (e) => showErr(e.message),
     onCreate: async (name) => {
-      if (!teamId) return null;
-      const l = await createTeamLabel(token, teamId, name);
-      if (l) teamLabels = [...teamLabels, l];
-      return l;
+      if (!teamId) throw new Error(t("link.selectTeamFirst"));
+      const created = await createTeamLabel(token, teamId, { name });
+      teamLabels = [...teamLabels, created].sort((a, b) => a.name.localeCompare(b.name));
+      return created;
     },
   });
-  function renderLabels() {
-    labelSelect.setLabels(teamLabels);
-    labelSelect.setSelected([...selectedLabels]);
-  }
 
   // 셀렉트 채우기 헬퍼: [{value,label}] + 맨 앞 "없음" 옵션.
   function fillSelect(sel, items, { noneLabel, selected = "" } = {}) {
@@ -218,7 +201,7 @@ async function main() {
     $("state").innerHTML = `<option>${t("common.loading")}</option>`;
     $("assignee").innerHTML = `<option>${t("common.loading")}</option>`;
     $("project").innerHTML = `<option>${t("common.loading")}</option>`;
-    // 라벨은 컴포넌트가 유지되므로 박스를 덮어쓰지 않는다(로드되면 setLabels 로 갱신).
+    labelSelect.setDisabled(true);
     try {
       const team = await resolveTeam(token, teamKey);
       teamId = team.id;
@@ -251,10 +234,11 @@ async function main() {
       await loadMilestones($("project").value);
 
       teamLabels = labels;
+      labelSelect.setLabels(teamLabels);
       // 존재하지 않는(이전 팀) 라벨 선택은 정리.
       const valid = new Set(labels.map((l) => l.id));
-      for (const id of [...selectedLabels]) if (!valid.has(id)) selectedLabels.delete(id);
-      renderLabels();
+      labelSelect.setSelected(labelSelect.getSelected().filter((id) => valid.has(id)));
+      labelSelect.setDisabled(false);
 
       templates = tpls;
       fillSelect($("template"), tpls.map((tp) => ({ value: tp.id, label: tp.name })), {
@@ -265,6 +249,8 @@ async function main() {
       $("state").innerHTML = `<option>—</option>`;
       $("assignee").innerHTML = `<option>—</option>`;
       $("project").innerHTML = `<option>—</option>`;
+      labelSelect.setLabels([]);
+      labelSelect.setDisabled(false);
     }
   }
 
@@ -312,8 +298,9 @@ async function main() {
     }
     const tplLabels = data.labelIds || data.labels;
     if (Array.isArray(tplLabels)) {
-      for (const id of tplLabels) if (teamLabels.some((l) => l.id === id)) selectedLabels.add(id);
-      renderLabels();
+      const cur = new Set(labelSelect.getSelected());
+      for (const id of tplLabels) if (teamLabels.some((l) => l.id === id)) cur.add(id);
+      labelSelect.setSelected([...cur]);
     }
   }
 
@@ -342,7 +329,7 @@ async function main() {
         priority: Number($("priority").value),
         projectId: $("project").value || undefined,
         projectMilestoneId: $("milestone").value || undefined,
-        labelIds: [...selectedLabels],
+        labelIds: labelSelect.getSelected(),
         stateId: $("state").value || undefined,
         parentId: parent?.id || undefined,
       });

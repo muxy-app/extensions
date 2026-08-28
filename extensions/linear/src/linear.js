@@ -402,24 +402,6 @@ export async function fetchTeamLabels(token, teamId) {
   return nodes.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-// 팀에 새 라벨을 만든다. color 를 안 주면 이름 해시로 팔레트에서 하나 고른다.
-export async function createTeamLabel(token, teamId, name, color) {
-  // Linear 기본 라벨 팔레트와 비슷한 색 몇 개. 이름 글자합으로 결정론적 선택.
-  const palette = ["#5e6ad2", "#26b5ce", "#4cb782", "#f2c94c", "#eb5757", "#bb87fc", "#f2994a", "#95a2b3"];
-  let picked = color;
-  if (!picked) {
-    let hash = 0;
-    for (const ch of name) hash = (hash + ch.charCodeAt(0)) % palette.length;
-    picked = palette[hash];
-  }
-  const mutation = `
-    mutation CreateLabel($input: IssueLabelCreateInput!) {
-      issueLabelCreate(input: $input) { success issueLabel { id name color } }
-    }`;
-  const data = await gql(token, mutation, { input: { name, teamId, color: picked } });
-  return data.issueLabelCreate?.issueLabel ?? null;
-}
-
 // 이슈 담당자 변경. assigneeId = null 이면 담당자 해제.
 export async function updateIssueAssignee(token, issueId, assigneeId) {
   const query = `
@@ -438,6 +420,24 @@ export async function updateIssuePriority(token, issueId, priority) {
     }`;
   const data = await gql(token, query, { id: issueId, priority });
   return data.issueUpdate?.success === true;
+}
+
+// 팀에 새 라벨을 생성한다. color 를 안 주면 Linear 가 자동 배정한다.
+// 생성된 라벨({id,name,color})을 돌려줘 곧바로 선택 목록에 넣을 수 있게 한다.
+export async function createTeamLabel(token, teamId, { name, color } = {}) {
+  const query = `
+    mutation CreateLabel($input: IssueLabelCreateInput!) {
+      issueLabelCreate(input: $input) {
+        success
+        issueLabel { id name color isGroup }
+      }
+    }`;
+  const input = { teamId, name };
+  if (color) input.color = color;
+  const data = await gql(token, query, { input });
+  const res = data.issueLabelCreate;
+  if (!res?.success || !res.issueLabel) throw new Error("라벨 생성에 실패했습니다.");
+  return res.issueLabel;
 }
 
 // 이슈 라벨 전체 교체(labelIds 배열로 지정한 집합으로 설정).

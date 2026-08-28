@@ -13,8 +13,8 @@ import {
 } from "./linear.js";
 import { renderMarkdown } from "./markdown.js";
 import { mountMarkdownEditor } from "./mdwysiwyg.js";
-import { mountLabelSelect } from "./labelselect.js";
 import { setLang, t } from "./i18n.js";
+import { mountLabelSelect } from "./labelselect.js";
 
 const muxy = window.muxy;
 const app = document.getElementById("app");
@@ -29,7 +29,6 @@ setLang(config?.language); // 패널이 넘긴 config 로 언어 적용
 let changed = false; // 목록 갱신이 필요한 변경이 있었는지
 let descEditor = null; // KNK-90: 본문 위지위그 에디터(싱글턴 탭 재렌더 시 정리용)
 let commentEditor = null; // 코멘트 입력도 본문과 같은 위지위그 에디터로(재렌더 시 정리용)
-let labelSelect = null; // 라벨 다중 선택 컴포넌트(재렌더 시 정리용)
 
 function h(html) {
   const tpl = document.createElement("template");
@@ -65,7 +64,6 @@ async function main() {
   // 싱글턴 탭 재렌더 시 이전 에디터 인스턴스를 정리(플러그인/리스너 누수 방지).
   if (descEditor) { try { descEditor.destroy(); } catch { /* 이미 정리됨 무시 */ } descEditor = null; }
   if (commentEditor) { try { commentEditor.destroy(); } catch { /* 이미 정리됨 무시 */ } commentEditor = null; }
-  if (labelSelect) { try { labelSelect.destroy(); } catch { /* 이미 정리됨 무시 */ } labelSelect = null; }
 
   // 탭으로 열렸으면 탭 제목을 이슈 식별자로 바꾼다(구버전엔 setTitle 없음 → 무시).
   if (asTab) {
@@ -106,7 +104,7 @@ async function main() {
 
     <div class="field">
       <span class="label">${t("issue.labels")}</span>
-      <div id="labels" class="label-chips muted">${t("common.loading")}</div>
+      <div id="labels" class="muted">${t("common.loading")}</div>
     </div>
 
     <div class="field">
@@ -304,12 +302,13 @@ async function main() {
     $("project").disabled = true;
   }
 
-  // 라벨: 팀 전체 라벨을 토글 칩으로 보여주고, 켜진 칩 집합을 이슈 라벨로 저장한다.
-  // 팀 라벨 목록(teamLabels)과 현재 이슈 라벨(issueLabelIds, loadDetail 에서 채움)이
-  // 모두 준비돼야 렌더한다.
+  // 라벨: 팀 전체 라벨을 다중선택 콤보박스(select box)로 보여준다. 목록에 없는 이름은
+  // 새 라벨로 만든다. 선택을 바꾸면 즉시 서버에 저장(onChange)하고, 실패 시 콤보박스가
+  // 이전 상태로 롤백한다. 팀 라벨 목록(teamLabels)과 현재 이슈 라벨(issueLabelIds,
+  // loadDetail 에서 채움)이 모두 준비되는 대로 콤보박스에 반영한다.
   let teamLabels = null;
   let issueLabelIds = null;
-  // 편집 가능하면 라벨 다중 선택 컴포넌트로, 아니면 읽기 전용 텍스트로 표시한다.
+  let labelSelect = null; // canEdit 일 때만 1회 마운트
   function renderLabels() {
     const box = $("labels");
     if (!canEdit) {
@@ -318,35 +317,31 @@ async function main() {
       box.textContent = names.length ? names.join(", ") : t("issue.noLabels");
       return;
     }
-    // 데이터가 새로 들어오면 컴포넌트에 반영.
-    if (labelSelect) {
-      if (teamLabels) labelSelect.setLabels(teamLabels);
-      if (issueLabelIds) labelSelect.setSelected([...issueLabelIds]);
+    box.classList.remove("muted");
+    if (!labelSelect) {
+      labelSelect = mountLabelSelect(box, {
+        disabled: true,
+        onError: (e) => showErr(e.message),
+        onChange: async (ids) => {
+          await updateIssueLabels(config.api_token, issue.id, ids);
+          issueLabelIds = new Set(ids);
+          issue.labels = (teamLabels || []).filter((l) => issueLabelIds.has(l.id));
+          changed = true;
+          toast(t("issue.saved"), issue.identifier);
+        },
+        onCreate: async (name) => {
+          const created = await createTeamLabel(config.api_token, issue.team.id, { name });
+          teamLabels = [...(teamLabels || []), created].sort((a, b) => a.name.localeCompare(b.name));
+          return created;
+        },
+      });
     }
+    // 팀 라벨 목록과 현재 이슈 라벨이 준비되는 대로 콤보박스에 반영한다.
+    if (teamLabels) labelSelect.setLabels(teamLabels);
+    if (issueLabelIds) labelSelect.setSelected([...issueLabelIds]);
+    labelSelect.setDisabled(!(teamLabels && issueLabelIds));
   }
   if (canEdit) {
-    const box = $("labels");
-    box.classList.remove("muted");
-    box.innerHTML = "";
-    labelSelect = mountLabelSelect(box, {
-      editable: true,
-      labels: [],
-      selected: [],
-      // 라벨 변경 즉시 서버 저장. 실패하면 컴포넌트가 이전 선택으로 되돌린다(throw).
-      onChange: async (ids) => {
-        await updateIssueLabels(config.api_token, issue.id, ids);
-        issueLabelIds = new Set(ids);
-        issue.labels = (teamLabels || []).filter((l) => issueLabelIds.has(l.id));
-        changed = true;
-        toast(t("issue.saved"), issue.identifier);
-      },
-      // 새 라벨 생성 → 팀 라벨 목록에 추가하고 반환(컴포넌트가 선택까지 처리).
-      onCreate: async (name) => {
-        const l = await createTeamLabel(config.api_token, issue.team.id, name);
-        if (l) teamLabels = [...(teamLabels || []), l];
-        return l;
-      },
-    });
     fetchTeamLabels(config.api_token, issue.team.id)
       .then((labels) => { teamLabels = labels; renderLabels(); })
       .catch((e) => showErr(e.message));
