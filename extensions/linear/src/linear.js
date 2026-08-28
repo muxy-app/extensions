@@ -360,7 +360,8 @@ export async function fetchProjectMilestones(token, projectId) {
 
 // 팀에서 사용 가능한 이슈 템플릿 목록(워크스페이스 공용 템플릿 포함).
 // templateData 에는 제목/본문/중요도/라벨/담당자/프로젝트 등 기본값이 들어 있어
-// 생성 폼을 채우는 데 쓴다. Linear 는 JSON 스칼라로 객체를 그대로 돌려준다.
+// 생성 폼을 채우는 데 쓴다. Linear 는 templateData 를 "JSON 문자열"로 돌려주므로
+// (객체가 아니다) 여기서 JSON.parse 로 객체화해 넘긴다. 파싱 실패 시 빈 객체로 둔다.
 export async function fetchTeamTemplates(token, teamId) {
   const query = `
     query TeamTemplates($id: String!) {
@@ -371,6 +372,12 @@ export async function fetchTeamTemplates(token, teamId) {
     }`;
   const data = await gql(token, query, { id: teamId });
   const nodes = (data.team?.templates?.nodes ?? []).filter((t) => t.type === "issue" || !t.type);
+  for (const n of nodes) {
+    if (typeof n.templateData === "string") {
+      try { n.templateData = JSON.parse(n.templateData); }
+      catch { n.templateData = {}; }
+    }
+  }
   return nodes.sort((a, b) => a.name.localeCompare(b.name));
 }
 

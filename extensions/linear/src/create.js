@@ -59,15 +59,11 @@ async function main() {
     </header>
     ${parent ? `<div class="issue-meta"><span class="chip">${t("create.parentOf", { id: escapeHtml(parent.identifier) })}</span></div>` : ""}
 
-    <div class="props">
-      <div class="field">
-        <span class="label">${t("create.teamKey")}</span>
-        <input type="text" id="team" value="${escapeHtml(defaultTeam)}" placeholder="${t("create.teamKeyPh")}" />
-      </div>
-      <div class="field">
-        <span class="label">${t("create.template")}</span>
-        <select id="template"><option value="">${t("create.noTemplate")}</option></select>
-      </div>
+    <!-- KNK-117: 팀 키는 프로젝트 설정/부모 이슈에서 자동으로 정해지므로 화면·DOM 어디에도 두지 않는다.
+         팀 키 값은 currentTeamKey 변수로만 관리한다. -->
+    <div class="field">
+      <span class="label">${t("create.template")}</span>
+      <select id="template"><option value="">${t("create.noTemplate")}</option></select>
     </div>
 
     <div class="field">
@@ -193,7 +189,9 @@ async function main() {
     }
   }
 
-  // ---- 팀 종속 데이터 로드(담당자·프로젝트·라벨·템플릿). 팀 키 변경 시 재실행. --
+  // ---- 팀 종속 데이터 로드(담당자·프로젝트·라벨·템플릿). --------------------------
+  // 팀 키는 화면에 노출하지 않으므로 DOM 대신 이 변수로만 관리한다(생성 시 폴백에 사용).
+  let currentTeamKey = defaultTeam;
   let teamId = null;
   let templates = [];
   async function loadTeamData(teamKey) {
@@ -205,7 +203,7 @@ async function main() {
     try {
       const team = await resolveTeam(token, teamKey);
       teamId = team.id;
-      $("team").value = team.key; // 정규화된 키 반영
+      currentTeamKey = team.key; // 정규화된 키 반영
 
       const [members, projects, labels, tpls, states] = await Promise.all([
         fetchTeamMembers(token, teamId).catch(() => []),
@@ -256,15 +254,6 @@ async function main() {
 
   // 프로젝트가 바뀌면 마일스톤을 다시 로드(리스너는 한 번만 등록).
   $("project").addEventListener("change", () => loadMilestones($("project").value));
-
-  // 팀 키를 바꾸면(포커스 아웃) 종속 데이터를 다시 로드한다.
-  let lastTeamKey = defaultTeam;
-  $("team").addEventListener("change", () => {
-    const key = $("team").value.trim();
-    if (key === lastTeamKey) return;
-    lastTeamKey = key;
-    loadTeamData(key);
-  });
 
   // ---- 템플릿 적용: templateData 로 폼을 채운다. -------------------------------
   $("template").addEventListener("change", () => {
@@ -318,7 +307,7 @@ async function main() {
     try {
       // teamId 가 아직 준비 안 됐으면(로드 실패/지연) 팀 키로 재확인.
       if (!teamId) {
-        const team = await resolveTeam(token, $("team").value.trim());
+        const team = await resolveTeam(token, currentTeamKey);
         teamId = team.id;
       }
       const created = await createIssue(token, {
