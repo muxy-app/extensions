@@ -1,5 +1,5 @@
 import * as forge from "@/lib/forge";
-import { run, runOutput, tryRun } from "@/lib/forge/exec";
+import { run, tryRun } from "@/lib/forge/exec";
 
 const PENDING_OP_PROBE = [
     `[ -f "$(git rev-parse --git-path rebase-merge/head-name)" ] || [ -f "$(git rev-parse --git-path rebase-apply/head-name)" ] && { printf %s rebase; exit; }`,
@@ -108,12 +108,9 @@ export async function branches() {
 }
 
 async function untrackedDiff() {
-    const out = await tryRun(["git", "ls-files", "--others", "--exclude-standard", "-z"]);
-    const paths = out.split("\0").filter(Boolean);
-    if (paths.length === 0)
-        return "";
-    const diffs = await Promise.all(paths.map((path) => runOutput(["git", "diff", "--no-color", "--no-index", "--", "/dev/null", path])));
-    return diffs.filter((d) => d.trim()).join("\n");
+    const script = `git ls-files --others --exclude-standard -z | while IFS= read -r -d '' f; do git diff --no-color --no-index -- /dev/null "$f"; done; true`;
+    const res = await muxy.exec({ shell: script }).catch(() => null);
+    return res?.stdout?.trim() ? res.stdout : "";
 }
 
 export async function diff({ staged } = {}) {

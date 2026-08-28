@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title description">
+  <title id="title">Hermes Agent</title>
+  <desc id="description">A winged message spark</desc>
+  <defs>
+    <linearGradient id="surface" x1="72" y1="56" x2="438" y2="456" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6D5DFB"/>
+      <stop offset="1" stop-color="#2A9DDB"/>
+    </linearGradient>
+  </defs>
+  <rect x="32" y="32" width="448" height="448" rx="112" fill="url(#surface)"/>
+  <path d="M123 278c55-6 102-26 140-60-17 51-49 93-95 124-27 18-62-3-55-35l10-29Zm266 0c-55-6-102-26-140-60 17 51 49 93 95 124 27 18 62-3 55-35l-10-29Z" fill="#fff" fill-opacity=".9"/>
+  <path d="m256 112 20 61 64 1-51 38 19 62-52-37-52 37 19-62-51-38 64-1 20-61Z" fill="#fff"/>
+  <path d="M203 354h106" stroke="#fff" stroke-width="24" stroke-linecap="round"/>
+</svg>

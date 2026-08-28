@@ -36,7 +36,9 @@
     "permissions" : [
       "commands:exec",
       "projects:read",
-      "panels:write"
+      "panels:write",
+      "gh:read",
+      "git:read"
     ],
     "marketplace" : {
       "author" : "ryohei",
@@ -54,5 +56,5 @@
     "dev" : "vite"
   },
   "type" : "module",
-  "version" : "0.1.0"
+  "version" : "0.1.1"
 }

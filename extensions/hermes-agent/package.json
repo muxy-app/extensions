@@ -1,0 +1,92 @@
+{
+  "devDependencies" : {
+    "@tailwindcss\/vite" : "^4.3.0",
+    "tailwindcss" : "^4.3.0",
+    "vite" : "^7.3.5"
+  },
+  "muxy" : {
+    "$schema" : "https:\/\/raw.githubusercontent.com\/muxy-app\/muxy\/main\/docs\/extensions\/schema\/manifest.schema.json",
+    "description" : "Connects to Hermes with one sign-in for agent work and project boards in Muxy",
+    "marketplace" : {
+      "author" : "Gabe",
+      "categories" : [
+        "developer-tools",
+        "productivity"
+      ],
+      "github" : "gabeosx",
+      "icon" : "assets\/icon.svg",
+      "repository" : "https:\/\/github.com\/gabeosx\/muxy-hermes-extension",
+      "screenshots" : [
+        "assets\/screenshots\/screenshot-1.png",
+        "assets\/screenshots\/screenshot-2.png",
+        "assets\/screenshots\/screenshot-3.png",
+        "assets\/screenshots\/screenshot-4.png"
+      ]
+    },
+    "commands" : [
+      {
+        "id" : "toggle-hermes-gateway",
+        "title" : "Hermes: Toggle Agent Panel",
+        "action" : {
+          "kind" : "togglePanel",
+          "panel" : "hermes-gateway"
+        }
+      },
+      {
+        "id" : "open-hermes-project-board",
+        "title" : "Hermes: Open Project Board",
+        "action" : {
+          "kind" : "openTab",
+          "tabType" : "hermes-project-board"
+        }
+      }
+    ],
+    "tabTypes" : [
+      {
+        "id" : "hermes-project-board",
+        "title" : "Hermes Project Board",
+        "entry" : "board\/index.html"
+      }
+    ],
+    "panels" : [
+      {
+        "entry" : "panel\/index.html",
+        "icon" : {
+          "symbol" : "sparkles"
+        },
+        "id" : "hermes-gateway",
+        "mode" : "pinned",
+        "position" : "right",
+        "title" : "Hermes Agent"
+      }
+    ],
+    "permissions" : [
+      "commands:exec",
+      "panels:write",
+      "projects:read",
+      "storage:read",
+      "storage:write",
+      "tabs:write"
+    ]
+  },
+  "engines" : {
+    "node" : ">=20"
+  },
+  "name" : "hermes-agent",
+  "private" : true,
+  "scripts" : {
+    "build" : "vite build && node scripts\/copy-manifest.mjs",
+    "dev" : "vite",
+    "fixture:kanban" : "node scripts\/run-kanban-fixture.mjs",
+    "qualify" : "node scripts\/qualify-release.mjs",
+    "qualify:automated" : "node scripts\/qualify-release.mjs",
+    "qualify:native" : "node scripts\/qualify-release.mjs --native-hold",
+    "qualify:native:complete" : "node scripts\/complete-native-qualification.mjs",
+    "test" : "node --test test/*.test.js",
+    "validate" : "node scripts/validate-release.mjs",
+    "validate:dist" : "node scripts/validate-dist.mjs",
+    "update-skill" : "node -e \"const fs=require('fs'),p=require('path');const url='https:\/\/raw.githubusercontent.com\/muxy-app\/muxy\/main\/Muxy\/Resources\/skills\/muxy-extension\/SKILL.md';fetch(url).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.text()}).then(t=>{for(const d of ['.claude\/skills\/muxy-extension','.agents\/skills\/muxy-extension']){fs.mkdirSync(d,{recursive:true});fs.writeFileSync(p.join(d,'SKILL.md'),t);console.log('Updated '+p.join(d,'SKILL.md'))}}).catch(e=>{console.error('Failed to update skill:',e.message);process.exit(1)})\""
+  },
+  "type" : "module",
+  "version" : "0.1.0"
+}

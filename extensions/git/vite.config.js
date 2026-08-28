@@ -6,7 +6,10 @@ export default defineConfig({
   base: "./",
   plugins: [tailwindcss()],
   resolve: {
-    alias: { "@": resolve(__dirname, "src") },
+    alias: {
+      "@": resolve(__dirname, "src"),
+      "@muxy/ui": resolve(__dirname, "../../shared/ui"),
+    },
   },
   define: {
     "process.env.NODE_ENV": JSON.stringify("production"),

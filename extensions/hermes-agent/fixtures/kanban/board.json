@@ -1,0 +1,72 @@
+{
+  "board": "muxy-test",
+  "columns": [
+    {
+      "name": "triage",
+      "tasks": [
+        {
+          "id": "t_fixture_triage",
+          "title": "Review incoming research request",
+          "status": "triage",
+          "assignee": "researcher",
+          "tenant": "muxy-test",
+          "priority": 2,
+          "comment_count": 1,
+          "latest_summary": "Waiting for scope and source requirements."
+        }
+      ]
+    },
+    {
+      "name": "todo",
+      "tasks": [
+        {
+          "id": "t_fixture_todo",
+          "title": "Prepare release checklist",
+          "status": "todo",
+          "assignee": "builder",
+          "tenant": "muxy-test",
+          "priority": 1,
+          "comment_count": 0,
+          "latest_summary": null
+        }
+      ]
+    },
+    { "name": "scheduled", "tasks": [] },
+    {
+      "name": "ready",
+      "tasks": [
+        {
+          "id": "t_fixture_ready",
+          "title": "Run compatibility matrix",
+          "status": "ready",
+          "assignee": "qa",
+          "tenant": "muxy-test",
+          "priority": 3,
+          "comment_count": 2,
+          "latest_summary": "Fixture inputs are prepared.",
+          "progress": { "done": 1, "total": 3 }
+        }
+      ]
+    },
+    { "name": "running", "tasks": [] },
+    { "name": "blocked", "tasks": [] },
+    { "name": "review", "tasks": [] },
+    {
+      "name": "done",
+      "tasks": [
+        {
+          "id": "t_fixture_done",
+          "title": "Verify dashboard authentication",
+          "status": "done",
+          "assignee": "qa",
+          "tenant": "muxy-test",
+          "priority": 1,
+          "comment_count": 1,
+          "latest_summary": "Session bearer was required and accepted."
+        }
+      ]
+    }
+  ],
+  "assignees": ["builder", "qa", "researcher"],
+  "tenants": ["muxy-test"]
+}

@@ -6,6 +6,7 @@ on:
     paths:
       - "extensions/**"
       - "scripts/**"
+      - "shared/**"
       - ".github/workflows/**"
   # Title rewrite + version-bump gate. This needs a writable token for fork PRs,
   # so it runs from the trusted base branch via pull_request_target. The job
@@ -73,9 +74,14 @@ jobs:
             | awk -F/ 'NF>1 && $1=="extensions" {print $2}' \
             | sort -u)"
 
+          shared_changed="$(git diff --name-only "$diff_base" "$HEAD_SHA" -- shared/)"
+
           # Tooling-only PRs build and validate everything because scripts or
           # workflow changes can affect every extension.
-          if [ -z "$changed" ]; then
+          if [ -n "$shared_changed" ]; then
+            echo "shared/ changed; building and validating all extensions."
+            echo "names=" >> "$GITHUB_OUTPUT"
+          elif [ -z "$changed" ]; then
             echo "No extension changed (tooling-only PR); building and validating all."
             echo "names=" >> "$GITHUB_OUTPUT"
           else

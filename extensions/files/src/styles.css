@@ -125,6 +125,8 @@ textarea {
   flex-direction: column;
   background: var(--muxy-background);
   color: var(--muxy-foreground);
+  cursor: default;
+  user-select: none;
 }
 
 .file-tree-wrap {
@@ -258,6 +260,8 @@ textarea {
 .file-tree-rename-input {
   min-width: 0;
   flex: 1;
+  cursor: text;
+  user-select: text;
   height: 20px;
   padding: 0 var(--s2);
   border: 1px solid var(--muxy-accent);
@@ -363,6 +367,21 @@ textarea {
   flex-direction: column;
   background: var(--muxy-background);
   color: var(--muxy-foreground);
+}
+
+/* Scoped to the surfaces that assert their own cursor: a `*` selector here
+   forced a full-document restyle in every editor tab on each toggle. */
+.files-pointer-guard,
+.files-pointer-guard .cm-editor,
+.files-pointer-guard .cm-scroller,
+.files-pointer-guard .cm-content,
+.files-pointer-guard .cm-line,
+.files-pointer-guard .md-preview,
+.files-pointer-guard .md-scroll,
+.files-pointer-guard .pdf-stage,
+.files-pointer-guard .pdf-text-layer,
+.files-pointer-guard .pdf-text-layer :is(span, br) {
+  cursor: default !important;
 }
 
 .topbar {

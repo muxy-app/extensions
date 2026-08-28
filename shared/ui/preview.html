@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>@muxy/ui preview</title>
+<link rel="stylesheet" href="./ui.css" />
+<style>
+  html[data-theme="dark"] {
+    --muxy-background: #1d1d1f;
+    --muxy-foreground: #e8e8ea;
+    --muxy-foreground-muted: #98989d;
+    --muxy-surface: #29292c;
+    --muxy-border: #3a3a3e;
+    --muxy-hover: #333338;
+    --muxy-accent: #4c8dff;
+    --muxy-accent-soft: rgba(76, 141, 255, 0.18);
+    --muxy-diff-add: #3fb950;
+    --muxy-diff-remove: #f85149;
+    --muxy-diff-hunk: #d29922;
+    --muxy-topbar-height: 32px;
+  }
+  html[data-theme="light"] {
+    --muxy-background: #ffffff;
+    --muxy-foreground: #1d1d1f;
+    --muxy-foreground-muted: #6e6e73;
+    --muxy-surface: #f2f2f4;
+    --muxy-border: #dddde1;
+    --muxy-hover: #e9e9ec;
+    --muxy-accent: #0a66ff;
+    --muxy-accent-soft: rgba(10, 102, 255, 0.12);
+    --muxy-diff-add: #1a7f37;
+    --muxy-diff-remove: #cf222e;
+    --muxy-diff-hunk: #9a6700;
+    --muxy-topbar-height: 32px;
+  }
+  body {
+    margin: 0;
+    font-family: var(--font-ui);
+    background: var(--muxy-background);
+    color: var(--muxy-foreground);
+  }
+  main {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: var(--s8);
+    display: flex;
+    flex-direction: column;
+    gap: var(--s7);
+  }
+  .demo {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--s5);
+  }
+  .demo-col {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s3);
+  }
+  .mx-menu.demo-static {
+    position: static;
+  }
+</style>
+</head>
+<body>
+<div class="mx-topbar">
+  <span class="mx-topbar-title">@muxy/ui preview</span>
+  <span class="mx-spacer"></span>
+  <button class="mx-btn" id="theme-toggle">Toggle theme</button>
+</div>
+<main>
+  <div>
+    <div class="mx-section-label">Buttons</div>
+    <div class="demo">
+      <button class="mx-btn">Default</button>
+      <button class="mx-btn mx-btn-primary">Primary</button>
+      <button class="mx-btn mx-btn-ghost">Ghost</button>
+      <button class="mx-btn mx-btn-danger">Danger</button>
+      <button class="mx-btn" disabled>Disabled</button>
+      <button class="mx-icon-btn" aria-label="settings">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4M4.2 4.2l2.8 2.8m10 10 2.8 2.8M1 12h4m14 0h4M4.2 19.8 7 17m10-10 2.8-2.8"/></svg>
+      </button>
+      <button class="mx-icon-btn is-active" aria-label="active">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      </button>
+    </div>
+  </div>
+  <div>
+    <div class="mx-section-label">Form controls</div>
+    <div class="demo">
+      <input class="mx-input" placeholder="Search…" />
+      <select class="mx-select"><option>main</option><option>develop</option></select>
+      <input class="mx-switch" type="checkbox" checked aria-label="toggle" />
+      <div class="mx-segmented">
+        <button class="mx-segmented-btn is-active">All</button>
+        <button class="mx-segmented-btn">Open</button>
+        <button class="mx-segmented-btn">Done</button>
+      </div>
+    </div>
+  </div>
+  <div>
+    <div class="mx-section-label">Status</div>
+    <div class="demo">
+      <span class="mx-badge">draft</span>
+      <span class="mx-badge mx-badge-accent">active</span>
+      <span class="mx-badge mx-badge-count">128</span>
+      <span class="mx-spinner"></span>
+      <span class="mx-spinner mx-spinner-lg"></span>
+      <div class="mx-progress" style="width: 160px"><div class="mx-progress-bar" style="width: 60%"></div></div>
+      <span class="mx-kbd">⌘K</span>
+      <a class="mx-link" href="#">A link</a>
+    </div>
+  </div>
+  <div>
+    <div class="mx-section-label">Card, menu, empty state</div>
+    <div class="demo" style="align-items: flex-start">
+      <div class="mx-card demo-col" style="width: 200px">
+        <span class="mx-topbar-title">Card title</span>
+        <span class="mx-row-sub">Supporting copy in a card.</span>
+        <div class="mx-divider"></div>
+        <button class="mx-btn">Action</button>
+      </div>
+      <div class="mx-menu demo-static">
+        <button class="mx-menu-item">Open</button>
+        <button class="mx-menu-item">Rename</button>
+        <div class="mx-menu-separator"></div>
+        <button class="mx-menu-item is-danger">Delete</button>
+      </div>
+      <div class="mx-card" style="width: 220px; padding: 0">
+        <div class="mx-empty">
+          <div class="mx-empty-title">Nothing here yet</div>
+          <div class="mx-empty-copy">Connect a repository to see its pull requests.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div>
+    <div class="mx-section-label">List rows</div>
+    <div class="mx-card" style="padding: var(--s2) 0">
+      <div class="mx-list">
+        <div class="mx-row"><span>README.md</span><span class="mx-spacer"></span><span class="mx-row-sub">2 days ago</span></div>
+        <div class="mx-row is-selected"><span>vite.config.js</span><span class="mx-spacer"></span><span class="mx-badge mx-badge-accent">M</span></div>
+        <div class="mx-row"><span>src/main.js</span><span class="mx-spacer"></span><span class="mx-row-sub">1.2 KB</span></div>
+      </div>
+    </div>
+  </div>
+  <div>
+    <div class="mx-section-label">Markdown preview</div>
+    <div class="mx-card mx-md">
+      <h2>Release notes</h2>
+      <p>Support for <a href="#">remote workspaces</a> landed, alongside <code>muxy.git</code> caching.</p>
+      <blockquote>Reads are cached per project; pass <code>fresh</code> to bypass.</blockquote>
+      <pre><code>npm run build
+node scripts/validate.mjs my-extension</code></pre>
+      <ul><li>Faster diff rendering</li><li>New <strong>worktree</strong> events</li></ul>
+    </div>
+  </div>
+</main>
+<script>
+  const root = document.documentElement;
+  const forced = new URLSearchParams(location.search).get("theme");
+  const preferred = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  root.dataset.theme = forced === "dark" || forced === "light" ? forced : preferred;
+  document.getElementById("theme-toggle").addEventListener("click", () => {
+    root.dataset.theme = root.dataset.theme === "dark" ? "light" : "dark";
+  });
+</script>
+</body>
+</html>

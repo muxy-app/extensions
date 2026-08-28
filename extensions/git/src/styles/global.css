@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "@muxy/ui/tokens.css";
 
 @theme inline {
   --color-background: var(--muxy-background);
@@ -25,27 +26,7 @@
 }
 
 :root {
-  --s1: 2px;
-  --s2: 4px;
-  --s3: 6px;
-  --s4: 8px;
-  --s5: 10px;
-  --s6: 12px;
-  --s7: 16px;
-  --s8: 20px;
-  --s9: 24px;
-  --s10: 32px;
-  --font-caption: 10px;
-  --font-footnote: 11px;
-  --font-body: 12px;
-  --font-emphasis: 13px;
-  --font-title: 14px;
-  --icon-sm: 12px;
-  --icon: 14px;
-  --control: 24px;
-  --radius-control: 6px;
-  --radius-card: 8px;
-  --row-height: 34px;
+  --radius-control: var(--radius);
   --lane-0: var(--muxy-accent);
   --lane-1: var(--muxy-diff-add);
   --lane-2: var(--muxy-diff-remove);

@@ -1,0 +1,108 @@
+{
+  "name": "gsd-control-tower",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Read-only Muxy panel for GSD next steps, roadmap progress, and agent activity.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && node scripts/copy-manifest.mjs",
+    "test": "node --test",
+    "validate:dist": "node scripts/validate-dist.mjs",
+    "validate": "node scripts/validate-release.mjs"
+  },
+  "devDependencies": {
+    "ajv": "^8.17.1",
+    "vite": "^7.3.5"
+  },
+  "muxy": {
+    "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
+    "description": "Read GSD next steps, roadmap progress, and live agent activity across Muxy projects.",
+    "permissions": [
+      "projects:read",
+      "worktrees:read",
+      "agents:read",
+      "files:read",
+      "git:read",
+      "panels:write",
+      "storage:read",
+      "storage:write"
+    ],
+    "events": [
+      "agent.status",
+      "file.changed",
+      "projects.changed",
+      "project.switched",
+      "worktree.switched",
+      "worktree.headChanged"
+    ],
+    "marketplace": {
+      "author": "Gabe",
+      "categories": [
+        "developer-tools",
+        "productivity"
+      ],
+      "github": "gabeosx",
+      "homepage": "https://github.com/gabeosx/muxy-gsd-control-tower",
+      "repository": "https://github.com/gabeosx/muxy-gsd-control-tower",
+      "icon": "assets/icon.svg",
+      "screenshots": [
+        "assets/screenshots/screenshot-1.png",
+        "assets/screenshots/screenshot-2.png"
+      ]
+    },
+    "panels": [
+      {
+        "id": "control-tower",
+        "title": "GSD Control Tower",
+        "icon": { "symbol": "tower.broadcast" },
+        "entry": "panel/index.html",
+        "position": "right",
+        "mode": "pinned",
+        "headerButtons": [
+          {
+            "id": "refresh",
+            "icon": { "symbol": "arrow.clockwise" },
+            "tooltip": "Refresh all workstreams",
+            "command": "refresh-tower"
+          },
+          {
+            "id": "diagnostics",
+            "icon": { "symbol": "info.circle" },
+            "tooltip": "Toggle diagnostics",
+            "command": "toggle-diagnostics"
+          }
+        ]
+      }
+    ],
+    "statusBarItems": [
+      {
+        "id": "tower",
+        "icon": { "symbol": "circle.dashed" },
+        "text": "",
+        "tooltip": "GSD Control Tower",
+        "side": "right",
+        "command": "toggle-tower"
+      }
+    ],
+    "commands": [
+      {
+        "id": "toggle-tower",
+        "title": "Control Tower: Toggle Panel",
+        "defaultShortcut": "cmd+shift+g",
+        "action": { "kind": "togglePanel", "panel": "control-tower" }
+      },
+      {
+        "id": "refresh-tower",
+        "title": "Control Tower: Refresh All Workstreams"
+      },
+      {
+        "id": "toggle-diagnostics",
+        "title": "Control Tower: Toggle Diagnostics View"
+      }
+    ]
+  }
+}

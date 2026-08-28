@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Review</title>
+  <link rel="stylesheet" href="review.css">
+</head>
+<body>
+  <div id="app">
+    <header id="topbar">
+      <div id="sidebar-toggle-wrap" class="tb-wrap">
+        <button id="sidebar-toggle" class="action icon-only" title="Hide file browser (right-click to move sidebar)" aria-label="Toggle file browser" aria-haspopup="menu" aria-pressed="true">◧</button>
+        <div id="sidebar-menu" class="menu tb-menu" hidden></div>
+      </div>
+      <div id="ref-picker-wrap" class="tb-wrap">
+        <button id="ref-picker" class="action" aria-haspopup="menu" aria-expanded="false" title="Choose what to review">
+          <span class="rp-icon">⎇</span> <span id="ref-label">Working tree</span> <span class="rp-caret">▾</span>
+        </button>
+        <div id="ref-menu" class="menu tb-menu ref-menu" hidden></div>
+      </div>
+      <button id="comments-toggle" class="action" title="Review comments" aria-expanded="false">
+        <span class="ct-icon">💬</span> Comments <span id="comments-count" class="count"></span>
+      </button>
+      <div id="topbar-spacer"></div>
+      <button id="refresh" class="action icon-only" title="Reload file list">↻</button>
+    </header>
+
+    <main id="split">
+      <aside id="sidebar">
+        <div id="sidebar-head">
+          <div id="segmented" role="tablist" aria-label="File scope">
+            <button id="seg-all" class="seg" role="tab" aria-selected="true" data-scope="all">All</button>
+            <button id="seg-changed" class="seg" role="tab" aria-selected="false" data-scope="changed">Changed</button>
+          </div>
+        </div>
+        <div id="tree-mount"></div>
+        <div id="tree-empty" class="empty" hidden>No files</div>
+      </aside>
+      <div id="divider" role="separator" aria-orientation="vertical" tabindex="0"></div>
+      <section id="content">
+        <div id="view-toolbar" hidden>
+          <div id="diff-nav" hidden>
+            <button id="diff-prev" class="action icon-only" title="Previous change" aria-label="Jump to previous change">↑</button>
+            <button id="diff-next" class="action icon-only" title="Next change" aria-label="Jump to next change">↓</button>
+            <span id="diff-nav-count" class="diff-nav-count"></span>
+          </div>
+          <div id="view-segmented" role="tablist" aria-label="View mode">
+            <button id="view-source" class="seg vseg" role="tab" aria-selected="true" data-view="source">Source</button>
+            <button id="view-preview" class="seg vseg" role="tab" aria-selected="false" data-view="preview">Preview</button>
+          </div>
+        </div>
+        <div id="viewer">
+          <div id="editor-mount"></div>
+          <!-- Rendered preview for markdown/HTML. Fully sandboxed (no scripts,
+               opaque origin) — content under review may be untrusted. -->
+          <iframe id="preview-mount" sandbox="" referrerpolicy="no-referrer" hidden></iframe>
+          <div id="placeholder" class="empty">
+            <div class="placeholder-inner">
+              <div class="placeholder-icon">⌘</div>
+              <p>Select a file to view its contents.</p>
+            </div>
+          </div>
+          <div id="binary-notice" class="empty" hidden>
+            <div class="placeholder-inner">
+              <p id="binary-text">This file can't be displayed as text.</p>
+              <button id="binary-open" class="action">Open in Muxy editor ↗</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <section id="comments-drawer" aria-label="Review comments" hidden>
+      <div id="cd-divider" role="separator" aria-orientation="horizontal" tabindex="0"></div>
+      <header id="cd-header">
+        <span id="cd-title">Comments</span>
+        <div id="cd-actions">
+          <div id="send-wrap">
+            <button id="send-btn" class="action send" disabled>Send to agent ▾</button>
+            <div id="send-menu" class="menu" hidden></div>
+          </div>
+          <button id="cd-close" class="action icon-only" title="Close panel">✕</button>
+        </div>
+      </header>
+      <div id="cd-body">
+        <div id="cd-list"></div>
+        <div id="cd-empty" class="empty">No comments yet — click a line number in a file to add one.</div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Classic IIFE bundle (built from review.js by scripts/build.sh). -->
+  <script src="review.bundle.js"></script>
+</body>
+</html>
