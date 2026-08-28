@@ -36,6 +36,12 @@ async function main() {
     <div id="scope-banner" class="scope-banner"></div>
     <div id="scope-body"></div>
     <p id="err" class="error" hidden></p>
+    <div class="actions">
+      <span class="spacer"></span>
+      <!-- 자동 저장이지만, 눌러서 즉시 저장하고 저장 피드백을 받고 싶을 때를 위한 수동 저장 버튼(가운데 배치). -->
+      <button id="save" class="primary">${t("common.save")}</button>
+      <span class="spacer"></span>
+    </div>
   `;
 
   const body = document.getElementById("scope-body");
@@ -469,6 +475,21 @@ async function main() {
   // 값 변경(select/checkbox)은 change, 텍스트 입력은 input 으로 감지. 버튼(click)은 대상 아님.
   body.addEventListener("change", autoSave);
   body.addEventListener("input", autoSave);
+
+  // 수동 저장: 자동 저장과 동일한 경로(persistScope)로 현재 스코프를 즉시 저장하고 피드백을 준다.
+  document.getElementById("save").addEventListener("click", async () => {
+    const btn = document.getElementById("save");
+    btn.disabled = true;
+    try {
+      await persistScope();
+      muxy.toast?.({ title: t("set.saved") });
+    } catch (e) {
+      errEl.textContent = e.message;
+      errEl.hidden = false;
+    } finally {
+      btn.disabled = false;
+    }
+  });
 
   // 닫기: 디바운스 대기분을 즉시 반영한 뒤 닫는다.
   document.getElementById("close").addEventListener("click", async () => {
