@@ -80,6 +80,9 @@ const ISSUE_FIELDS = `
   assignee { id name displayName avatarUrl }
   parent { id identifier title }`;
 
+// 목록에서 하위 이슈 완료 정도를 계산하기 위한 경량 요약(상태 type 만).
+const CHILD_SUMMARY = `children(first: 100) { nodes { state { type } } }`;
+
 // 활성 상태 타입 필터(완료/취소 제외).
 function activeStateFilter() {
   return { type: { in: ["triage", "backlog", "unstarted", "started"] } };
@@ -99,7 +102,7 @@ export async function fetchMyIssues(token, { teamKey = "", projectId = "", activ
         name
         displayName
         assignedIssues(first: $first, filter: $filter, orderBy: updatedAt) {
-          nodes { ${ISSUE_FIELDS} }
+          nodes { ${ISSUE_FIELDS} ${CHILD_SUMMARY} }
         }
       }
     }`;
@@ -119,7 +122,7 @@ export async function fetchProjectIssues(token, { projectId, activeOnly = true, 
         id
         name
         issues(first: $first, filter: $filter, orderBy: updatedAt) {
-          nodes { ${ISSUE_FIELDS} }
+          nodes { ${ISSUE_FIELDS} ${CHILD_SUMMARY} }
         }
       }
     }`;
@@ -397,6 +400,24 @@ export async function fetchTeamLabels(token, teamId) {
   const data = await gql(token, query, { id: teamId });
   const nodes = (data.team?.labels?.nodes ?? []).filter((l) => !l.isGroup);
   return nodes.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// 팀에 새 라벨을 만든다. color 를 안 주면 이름 해시로 팔레트에서 하나 고른다.
+export async function createTeamLabel(token, teamId, name, color) {
+  // Linear 기본 라벨 팔레트와 비슷한 색 몇 개. 이름 글자합으로 결정론적 선택.
+  const palette = ["#5e6ad2", "#26b5ce", "#4cb782", "#f2c94c", "#eb5757", "#bb87fc", "#f2994a", "#95a2b3"];
+  let picked = color;
+  if (!picked) {
+    let hash = 0;
+    for (const ch of name) hash = (hash + ch.charCodeAt(0)) % palette.length;
+    picked = palette[hash];
+  }
+  const mutation = `
+    mutation CreateLabel($input: IssueLabelCreateInput!) {
+      issueLabelCreate(input: $input) { success issueLabel { id name color } }
+    }`;
+  const data = await gql(token, mutation, { input: { name, teamId, color: picked } });
+  return data.issueLabelCreate?.issueLabel ?? null;
 }
 
 // 이슈 담당자 변경. assigneeId = null 이면 담당자 해제.

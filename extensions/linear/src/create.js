@@ -11,9 +11,11 @@ import {
   resolveTeam, createIssue, fetchIssueById,
   fetchTeamMembers, fetchTeamProjects, fetchTeamLabels,
   fetchProjectMilestones, fetchTeamTemplates, fetchTeamStates,
+  createTeamLabel,
 } from "./linear.js";
 import { setLang, t } from "./i18n.js";
 import { mountMarkdownEditor } from "./mdwysiwyg.js";
+import { mountLabelSelect } from "./labelselect.js";
 
 const muxy = window.muxy;
 const app = document.getElementById("app");
@@ -56,7 +58,11 @@ async function main() {
   }
 
   app.innerHTML = `
-    <h2 class="m-title">${parent ? t("create.subTitle") : t("create.title")}</h2>
+    <header class="m-head">
+      <h2 class="m-title">${parent ? t("create.subTitle") : t("create.title")}</h2>
+      <span class="spacer"></span>
+      <button id="cancel" class="icon-btn" title="${t("common.close")}" aria-label="${t("common.close")}">✕</button>
+    </header>
     ${parent ? `<div class="issue-meta"><span class="chip">${t("create.parentOf", { id: escapeHtml(parent.identifier) })}</span></div>` : ""}
 
     <div class="props">
@@ -110,7 +116,6 @@ async function main() {
 
     <p id="err" class="error" hidden></p>
     <div class="actions">
-      <button id="cancel">${t("common.cancel")}</button>
       <button id="create" class="primary">${t("common.create")}</button>
     </div>
   `;
@@ -139,25 +144,29 @@ async function main() {
     }
   })();
 
-  // ---- 라벨: 팀 라벨을 토글 칩으로. 켜진 집합을 생성 시 함께 등록한다. ----------
+  // ---- 라벨: 다중 선택 컴포넌트. 선택 집합을 생성 시 함께 등록한다. 새 라벨도 추가 가능. --
   let teamLabels = [];
   const selectedLabels = new Set();
+  const labelBox = $("labels");
+  labelBox.classList.remove("muted");
+  labelBox.innerHTML = "";
+  const labelSelect = mountLabelSelect(labelBox, {
+    editable: true,
+    labels: [],
+    selected: [],
+    // 생성 전이므로 서버 저장 없이 로컬 선택 집합만 갱신(생성 시 labelIds 로 전달).
+    onChange: async (ids) => { selectedLabels.clear(); ids.forEach((id) => selectedLabels.add(id)); },
+    // 새 라벨은 즉시 팀에 만든다(teamId 는 팀 로드 후 채워짐).
+    onCreate: async (name) => {
+      if (!teamId) return null;
+      const l = await createTeamLabel(token, teamId, name);
+      if (l) teamLabels = [...teamLabels, l];
+      return l;
+    },
+  });
   function renderLabels() {
-    const box = $("labels");
-    box.classList.remove("muted");
-    box.innerHTML = "";
-    if (!teamLabels.length) { box.textContent = t("issue.noLabels"); return; }
-    for (const l of teamLabels) {
-      const chip = h(`<button class="label-chip" type="button"></button>`);
-      chip.classList.toggle("on", selectedLabels.has(l.id));
-      chip.style.setProperty("--label-color", l.color || "#8a8f98");
-      chip.textContent = l.name;
-      chip.addEventListener("click", () => {
-        if (selectedLabels.has(l.id)) selectedLabels.delete(l.id); else selectedLabels.add(l.id);
-        chip.classList.toggle("on", selectedLabels.has(l.id));
-      });
-      box.append(chip);
-    }
+    labelSelect.setLabels(teamLabels);
+    labelSelect.setSelected([...selectedLabels]);
   }
 
   // 셀렉트 채우기 헬퍼: [{value,label}] + 맨 앞 "없음" 옵션.
@@ -209,8 +218,7 @@ async function main() {
     $("state").innerHTML = `<option>${t("common.loading")}</option>`;
     $("assignee").innerHTML = `<option>${t("common.loading")}</option>`;
     $("project").innerHTML = `<option>${t("common.loading")}</option>`;
-    $("labels").textContent = t("common.loading");
-    $("labels").classList.add("muted");
+    // 라벨은 컴포넌트가 유지되므로 박스를 덮어쓰지 않는다(로드되면 setLabels 로 갱신).
     try {
       const team = await resolveTeam(token, teamKey);
       teamId = team.id;
@@ -257,8 +265,6 @@ async function main() {
       $("state").innerHTML = `<option>—</option>`;
       $("assignee").innerHTML = `<option>—</option>`;
       $("project").innerHTML = `<option>—</option>`;
-      $("labels").textContent = t("issue.noLabels");
-      $("labels").classList.remove("muted");
     }
   }
 

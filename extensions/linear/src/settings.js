@@ -24,7 +24,11 @@ async function main() {
   const tokenEntries = Array.isArray(config.api_tokens) ? config.api_tokens : [];
 
   app.innerHTML = `
-    <h2 class="m-title">${t("set.title")}</h2>
+    <header class="m-head">
+      <h2 class="m-title">${t("set.title")}</h2>
+      <span class="spacer"></span>
+      <button id="close" class="icon-btn" title="${t("common.close")}" aria-label="${t("common.close")}">✕</button>
+    </header>
     <div class="seg" id="scope" style="margin:6px 0 6px">
       <button class="seg-btn" data-scope="global">${t("scope.global")}</button>
       <button class="seg-btn" data-scope="project">${t("scope.project")}</button>
@@ -32,9 +36,6 @@ async function main() {
     <div id="scope-banner" class="scope-banner"></div>
     <div id="scope-body"></div>
     <p id="err" class="error" hidden></p>
-    <div class="actions">
-      <button id="close" class="primary">${t("common.close")}</button>
-    </div>
   `;
 
   const body = document.getElementById("scope-body");

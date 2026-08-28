@@ -7,11 +7,42 @@ body.modal {
 }
 
 #app { max-width: 100%; }
+/* 모달 콘텐츠 맨 아래에 여백을 둬서 마지막 요소가 창 바닥에 붙지 않게 한다. */
+body.modal #app { padding-bottom: 20px; }
 
 /* 탭으로 열릴 때는 넓은 화면에서 본문을 가운데 정렬하고 폭을 제한한다(모달과 동일 컴포넌트 재사용). */
 body.tab #app { max-width: 760px; margin: 0 auto; }
 
-.m-head { display: flex; align-items: center; gap: 8px; }
+/* 상단 X 바: 스크롤과 무관하게 항상 최상단에 고정한다(sticky). 내용은 그 아래로 스크롤. */
+.m-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--muxy-background, #1e1e1e);
+  border-bottom: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.25));
+}
+/* body 패딩만큼 바깥으로 빼서 바가 좌우·상단 끝까지 채우게 하고, 아래로 약간 띄운다. */
+body.modal .m-head { margin: -14px -14px 10px; padding: 8px 14px; }
+body.tab .m-head { margin: -24px -20px 12px; padding: 12px 20px; }
+/* 모든 모달 상단 바 높이 통일 + 제목을 바 안에 정렬(X 버튼 왼쪽). */
+.m-head { min-height: 36px; }
+.m-head .m-title { margin: 0; font-size: 15px; font-weight: 600; line-height: 1.3; }
+/* 상단 X 닫기 버튼: 테두리·배경 없이 글리프만 깔끔하게. 클릭 범위는 넉넉히. */
+.m-head #cancel,
+.m-head #close {
+  border: none;
+  background: transparent;
+  font-size: 16px;
+  opacity: 0.7;
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+}
+.m-head #cancel:hover,
+.m-head #close:hover { background: var(--muxy-surface, rgba(127, 127, 127, 0.15)); opacity: 1; }
 .m-id {
   font-size: 12px;
   font-weight: 700;
@@ -527,6 +558,82 @@ textarea.invalid {
   background: color-mix(in srgb, var(--label-color, #8a8f98) 18%, transparent);
 }
 
+/* ── 라벨 다중 선택 컴포넌트(labelselect.js) ── */
+.lblsel { position: relative; width: 100%; }
+/* 컨트롤: input/select 처럼 보이는 박스. 선택된 라벨 칩을 담는다. */
+.lblsel-control {
+  width: 100%;
+  min-height: 34px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  text-align: left;
+  padding: 4px 8px;
+  border: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.3));
+  border-radius: 6px;
+  background: var(--muxy-surface-solid, rgba(0, 0, 0, 0.2));
+  cursor: pointer;
+}
+.lblsel-control:hover { border-color: var(--muxy-accent, #5e6ad2); }
+.lblsel-ph { opacity: 0.55; font-size: 13px; }
+.lblsel-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--label-color, #8a8f98);
+  background: color-mix(in srgb, var(--label-color, #8a8f98) 18%, transparent);
+}
+/* 드롭다운 팝오버 */
+.lblsel-pop {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 260px;
+  display: flex;
+  flex-direction: column;
+  background: var(--muxy-background, #1e1e1e);
+  border: 1px solid var(--muxy-border, rgba(127, 127, 127, 0.35));
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+.lblsel-search {
+  margin: 6px;
+  width: auto;
+}
+.lblsel-list { overflow-y: auto; padding: 2px 4px; }
+.lblsel-opt {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  padding: 6px 8px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.lblsel-opt:hover { background: var(--muxy-surface, rgba(127, 127, 127, 0.15)); }
+.lblsel-dot { flex: none; width: 9px; height: 9px; border-radius: 50%; }
+.lblsel-name { flex: 1; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lblsel-check { flex: none; opacity: 0; color: var(--muxy-accent, #5e6ad2); font-weight: 700; }
+.lblsel-opt.on .lblsel-check { opacity: 1; }
+.lblsel-empty { padding: 8px; font-size: 12px; opacity: 0.6; text-align: center; }
+.lblsel-create {
+  margin: 4px 6px 6px;
+  width: auto;
+  font-size: 12px;
+  text-align: left;
+  border-style: dashed;
+}
+
 /* 위험 동작 버튼(이슈 삭제) */
 button.danger {
   color: #e5484d;
@@ -569,3 +676,20 @@ button.danger:hover { background: color-mix(in srgb, #e5484d 15%, transparent); 
 .sub-dot { flex: none; width: 9px; height: 9px; border-radius: 50%; }
 .sub-id { flex: none; font-size: 11px; opacity: 0.65; font-variant-numeric: tabular-nums; }
 .sub-title { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 하위 이슈 완료 정도: 헤더 옆의 작은 진행 막대 + "n/m 완료" 텍스트 */
+.sub-progress { display: inline-flex; align-items: center; gap: 6px; }
+.sub-progress-bar {
+  width: 56px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--muxy-surface, rgba(127, 127, 127, 0.25));
+  overflow: hidden;
+}
+.sub-progress-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--muxy-accent, #5e6ad2);
+  transition: width 0.2s ease;
+}
+.sub-progress-text { font-size: 11px; opacity: 0.7; font-variant-numeric: tabular-nums; }
