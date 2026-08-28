@@ -96,6 +96,49 @@ test("normalizeNumber strips zero padding per segment", () => {
   assert.equal(normalizeNumber("weird"), "weird");
 });
 
+test("collectPhases recognizes artifact chips for decimal phase prefixes", async () => {
+  const files = [
+    "04.1-CONTEXT.md", "04.1-DISCUSSION-LOG.md", "04.1-RESEARCH.md",
+    "04.1-UI-SPEC.md", "04.1-SPEC.md", "04.1-PATTERNS.md",
+    "04.1-REVIEW.md", "04.1-SECURITY.md", "04.1-VALIDATION.md",
+    "04.1-01-PLAN.md", "04.1-01-SUMMARY.md", "04.1-02-PLAN.md",
+    "04.1-VERIFICATION.md",
+  ];
+  const source = {
+    async list(path) {
+      if (path === ".planning/phases") {
+        return [{ name: "04.1-product-identity-experience-polish", isDirectory: true }];
+      }
+      if (path === ".planning/phases/04.1-product-identity-experience-polish") {
+        return files.map((name) => ({ name, isDirectory: false }));
+      }
+      return null;
+    },
+    async read(path) {
+      return path.endsWith("04.1-VERIFICATION.md")
+        ? "---\nstatus: passed\nscore: 3/3\n---\n"
+        : "# artifact\n";
+    },
+  };
+
+  const phases = await collectPhases(source, { currentPhaseNumber: "04.1" });
+  assert.equal(phases.length, 1);
+  assert.equal(phases[0].number, "4.1");
+  assert.equal(phases[0].isCurrent, true);
+  assert.deepEqual(phases[0].stages, {
+    discuss: true,
+    research: true,
+    ui: true,
+    spec: true,
+    patterns: true,
+    review: true,
+    security: true,
+    validation: true,
+  });
+  assert.deepEqual([phases[0].plansTotal, phases[0].plansDone], [2, 1]);
+  assert.equal(phases[0].verification, "passed");
+});
+
 test("end-to-end: executing snapshot carries concerns, fresh activity, and the pipeline", async () => {
   const source = unnamedGameSource();
   const baseRead = source.read.bind(source);

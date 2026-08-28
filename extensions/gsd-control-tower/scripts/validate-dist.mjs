@@ -46,6 +46,7 @@ function expectedMuxy() {
     panels: [{
       id: "control-tower", title: "GSD Control Tower", icon: { symbol: "tower.broadcast" },
       entry: "panel/index.html", position: "right", mode: "pinned",
+      hiddenControls: ["pin"],
       headerButtons: [
         { id: "refresh", icon: { symbol: "arrow.clockwise" }, tooltip: "Refresh all workstreams", command: "refresh-tower" },
         { id: "diagnostics", icon: { symbol: "info.circle" }, tooltip: "Toggle diagnostics", command: "toggle-diagnostics" },
@@ -145,7 +146,7 @@ async function validateSchema(manifest) {
 
 function assertManifest(manifest, label) {
   assert.equal(manifest.name, "gsd-control-tower", `${label}: frozen marketplace ID changed`);
-  assert.equal(manifest.version, "0.1.0", `${label}: immutable release version changed`);
+  assert.equal(manifest.version, "0.2.0", `${label}: immutable release version changed`);
   assert.equal(manifest.private, true, `${label}: npm package must remain private`);
   assert.equal(manifest.engines?.node, ">=20", `${label}: Node contract changed`);
   assert.equal(Object.keys(manifest.dependencies ?? {}).length, 0, `${label}: runtime dependencies are forbidden`);
