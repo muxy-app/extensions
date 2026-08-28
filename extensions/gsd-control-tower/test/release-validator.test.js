@@ -23,7 +23,7 @@ test("release secret scan excludes private planning inputs and finds no credenti
 
 test("release governance freezes versions, CI authority, and handoff docs", async () => {
   const governance = await validateReleaseGovernance();
-  assert.equal(governance.version, "0.1.0");
+  assert.equal(governance.version, "0.2.0");
 });
 
 test("release validator owns isolated-copy cleanup and deterministic comparison", async () => {
