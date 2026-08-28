@@ -9,10 +9,12 @@ import {
   updateIssueDescription, updateIssueTitle,
   fetchTeamMembers, fetchTeamLabels, fetchTeamProjects,
   updateIssueAssignee, updateIssuePriority, updateIssueLabels, updateIssueProject, deleteIssue,
+  createTeamLabel,
 } from "./linear.js";
 import { renderMarkdown } from "./markdown.js";
 import { mountMarkdownEditor } from "./mdwysiwyg.js";
 import { setLang, t } from "./i18n.js";
+import { mountLabelSelect } from "./labelselect.js";
 
 const muxy = window.muxy;
 const app = document.getElementById("app");
@@ -26,6 +28,7 @@ setLang(config?.language); // 패널이 넘긴 config 로 언어 적용
 
 let changed = false; // 목록 갱신이 필요한 변경이 있었는지
 let descEditor = null; // KNK-90: 본문 위지위그 에디터(싱글턴 탭 재렌더 시 정리용)
+let commentEditor = null; // 코멘트 입력도 본문과 같은 위지위그 에디터로(재렌더 시 정리용)
 
 function h(html) {
   const tpl = document.createElement("template");
@@ -60,6 +63,7 @@ async function main() {
   }
   // 싱글턴 탭 재렌더 시 이전 에디터 인스턴스를 정리(플러그인/리스너 누수 방지).
   if (descEditor) { try { descEditor.destroy(); } catch { /* 이미 정리됨 무시 */ } descEditor = null; }
+  if (commentEditor) { try { commentEditor.destroy(); } catch { /* 이미 정리됨 무시 */ } commentEditor = null; }
 
   // 탭으로 열렸으면 탭 제목을 이슈 식별자로 바꾼다(구버전엔 setTitle 없음 → 무시).
   if (asTab) {
@@ -70,10 +74,14 @@ async function main() {
     <header class="m-head">
       <div class="m-id">${escapeHtml(issue.identifier)}</div>
       <button id="open-web" class="icon-btn" title="${t("issue.openInLinear")}">↗</button>
-      <button id="delete" class="icon-btn danger" title="${t("issue.delete")}">🗑</button>
+      <button id="cancel" class="icon-btn" title="${t("common.close")}" aria-label="${t("common.close")}">✕</button>
     </header>
     <textarea id="title-input" class="m-title seamless" rows="1" spellcheck="false">${escapeHtml(issue.title)}</textarea>
     ${issue.projectMilestone?.name ? `<div class="issue-meta"><span class="chip">◆ ${escapeHtml(issue.projectMilestone.name)}</span></div>` : ""}
+    <div class="row" style="margin-bottom:8px">
+      <span class="spacer"></span>
+      <button id="delete" class="mini danger">${t("issue.delete")}</button>
+    </div>
 
     <div class="props">
       <div class="field">
@@ -96,7 +104,7 @@ async function main() {
 
     <div class="field">
       <span class="label">${t("issue.labels")}</span>
-      <div id="labels" class="label-chips muted">${t("common.loading")}</div>
+      <div id="labels" class="muted">${t("common.loading")}</div>
     </div>
 
     <div class="field">
@@ -107,6 +115,7 @@ async function main() {
     <hr class="sep" />
     <div class="row" style="margin-bottom:6px">
       <h3 class="sec-title" style="margin:0">${t("issue.subIssues")}</h3>
+      <span id="sub-progress" class="sub-progress" hidden></span>
       <span class="spacer"></span>
       <button id="add-sub" class="mini">${t("issue.addSubIssue")}</button>
     </div>
@@ -116,17 +125,14 @@ async function main() {
     <h3 class="sec-title">${t("issue.comments")}</h3>
     <div id="comments" class="comments muted">${t("common.loading")}</div>
     <div class="field" style="margin-top:10px">
-      <textarea id="comment" class="seamless" placeholder="${t("issue.commentPlaceholder")}"></textarea>
+      <div id="comment"></div>
       <div class="row" id="comment-actions" hidden style="margin-top:6px">
         <span class="spacer"></span>
-        <button id="add-comment" class="primary">${t("issue.addComment")}</button>
+        <button id="add-comment" class="primary" style="margin: 0 8px 10px 0">${t("issue.addComment")}</button>
       </div>
     </div>
 
     <p id="err" class="error" hidden></p>
-    <div class="actions">
-      <button id="cancel">${t("common.close")}</button>
-    </div>
   `;
 
   const $ = (id) => document.getElementById(id);
@@ -296,12 +302,13 @@ async function main() {
     $("project").disabled = true;
   }
 
-  // 라벨: 팀 전체 라벨을 토글 칩으로 보여주고, 켜진 칩 집합을 이슈 라벨로 저장한다.
-  // 팀 라벨 목록(teamLabels)과 현재 이슈 라벨(issueLabelIds, loadDetail 에서 채움)이
-  // 모두 준비돼야 렌더한다.
+  // 라벨: 팀 전체 라벨을 다중선택 콤보박스(select box)로 보여준다. 목록에 없는 이름은
+  // 새 라벨로 만든다. 선택을 바꾸면 즉시 서버에 저장(onChange)하고, 실패 시 콤보박스가
+  // 이전 상태로 롤백한다. 팀 라벨 목록(teamLabels)과 현재 이슈 라벨(issueLabelIds,
+  // loadDetail 에서 채움)이 모두 준비되는 대로 콤보박스에 반영한다.
   let teamLabels = null;
   let issueLabelIds = null;
-  let labelSaving = false;
+  let labelSelect = null; // canEdit 일 때만 1회 마운트
   function renderLabels() {
     const box = $("labels");
     if (!canEdit) {
@@ -310,35 +317,29 @@ async function main() {
       box.textContent = names.length ? names.join(", ") : t("issue.noLabels");
       return;
     }
-    if (!teamLabels || !issueLabelIds) return;
     box.classList.remove("muted");
-    box.innerHTML = "";
-    if (!teamLabels.length) { box.textContent = t("issue.noLabels"); return; }
-    for (const l of teamLabels) {
-      const chip = h(`<button class="label-chip" type="button"></button>`);
-      chip.classList.toggle("on", issueLabelIds.has(l.id));
-      chip.style.setProperty("--label-color", l.color || "#8a8f98");
-      chip.textContent = l.name;
-      chip.addEventListener("click", () => toggleLabel(l.id, chip));
-      box.append(chip);
+    if (!labelSelect) {
+      labelSelect = mountLabelSelect(box, {
+        disabled: true,
+        onError: (e) => showErr(e.message),
+        onChange: async (ids) => {
+          await updateIssueLabels(config.api_token, issue.id, ids);
+          issueLabelIds = new Set(ids);
+          issue.labels = (teamLabels || []).filter((l) => issueLabelIds.has(l.id));
+          changed = true;
+          toast(t("issue.saved"), issue.identifier);
+        },
+        onCreate: async (name) => {
+          const created = await createTeamLabel(config.api_token, issue.team.id, { name });
+          teamLabels = [...(teamLabels || []), created].sort((a, b) => a.name.localeCompare(b.name));
+          return created;
+        },
+      });
     }
-  }
-  async function toggleLabel(id, chip) {
-    if (labelSaving) return;
-    labelSaving = true;
-    const next = new Set(issueLabelIds);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    try {
-      await updateIssueLabels(config.api_token, issue.id, [...next]);
-      issueLabelIds = next;
-      chip.classList.toggle("on", next.has(id));
-      changed = true;
-      toast(t("issue.saved"), issue.identifier);
-    } catch (e) {
-      showErr(e.message);
-    } finally {
-      labelSaving = false;
-    }
+    // 팀 라벨 목록과 현재 이슈 라벨이 준비되는 대로 콤보박스에 반영한다.
+    if (teamLabels) labelSelect.setLabels(teamLabels);
+    if (issueLabelIds) labelSelect.setSelected([...issueLabelIds]);
+    labelSelect.setDisabled(!(teamLabels && issueLabelIds));
   }
   if (canEdit) {
     fetchTeamLabels(config.api_token, issue.team.id)
@@ -401,6 +402,16 @@ async function main() {
     const box = $("sub-issues");
     box.classList.remove("muted");
     box.innerHTML = "";
+    // 하위 이슈 완료 정도(완료 상태 개수 / 전체)를 헤더 옆에 표기한다.
+    const prog = $("sub-progress");
+    if (list.length) {
+      const done = list.filter((c) => c.state?.type === "completed").length;
+      const pct = Math.round((done / list.length) * 100);
+      prog.innerHTML = `<span class="sub-progress-bar"><span style="width:${pct}%"></span></span><span class="sub-progress-text">${t("issue.subDone", { done, total: list.length })}</span>`;
+      prog.hidden = false;
+    } else {
+      prog.hidden = true;
+    }
     if (!list.length) {
       box.append(h(`<div class="muted">${t("issue.noSubIssues")}</div>`));
       return;
@@ -441,8 +452,8 @@ async function main() {
     $("add-sub").addEventListener("click", async () => {
       const r = await muxy.modal.openWebview({
         entry: "modals/create.html",
-        width: 460,
-        height: 640,
+        width: 820,
+        height: 760,
         data: { parent: { id: issue.id, identifier: issue.identifier, teamKey: issue.team?.key } },
       });
       if (r?.created) {
@@ -512,28 +523,33 @@ async function main() {
 
   // 코멘트: 본문 편집처럼 깔끔한 인라인 필드. 내용에 맞춰 자동으로 늘어나고, 작성 중일
   // 때만(포커스 또는 내용 있음) "코멘트 추가" 버튼을 노출한다.
-  const commentEl = $("comment");
+  // 본문(desc)과 동일한 위지위그 마크다운 에디터로 코멘트를 작성한다(입력창 디자인·즉시 서식 반영).
+  commentEditor = mountMarkdownEditor($("comment"), {
+    placeholder: t("issue.commentPlaceholder"),
+    editable: true,
+    toolbar: true,
+  });
+  let commentFocused = false;
   function syncCommentActions() {
-    const active = document.activeElement === commentEl || commentEl.value.trim() !== "";
+    const active = commentFocused || commentEditor.getMarkdown().trim() !== "";
     $("comment-actions").hidden = !active;
   }
-  commentEl.addEventListener("input", () => { autoGrow(commentEl); syncCommentActions(); });
-  commentEl.addEventListener("focus", syncCommentActions);
-  commentEl.addEventListener("blur", syncCommentActions);
+  commentEditor.editor.on("focus", () => { commentFocused = true; syncCommentActions(); });
+  commentEditor.editor.on("blur", () => { commentFocused = false; syncCommentActions(); });
+  commentEditor.editor.on("update", syncCommentActions);
   // Cmd/Ctrl+Enter 로 바로 등록(본문처럼 키보드로 마무리).
-  commentEl.addEventListener("keydown", (e) => {
+  commentEditor.editor.view.dom.addEventListener("keydown", (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); $("add-comment").click(); }
   });
 
   // 코멘트 추가
   $("add-comment").addEventListener("click", async () => {
-    const body = commentEl.value.trim();
+    const body = commentEditor.getMarkdown().trim();
     if (!body) return;
     $("add-comment").disabled = true;
     try {
       await createComment(config.api_token, issue.id, body);
-      commentEl.value = "";
-      autoGrow(commentEl);
+      commentEditor.setMarkdown("");
       syncCommentActions();
       changed = true;
       toast(t("issue.commentAdded"), issue.identifier);

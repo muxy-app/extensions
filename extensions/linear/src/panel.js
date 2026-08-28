@@ -349,7 +349,8 @@ function issueRow(issue, { indent = false, showProject = false } = {}) {
     row.append(el("div", { className: "issue-parent" }, `↳ ${issue.parent.identifier} ${issue.parent.title}`));
   }
 
-  const top = el("div", { className: "issue-top" });
+  // 1행: 이슈번호 · 제목 · (오른쪽 끝) 담당자. 제목을 가장 눈에 띄게 둔다.
+  const head = el("div", { className: "issue-head" });
   // 이슈 번호는 클릭 시 행이 열리는 대신 번호를 클립보드로 복사한다.
   const idEl = el("span", {
     className: "issue-id",
@@ -362,18 +363,23 @@ function issueRow(issue, { indent = false, showProject = false } = {}) {
   idEl.addEventListener("keydown", (e) => {
     if (e.key === "Enter" || e.key === " ") { e.preventDefault(); copyId(e); }
   });
-  top.append(idEl);
-  if (displayCfg.list_show_state) top.append(stateBadge(issue.state));
+  head.append(idEl, el("div", { className: "issue-title" }, issue.title));
+  if (displayCfg.list_show_assignee) head.append(assigneeAvatar(issue.assignee));
+  row.append(head);
+
+  // 2행: 상태·우선순위·프로젝트·마일스톤·라벨·진행률 등 부가 메타(있는 것만, 작게).
+  const meta = el("div", { className: "issue-meta-row" });
+  if (displayCfg.list_show_state) meta.append(stateBadge(issue.state));
   if (displayCfg.list_show_priority && priorityLabel(issue.priority)) {
-    top.append(el("span", { className: "issue-prio" }, priorityLabel(issue.priority)));
+    meta.append(el("span", { className: "issue-prio" }, priorityLabel(issue.priority)));
   }
   // 프로젝트가 섞여 보일 때만 프로젝트 칩 표시.
   if (showProject && displayCfg.list_show_project && issue.project?.name) {
-    top.append(el("span", { className: "issue-project" }, issue.project.name));
+    meta.append(el("span", { className: "issue-project" }, issue.project.name));
   }
   // 마일스톤 칩.
   if (displayCfg.list_show_milestone && issue.projectMilestone?.name) {
-    top.append(el("span", { className: "issue-milestone", title: t("panel.milestoneTitle") }, `◆ ${issue.projectMilestone.name}`));
+    meta.append(el("span", { className: "issue-milestone", title: t("panel.milestoneTitle") }, `◆ ${issue.projectMilestone.name}`));
   }
   // 라벨 칩(라벨 고유 색상으로 점 표시).
   if (displayCfg.list_show_labels) {
@@ -382,15 +388,23 @@ function issueRow(issue, { indent = false, showProject = false } = {}) {
       const dot = el("span", { className: "label-dot" });
       if (lbl.color) dot.style.background = lbl.color;
       chip.append(dot, document.createTextNode(lbl.name));
-      top.append(chip);
+      meta.append(chip);
     }
   }
-  // 담당자 아바타.
-  if (displayCfg.list_show_assignee) {
-    top.append(assigneeAvatar(issue.assignee));
+  // 하위 이슈가 있으면 완료 정도를 원형 진행 링(도넛) + 숫자로 표시.
+  const kids = issue.children?.nodes ?? [];
+  if (kids.length) {
+    const done = kids.filter((c) => c.state?.type === "completed").length;
+    const pct = Math.round((done / kids.length) * 100);
+    const wrap = el("span", { className: "issue-subprog", title: t("issue.subIssues") });
+    if (pct === 100) wrap.classList.add("done");
+    const ring = el("span", { className: "issue-subprog-ring" });
+    ring.style.setProperty("--pct", pct);
+    wrap.append(ring, el("span", { className: "issue-subprog-num" }, `${done}/${kids.length}`));
+    meta.append(wrap);
   }
-  const title = el("div", { className: "issue-title" }, issue.title);
-  row.append(top, title);
+  // 부가 메타가 하나라도 있으면 2행을 붙인다.
+  if (meta.childNodes.length) row.append(meta);
   row.addEventListener("click", () => openIssue(issue));
   // 우클릭 → 빠른 상태 변경 메뉴(기본 브라우저 메뉴는 막는다).
   row.addEventListener("contextmenu", (e) => {
@@ -476,7 +490,7 @@ function section(titleText, issues, opts = {}) {
         e.stopPropagation(); // 행 클릭(이슈 열기)로 전파 방지
         toggleCollapse(entry.issue.id, caret);
       });
-      row.querySelector(".issue-top").prepend(caret);
+      row.querySelector(".issue-head").prepend(caret);
     }
 
     wrap.append(row);
@@ -1034,8 +1048,21 @@ async function openSettings() {
 }
 
 async function openCreate() {
-  // 새 이슈 생성도 무조건 풀 탭(페이지)으로만 연다.
-  // KNK-88: 새 이슈 생성을 좁은 모달 대신 풀 탭 웹뷰로 연다(같은 create.js 재사용).
+  // 새 이슈 여는 방식도 이슈 상세와 동일하게 설정값(issue_open_mode)을 따른다 — tab(기본) / modal.
+  const config = await loadConfig();
+  const mode = config.issue_open_mode || "tab";
+
+  // modal: 좁은 생성 모달로 연다. 생성되면 방금 만든 이슈의 상세를 바로 연다(설정에 따라 모달로 열림).
+  if (mode === "modal") {
+    const result = await muxy.modal.openWebview({ entry: "modals/create.html", width: 820, height: 760 });
+    if (result?.created) {
+      render();
+      if (result.issue) openIssue(result.issue);
+    }
+    return;
+  }
+
+  // tab(기본): 새 이슈 생성을 풀 탭 웹뷰로 연다(같은 create.js 재사용).
   // 생성되면 create 쪽에서 탭을 닫고, 목록은 패널 폴링(3초)이 자동 갱신한다.
   // extensionWebView 를 지원하지 않는 구버전 muxy 에서는 예외를 잡아 기존 모달로 폴백한다.
   try {
@@ -1047,7 +1074,7 @@ async function openCreate() {
   } catch (e) {
     console.warn("[linear] 새 이슈를 탭으로 열기 실패 → 모달로 폴백:", e?.message || e);
   }
-  const result = await muxy.modal.openWebview({ entry: "modals/create.html", width: 460, height: 640 });
+  const result = await muxy.modal.openWebview({ entry: "modals/create.html", width: 820, height: 760 });
   // KNK-98: 생성되면 방금 만든 이슈의 상세를 바로 연다(모달 폴백 경로).
   if (result?.created) {
     render();

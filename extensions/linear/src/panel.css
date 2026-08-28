@@ -242,7 +242,11 @@
 .issue:hover { background: var(--muxy-surface-solid, rgba(127, 127, 127, 0.2)); }
 .issue.is-current { border-color: var(--muxy-accent, #5e6ad2); }
 
-.issue-top { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+/* 1행: 이슈번호 · 제목 · (오른쪽) 담당자 */
+.issue-head { display: flex; align-items: center; gap: 8px; }
+/* 2행: 부가 메타. 있을 때만 붙으며 살짝 아래 간격 + 옅게. */
+.issue-meta-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 5px; }
+.issue-meta-row .assignee { margin-left: 0; }
 /* 접기/펼치기 caret */
 .caret {
   display: inline-flex;
@@ -259,7 +263,16 @@
 .issue-id { font-size: 11px; font-weight: 600; opacity: 0.8; font-variant-numeric: tabular-nums; cursor: pointer; border-radius: 4px; padding: 0 3px; margin: 0 -3px; }
 .issue-id:hover { opacity: 1; background: var(--muxy-surface-solid, rgba(127, 127, 127, 0.3)); }
 .issue-id:focus-visible { outline: 1px solid var(--muxy-accent, #5b8def); outline-offset: 1px; }
-.issue-title { font-size: 13px; line-height: 1.35; }
+/* 제목: 1행에서 가장 크게, 남는 폭을 채우고 넘치면 말줄임. */
+.issue-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* 부모 이슈 브레드크럼 */
 .issue-parent {
@@ -333,6 +346,30 @@
   white-space: nowrap;
   max-width: 45%;
 }
+/* 하위 이슈 완료 정도: 원형 진행 링(도넛) + n/m 숫자 */
+.issue-subprog {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  opacity: 0.9;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.issue-subprog-ring {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  /* --pct(0~100) 만큼 원을 채우고, 가운데를 뚫어 도넛(링)으로 만든다. */
+  background: conic-gradient(var(--muxy-accent, #5e6ad2) calc(var(--pct, 0) * 1%), var(--muxy-surface, rgba(127, 127, 127, 0.28)) 0);
+  -webkit-mask: radial-gradient(closest-side, transparent 62%, #000 63%);
+  mask: radial-gradient(closest-side, transparent 62%, #000 63%);
+}
+.issue-subprog.done .issue-subprog-ring {
+  background: #4cb782;
+}
+.issue-subprog.done .issue-subprog-num { color: #4cb782; }
 /* 라벨 칩 */
 .issue-label {
   display: inline-flex;

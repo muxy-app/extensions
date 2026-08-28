@@ -112,3 +112,5 @@ label { display: block; }
 .error { color: #e5534b; font-size: 12px; }
 
 .actions { display: flex; gap: var(--gap); justify-content: flex-end; margin-top: 12px; }
+/* 저장 버튼을 가운데로 밀기 위한 신축 여백(양옆 spacer 가 동일 비율로 늘어난다) */
+.actions .spacer { flex: 1; }
