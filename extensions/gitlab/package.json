@@ -1,0 +1,76 @@
+{
+  "name": "gitlab",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "scripts": {
+    "build": "vite build && node -e \"require('fs').copyFileSync('package.json','dist/package.json')\"",
+    "dev": "vite",
+    "test": "node --test test/*.test.mjs"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  },
+  "muxy": {
+    "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
+    "description": "Browse and manage GitLab issues and merge requests for the current project — on gitlab.com or a self-managed instance.",
+    "panels": [
+      {
+        "id": "issues",
+        "title": "GitLab",
+        "icon": {
+          "svg": "assets/icon.svg"
+        },
+        "entry": "index.html",
+        "position": "right",
+        "mode": "pinned"
+      }
+    ],
+    "commands": [
+      {
+        "id": "toggle-issues-panel",
+        "title": "GitLab: Toggle Sidebar",
+        "action": {
+          "kind": "togglePanel",
+          "panel": "issues"
+        }
+      }
+    ],
+    "topbarItems": [
+      {
+        "id": "issues-panel",
+        "icon": {
+          "svg": "assets/icon.svg"
+        },
+        "tooltip": "Toggle GitLab sidebar",
+        "command": "toggle-issues-panel"
+      }
+    ],
+    "events": [
+      "project.switched"
+    ],
+    "permissions": [
+      "commands:exec",
+      "projects:read",
+      "panels:write"
+    ],
+    "marketplace": {
+      "author": "Eric Marchand",
+      "github": "phimage",
+      "repository": "https://github.com/muxy-app/extensions",
+      "categories": [
+        "git",
+        "productivity"
+      ],
+      "icon": "assets/icon.svg",
+      "screenshots": [
+        "screenshots/screenshot-1.png",
+        "screenshots/screenshot-2.png",
+        "screenshots/screenshot-3.png"
+      ]
+    }
+  },
+  "allowScripts": {
+    "esbuild@0.21.5": true
+  }
+}
