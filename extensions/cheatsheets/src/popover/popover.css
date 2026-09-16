@@ -1,0 +1,53 @@
+@import "@/shared/theme.css";
+@import "@/shared/list.css";
+
+/* Popovers sit on native macOS popover material — keep the page transparent. */
+body { background: transparent; }
+
+#root { height: 100%; display: flex; flex-direction: column; }
+
+.read-body .man, .read-body .tldr-desc { font-size: var(--font-body); }
+
+/* Footer */
+.footer {
+  border-top: 1px solid var(--muxy-border);
+  /* s4 vertical would make the bar 44px tall around the 28px ⚙ button. */
+  padding: var(--s2) var(--s5);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s3);
+  flex: 0 0 auto;
+  font-size: var(--font-footnote);
+  color: var(--muxy-foreground-muted);
+}
+.footer select {
+  height: 22px;
+  border-radius: 4px;
+  border: 1px solid var(--muxy-border);
+  background: var(--muxy-surface-solid);
+  color: var(--muxy-foreground);
+  font-size: var(--font-footnote);
+}
+/* Shares one line with the ⚙ button, which sits hard right. */
+.footer .cache-info {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--font-caption);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.footer .mini-btn {
+  height: 22px;
+  padding: 0 var(--s4);
+  border-radius: 4px;
+  border: 1px solid var(--muxy-border);
+  background: var(--muxy-surface-solid);
+  font-size: var(--font-footnote);
+  color: var(--muxy-foreground);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+}
+.footer .mini-btn:hover { background: var(--muxy-hover); border-color: var(--muxy-accent); }
