@@ -1,0 +1,7 @@
+20986586250
+@@
+[ NULL ]  ASN:0x0-0x19ee9ed: (in front) 
+    bundleID="com.muxy.app"
+    bundle path=[ NULL ] 
+    executable path=[ NULL ] 
+ !cgsConnection !signalled type=[ NULL ]  flavor=[ NULL ]  Version=[ NULL ]  Arch=!!none
