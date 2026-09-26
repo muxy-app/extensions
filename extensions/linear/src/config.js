@@ -5,8 +5,8 @@
 // 설정 입력 UI 는 설정 모달(modals/settings.html)에서 제공한다.
 
 export const CONFIG_DEFAULTS = {
-  // UI 언어는 한국어 고정(다국어 기능 제거). 하위 호환용으로 값만 유지한다.
-  language: "ko",
+  // UI 언어. 설정 모달의 언어 셀렉터로 변경(en/ko/ja/zh). 기본값은 영어.
+  language: "en",
   // 실효 Linear Personal API Key. 아래 api_tokens 목록이 있으면 활성 키에서 자동 유도된다.
   // (하위 호환: 목록을 안 쓰면 이 값이 그대로 단일 키로 쓰인다.)
   api_token: "",

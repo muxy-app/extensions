@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>CI/CD</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header class="topbar">
+        <div class="topbar__row">
+          <div class="seg" id="view-switch" role="tablist">
+            <button class="seg__btn is-active" data-view="runs">Pipelines</button>
+            <button class="seg__btn" data-view="envs">Environments</button>
+          </div>
+          <div class="topbar__spacer"></div>
+          <button id="sources" class="icon-btn" title="Configure sources" aria-label="Configure sources">
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor"
+                 stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M2 4.5h5M11 4.5h3M2 11.5h3M9 11.5h5" />
+              <circle cx="9" cy="4.5" r="1.8" /><circle cx="7" cy="11.5" r="1.8" />
+            </svg>
+          </button>
+          <button id="refresh" class="icon-btn" title="Refresh" aria-label="Refresh">
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor"
+                 stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9" />
+              <path d="M13.5 2.5V5H11" />
+            </svg>
+          </button>
+        </div>
+        <div class="topbar__row topbar__row--sub">
+          <div class="picker">
+            <select id="project" class="picker__select" aria-label="Project">
+              <option value="">Current project</option>
+            </select>
+            <svg class="picker__caret" viewBox="0 0 16 16" width="12" height="12" fill="none"
+                 stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 6l4 4 4-4" />
+            </svg>
+          </div>
+          <div class="picker picker--branch">
+            <select id="branch" class="picker__select" aria-label="Branch">
+              <option value="">All branches</option>
+            </select>
+            <svg class="picker__caret" viewBox="0 0 16 16" width="12" height="12" fill="none"
+                 stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 6l4 4 4-4" />
+            </svg>
+          </div>
+          <span id="sourcebar" class="topbar__sources"></span>
+        </div>
+      </header>
+      <main id="content" class="content"></main>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

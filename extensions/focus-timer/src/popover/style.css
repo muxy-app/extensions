@@ -1,0 +1,261 @@
+/* Popovers sit over native macOS popover material — keep the body transparent
+   and use --muxy-surface chips so the material shows through. */
+
+:root {
+  --s1: 2px; --s2: 4px; --s3: 6px; --s4: 8px; --s5: 10px;
+  --s6: 12px; --s7: 16px; --s8: 20px; --s9: 24px; --s10: 32px;
+  --font-caption: 10px; --font-footnote: 11px; --font-body: 12px;
+  --font-emphasis: 13px; --font-title: 14px;
+  --control: 24px;
+  --radius: 6px; --radius-card: 8px;
+  --mono: "SF Mono", Menlo, monospace;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+html, body { margin: 0; }
+
+body {
+  background: transparent;
+  color: var(--muxy-foreground);
+  font: var(--font-body) -apple-system, "SF Pro", system-ui, sans-serif;
+  overflow-x: hidden;
+  overflow-y: auto;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+  padding: var(--s5);
+}
+
+.section {
+  background: var(--muxy-surface);
+  border: 1px solid var(--muxy-border);
+  border-radius: var(--radius-card);
+  padding: var(--s4) var(--s5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+}
+
+.label {
+  font-size: var(--font-footnote);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muxy-foreground-muted);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+}
+
+.row-spread { justify-content: space-between; }
+
+.note {
+  font-size: var(--font-footnote);
+  color: var(--muxy-foreground-muted);
+}
+
+.banner {
+  font-size: var(--font-footnote);
+  color: var(--muxy-foreground-muted);
+  background: var(--muxy-surface);
+  border: 1px solid var(--muxy-border);
+  border-radius: var(--radius);
+  padding: var(--s3) var(--s5);
+}
+
+/* ── pomodoro card ─────────────────────────────────────────────────────── */
+
+.pomo-clock {
+  font-family: var(--mono);
+  font-size: 32px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  padding: var(--s3) 0 0;
+}
+
+.pomo-phase {
+  text-align: center;
+  font-size: var(--font-footnote);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muxy-foreground-muted);
+}
+
+.pomo-phase.focus { color: var(--muxy-accent); }
+
+.pomo-dots {
+  display: flex;
+  justify-content: center;
+  gap: var(--s2);
+  font-size: var(--font-caption);
+  color: var(--muxy-foreground-muted);
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1px solid var(--muxy-foreground-muted);
+}
+
+.dot.filled {
+  background: var(--muxy-accent);
+  border-color: var(--muxy-accent);
+}
+
+.pomo-buttons {
+  display: flex;
+  justify-content: center;
+  gap: var(--s3);
+  padding-top: var(--s2);
+}
+
+/* ── controls ──────────────────────────────────────────────────────────── */
+
+button {
+  font: inherit;
+  color: var(--muxy-foreground);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.btn {
+  height: 28px;
+  padding: 0 var(--s5);
+  border-radius: var(--radius);
+  background: var(--muxy-surface-solid);
+  border: 1px solid var(--muxy-border);
+  font-size: var(--font-emphasis);
+}
+
+.btn:hover { background: var(--muxy-hover); border-color: var(--muxy-accent); }
+
+.btn-primary {
+  background: var(--muxy-accent);
+  border-color: var(--muxy-accent);
+  color: var(--muxy-accent-foreground);
+}
+
+.btn-primary:hover { background: var(--muxy-accent); filter: brightness(1.08); }
+
+.btn-quiet {
+  font-size: var(--font-footnote);
+  color: var(--muxy-foreground-muted);
+  padding: 0 var(--s3);
+}
+
+.btn-quiet:hover { color: var(--muxy-foreground); background: var(--muxy-hover); border-radius: var(--radius); }
+
+.toggle {
+  min-height: var(--control);
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  font-size: var(--font-footnote);
+  color: var(--muxy-foreground-muted);
+  border-radius: var(--radius);
+  padding: 0 var(--s3);
+  margin: 0 calc(-1 * var(--s3));
+}
+
+.toggle:hover { background: var(--muxy-hover); color: var(--muxy-foreground); }
+
+.icon { display: inline-flex; align-items: center; }
+
+.chevron { display: inline-block; transition: transform 0.15s ease; }
+.chevron.open { transform: rotate(180deg); }
+
+/* ── today ─────────────────────────────────────────────────────────────── */
+
+.today-total {
+  font-family: var(--mono);
+  font-size: var(--font-title);
+  font-weight: 600;
+}
+
+.proj-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+  padding: var(--s1) 0;
+}
+
+.proj-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--s4);
+}
+
+.proj-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.proj-row.active .proj-name { font-weight: 600; }
+
+.proj-time {
+  font-family: var(--mono);
+  font-size: var(--font-footnote);
+  color: var(--muxy-foreground-muted);
+  flex: none;
+}
+
+.bar {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--muxy-hover);
+  overflow: hidden;
+}
+
+.bar-fill { height: 100%; border-radius: 2px; background: var(--muxy-accent); }
+.bar-fill.agent { background: var(--muxy-foreground-muted); opacity: 0.55; }
+
+/* ── settings ──────────────────────────────────────────────────────────── */
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--s2) var(--s4);
+  font-size: var(--font-body);
+}
+
+.settings-grid label { color: var(--muxy-foreground-muted); }
+
+input[type="number"], input[type="time"], select {
+  font: inherit;
+  color: var(--muxy-foreground);
+  background: var(--muxy-surface-solid);
+  border: 1px solid var(--muxy-border);
+  border-radius: var(--radius);
+  padding: var(--s1) var(--s2);
+  width: 72px;
+}
+
+input[type="number"] { width: 52px; text-align: right; }
+input[type="checkbox"] { accent-color: var(--muxy-accent); }
+
+input:focus, select:focus { outline: none; border-color: var(--muxy-accent); }
+
+.settings-span { grid-column: 1 / -1; }
+
+.hours-row { display: flex; align-items: center; gap: var(--s2); }
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron, .bar-fill { transition: none; }
+}
