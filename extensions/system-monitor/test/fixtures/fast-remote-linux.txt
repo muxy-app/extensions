@@ -1,0 +1,11 @@
+Linux
+@@
+top: invalid option -- 'l'
+@@
+sh: vm_stat: command not found
+@@
+sysctl: cannot stat /proc/sys/hw/pagesize: No such file or directory
+@@
+netstat: invalid option -- 'b'
+@@
+sh: ioreg: command not found

@@ -1,0 +1,4 @@
+Now drawing from 'AC Power'
+@@
+Filesystem     1024-blocks      Used Available Capacity  Mounted on
+/dev/disk1s1s1   488245288  15000000 200000000     7%    /
