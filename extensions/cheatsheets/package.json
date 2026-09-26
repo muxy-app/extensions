@@ -1,0 +1,89 @@
+{
+  "name": "cheatsheets",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && node scripts/build-background.mjs && node scripts/copy-manifest.mjs",
+    "test": "node --test",
+    "update-skill": "node scripts/update-skill.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "vite": "^7.3.5"
+  },
+  "muxy": {
+    "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
+    "description": "tldr pages and man pages, rendered — palette lookup, popover browser, copy-ready examples. Works with tlrc or nothing installed.",
+    "marketplace": {
+      "author": "Nick Fay",
+      "github": "n14395",
+      "categories": ["documentation", "developer-tools"],
+      "icon": "icon.svg",
+      "screenshots": [
+        "screenshots/screenshot-1.png",
+        "screenshots/screenshot-2.png",
+        "screenshots/screenshot-3.png"
+      ]
+    },
+    "background": "background.js",
+    "permissions": [
+      "commands:exec",
+      "panels:write",
+      "tabs:write",
+      "storage:read",
+      "storage:write"
+    ],
+    "commands": [
+      {
+        "id": "lookup",
+        "title": "Cheatsheets: Look Up Command…",
+        "subtitle": "tldr and man pages",
+        "defaultShortcut": "cmd+ctrl+k",
+        "action": {
+          "kind": "openModal",
+          "entry": "lookup/index.html",
+          "width": 680,
+          "height": 560
+        }
+      },
+      {
+        "id": "search",
+        "title": "Cheatsheets: Search tldr by Keyword…",
+        "subtitle": "Full keyword search across tldr pages"
+      },
+      {
+        "id": "open-popover",
+        "title": "Cheatsheets: Browser",
+        "action": { "kind": "openPopover", "popover": "browser" }
+      }
+    ],
+    "popovers": [
+      {
+        "id": "browser",
+        "title": "Cheatsheets",
+        "entry": "popover/index.html",
+        "width": 380,
+        "height": 520
+      }
+    ],
+    "tabTypes": [
+      {
+        "id": "sheet",
+        "title": "Cheatsheet",
+        "entry": "viewer/index.html",
+        "defaultData": { "presentation": "tab" }
+      }
+    ],
+    "statusBarItems": [
+      {
+        "id": "book",
+        "icon": { "symbol": "text.book.closed" },
+        "side": "right",
+        "tooltip": "Cheatsheets",
+        "command": "open-popover"
+      }
+    ]
+  }
+}

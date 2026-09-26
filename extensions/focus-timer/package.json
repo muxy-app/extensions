@@ -1,0 +1,97 @@
+{
+  "name": "focus-timer",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && node scripts/build-background.mjs && node scripts/copy-manifest.mjs",
+    "test": "node --test test/*.test.js"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "vite": "^7.3.5"
+  },
+  "muxy": {
+    "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
+    "description": "Pomodoro plus automatic per-project time tracking — your focused time vs. your agents', all local, no accounts.",
+    "background": "background.js",
+    "permissions": [
+      "agents:read",
+      "projects:read",
+      "worktrees:read",
+      "notifications:write",
+      "panels:write",
+      "tabs:write",
+      "commands:exec",
+      "storage:read",
+      "storage:write"
+    ],
+    "events": [
+      "agent.status",
+      "project.switched",
+      "worktree.switched",
+      "worktree.headChanged",
+      "pane.focused",
+      "pane.created",
+      "pane.closed"
+    ],
+    "commands": [
+      {
+        "id": "pomodoro-toggle",
+        "title": "Focus Timer: Start / Pause Pomodoro",
+        "defaultShortcut": "cmd+ctrl+t"
+      },
+      {
+        "id": "open-popover",
+        "title": "Focus Timer: Today & Controls",
+        "action": { "kind": "openPopover", "popover": "main" }
+      },
+      {
+        "id": "open-report",
+        "title": "Focus Timer: Report",
+        "action": { "kind": "openTab", "tabType": "report" }
+      },
+      {
+        "id": "toggle-tracking",
+        "title": "Focus Timer: Pause / Resume Tracking"
+      }
+    ],
+    "popovers": [
+      {
+        "id": "main",
+        "title": "Focus Timer",
+        "entry": "popover/index.html",
+        "width": 340,
+        "height": 460
+      }
+    ],
+    "tabTypes": [
+      {
+        "id": "report",
+        "title": "Time Report",
+        "entry": "report/index.html"
+      }
+    ],
+    "statusBarItems": [
+      {
+        "id": "timer",
+        "icon": { "symbol": "timer" },
+        "side": "right",
+        "tooltip": "Focus Timer",
+        "command": "open-popover"
+      }
+    ],
+    "marketplace": {
+      "author": "Nick Fay",
+      "github": "n14395",
+      "categories": ["productivity"],
+      "icon": "assets/icon.svg",
+      "screenshots": [
+        "assets/screenshots/1.png",
+        "assets/screenshots/2.png",
+        "assets/screenshots/3.png"
+      ]
+    }
+  }
+}
