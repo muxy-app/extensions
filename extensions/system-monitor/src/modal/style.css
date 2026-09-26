@@ -1,0 +1,118 @@
+/* The webview modal is a framed card on the main window — paint the theme
+   background (unlike the popover, there is no native material behind it). */
+
+:root {
+  --s1: 2px; --s2: 4px; --s3: 6px; --s4: 8px; --s5: 10px;
+  --s6: 12px; --s7: 16px; --s8: 20px; --s9: 24px; --s10: 32px;
+  --font-footnote: 11px; --font-body: 12px; --font-title: 14px;
+  --control: 24px;
+  --radius: 6px;
+  --mono: "SF Mono", Menlo, monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; height: 100%; }
+
+body {
+  background: var(--muxy-background);
+  color: var(--muxy-foreground);
+  font: var(--font-body) -apple-system, "SF Pro", system-ui, sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+  padding: var(--s6) var(--s7);
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--s2);
+}
+
+.title {
+  font-size: var(--font-title);
+  font-weight: 600;
+}
+
+button {
+  font: inherit;
+  color: var(--muxy-foreground);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.done {
+  height: 28px;
+  padding: 0 var(--s5);
+  border-radius: var(--radius);
+  background: var(--muxy-accent);
+  color: var(--muxy-accent-foreground);
+  font-weight: 600;
+}
+
+.done:hover { filter: brightness(1.1); }
+
+.field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s4);
+  font-size: var(--font-body);
+}
+
+.field > span:first-child { color: var(--muxy-foreground-muted); }
+
+.note {
+  font-size: var(--font-footnote);
+  font-family: var(--mono);
+  color: var(--muxy-foreground-muted);
+}
+
+.group-label {
+  margin-top: var(--s2);
+  font-size: var(--font-footnote);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muxy-foreground-muted);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s3) var(--s4);
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  font-size: var(--font-body);
+}
+
+input[type="text"], input[type="number"], select {
+  font: var(--font-body) -apple-system, "SF Pro", system-ui, sans-serif;
+  color: var(--muxy-foreground);
+  background: var(--muxy-surface-solid);
+  border: 1px solid var(--muxy-border);
+  border-radius: var(--radius);
+  padding: var(--s1) var(--s3);
+  height: var(--control);
+  outline: none;
+}
+
+input[type="text"] { width: 200px; font-family: var(--mono); }
+input[type="number"] { width: 56px; font-family: var(--mono); }
+
+input:focus, select:focus { border-color: var(--muxy-accent); }
+
+input[type="checkbox"] { accent-color: var(--muxy-accent); }
