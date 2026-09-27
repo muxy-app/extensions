@@ -43,5 +43,9 @@ muxy.events.subscribe("tab.closed", (payload) => {
 
 muxy.events.subscribe(`extension.${EXT}.find-tab`, (payload) => {
     const tabID = tabsByConnection.get(payload?.connectionId) || null;
-    muxy.events.emit(`extension.${EXT}.found-tab`, { requestId: payload?.requestId, tabID }).catch(() => undefined);
+    try {
+        muxy.events.emit(`extension.${EXT}.found-tab`, { requestId: payload?.requestId, tabID });
+    }
+    catch {
+    }
 });
