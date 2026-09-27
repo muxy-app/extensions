@@ -2,7 +2,7 @@
   "name": "agentic-sidebar",
   "private": true,
   "type": "module",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "scripts": {
     "build": "vite build && node scripts/copy-manifest.mjs",
     "dev": "vite"
@@ -21,6 +21,7 @@
       "worktrees:write",
       "agents:read",
       "git:read",
+      "files:read",
       "panels:write"
     ],
     "events": [

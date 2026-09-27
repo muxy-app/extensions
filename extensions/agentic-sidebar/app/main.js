@@ -354,11 +354,7 @@ async function switchProject(project) {
 async function switchWorktree(project, worktree) {
   if (worktree.isActive) return;
   const identifier = worktree.path || worktree.id || worktree.branch;
-  if (muxy.worktrees?.switchTo) {
-    await safely(() => muxy.worktrees.switchTo({ identifier }), null);
-  } else if (muxy.git?.worktree?.switchTo) {
-    await safely(() => muxy.git.worktree.switchTo({ identifier }), null);
-  }
+  await safely(() => muxy.worktrees.switchTo(identifier, project.id), null);
 }
 
 function activeProjectId() {

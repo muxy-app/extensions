@@ -17,6 +17,7 @@ worktrees by what your AI agents are doing, with live status.
 - `worktrees:read`, `worktrees:write` — list and switch worktrees.
 - `agents:read` — show agent status and receive `agent.status` events.
 - `git:read` — branch, change, and worktree details.
+- `files:read` — receive `file.changed` to refresh a project's Git status.
 - `panels:write` — the pinned panel and its toggle.
 
 ## Build
