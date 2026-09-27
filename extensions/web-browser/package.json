@@ -1,6 +1,6 @@
 {
   "name": "web-browser",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,8 +12,8 @@
   },
   "muxy": {
     "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
-    "description": "Web browser tab with a right-side status bar launcher.",
-    "permissions": ["tabs:write"],
+    "description": "Open web pages from Muxy: in its built-in browser, or in your default browser where Muxy has none.",
+    "permissions": ["tabs:write", "browser:write", "commands:exec"],
     "tabTypes": [
       {
         "id": "web-browser",
