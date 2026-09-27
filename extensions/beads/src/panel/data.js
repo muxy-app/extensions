@@ -7,6 +7,7 @@ const BOARD_COLUMNS = [
 ];
 
 const BUILT_IN_COLUMN_IDS = new Set(BOARD_COLUMNS.map((column) => column.id));
+const FULL_REFRESH_INTERVAL_MS = 300000;
 
 const STATUS_LABELS = {
   open: "Open",
@@ -35,10 +36,23 @@ export async function loadBoardContext() {
   };
 }
 
-export async function loadBoardData(context = null) {
+export async function loadBoardData(context = null, { previous = null, force = false } = {}) {
   const { projectName, workspacePath, workspaceKey } = context ?? await loadBoardContext();
-  const cli = await loadIssuesFromCli();
+  const snapshotAt = Date.now();
+  const canResume = !force && workspaceKey && workspaceKey === previous?.workspaceKey
+    && workspacePath === previous.workspacePath && previous.source === "bd list --json"
+    && Number.isSafeInteger(previous.journalSeq) && previous.journalSeq >= 0
+    && snapshotAt - previous.snapshotAt < FULL_REFRESH_INTERVAL_MS;
 
+  // Read the checkpoint before the snapshot so concurrent writes are checked again next tick.
+  const journal = workspaceKey
+    ? await loadJournal(canResume ? previous.journalSeq : 0, workspacePath)
+    : { seq: null };
+  if (canResume && !journal.rebuild && journal.seq === previous.journalSeq) {
+    return { ...previous, projectName, unchanged: true };
+  }
+
+  const cli = await loadIssuesFromCli(workspacePath);
   if (cli.ok) {
     return {
       issues: normalizeIssues(cli.issues, cli.readyIDs),
@@ -46,6 +60,8 @@ export async function loadBoardData(context = null) {
       projectName,
       workspacePath,
       workspaceKey,
+      journalSeq: cli.readyOK ? journal.seq : null,
+      snapshotAt,
       error: null,
     };
   }
@@ -57,6 +73,8 @@ export async function loadBoardData(context = null) {
     projectName,
     workspacePath,
     workspaceKey,
+    journalSeq: null,
+    snapshotAt,
     error: exported.ok ? cli.error : exported.error || cli.error,
   };
 }
@@ -125,25 +143,58 @@ export function getIssueAge(issue) {
   return months === 1 ? "1mo" : `${months}mo`;
 }
 
-async function loadIssuesFromCli() {
-  const all = await runBdJSON(["bd", "list", "--json", "--all", "--limit", "0"]);
+async function loadJournal(since, workspacePath) {
+  try {
+    const result = await muxy.exec(["bd", "events", "tail", "--since", String(since), "--json"], {
+      timeoutMs: 10000,
+      ...(workspacePath ? { cwd: workspacePath } : {}),
+    });
+    // The CLI still exits successfully when disabled and only warns on stderr.
+    if (result.timedOut || result.truncated || /events journal is disabled|events_journal_disabled/i.test(result.stderr || "")) {
+      return { seq: null };
+    }
+    if (result.exitCode !== 0) {
+      const error = JSON.parse(result.stdout || "{}");
+      if (error.code === "events_journal_truncated" && Number.isSafeInteger(error.head) && error.head >= 0) {
+        return { seq: error.head, rebuild: true };
+      }
+      return { seq: null };
+    }
+
+    let seq = since;
+    for (const record of parseJSONLines(result.stdout || "", "bd events tail")) {
+      if (!Number.isSafeInteger(record?.seq) || record.seq <= seq
+        || typeof record.op !== "string" || typeof record.issue_id !== "string") {
+        return { seq: null };
+      }
+      seq = record.seq;
+    }
+    return { seq };
+  } catch {
+    return { seq: null };
+  }
+}
+
+async function loadIssuesFromCli(workspacePath) {
+  const all = await runBdJSON(["bd", "list", "--json", "--all", "--limit", "0"], workspacePath);
   if (!all.ok) return all;
 
-  const ready = await runBdJSON(["bd", "ready", "--json"]);
+  const ready = await runBdJSON(["bd", "ready", "--json"], workspacePath);
   const readyIDs = new Set((ready.ok ? unwrapIssues(ready.value) : []).map((issue) => issue.id));
 
   return {
     ok: true,
     issues: unwrapIssues(all.value),
     readyIDs,
+    readyOK: ready.ok,
     source: "bd list --json",
   };
 }
 
-async function runBdJSON(argv) {
+async function runBdJSON(argv, workspacePath) {
   try {
-    const result = await muxy.exec(argv, { timeoutMs: 10000 });
-    if (result.exitCode !== 0) {
+    const result = await muxy.exec(argv, { timeoutMs: 10000, ...(workspacePath ? { cwd: workspacePath } : {}) });
+    if (result.exitCode !== 0 || result.timedOut || result.truncated) {
       return {
         ok: false,
         issues: [],
