@@ -98,7 +98,7 @@
     const raw = String(rawInput || "").trim();
     if (!raw) return null;
 
-    if (/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(raw)) {
+    if (/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(raw) && !/^[^\s/:]+:\d+(?:[/?#]|$)/.test(raw)) {
       try {
         return new URL(raw).toString();
       } catch (_error) {
