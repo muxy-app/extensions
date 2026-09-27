@@ -508,11 +508,20 @@ async function toggleDirectory(path) {
   await loadDir(normalized);
 }
 
+// Files open in the Files extension's editor, which takes paths relative to
+// the active worktree. Muxy asks before opening another extension's tab.
 async function openFile(path) {
   const normalized = normalizePath(path);
   try {
-    const filePath = resolveEditorFilePath(path);
-    await muxy().tabs.open({ kind: 'editor', filePath });
+    if (!normalized) throw new Error('Cannot open the workspace root as a file.');
+    await muxy().tabs.open({
+      kind: 'extensionWebView',
+      extension: {
+        id: 'files',
+        tabType: 'code-editor',
+        data: { filePath: normalized, replaceable: false },
+      },
+    });
   } catch (error) {
     console.error('Failed to open file', error);
     setStatus(`Could not open ${displayPath(normalized)}: ${error?.message || error}`, 'error');
