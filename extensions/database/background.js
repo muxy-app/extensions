@@ -41,28 +41,7 @@ muxy.events.subscribe("tab.closed", (payload) => {
     }
 });
 
-muxy.events.subscribe(`extension.${EXT}.open-connection`, async (payload) => {
-    const connectionId = payload?.connectionId;
-    if (!connectionId)
-        return;
-    const existing = tabsByConnection.get(connectionId);
-    if (existing) {
-        try {
-            await muxy.tabs.switchTo(existing);
-            return;
-        }
-        catch {
-            tabsByConnection.delete(connectionId);
-        }
-    }
-    try {
-        const tabID = await muxy.tabs.open({
-            kind: "extensionWebView",
-            extension: { id: muxy.extensionID, tabType: "workbench", data: { connectionId } },
-        });
-        if (tabID)
-            tabsByConnection.set(connectionId, tabID);
-    }
-    catch {
-    }
+muxy.events.subscribe(`extension.${EXT}.find-tab`, (payload) => {
+    const tabID = tabsByConnection.get(payload?.connectionId) || null;
+    muxy.events.emit(`extension.${EXT}.found-tab`, { requestId: payload?.requestId, tabID }).catch(() => undefined);
 });

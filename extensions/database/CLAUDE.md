@@ -11,8 +11,8 @@ SQL database client extension for Muxy supporting SQLite, MySQL, MariaDB, and Po
 
 ## Architecture
 
-- A pinned `connections` panel (`panel/connections.html` → `src/connections-panel.jsx`) renders `ConnectionsScreen` and lists saved connections. Clicking one emits `extension.database.open-connection`.
-- `background.js` receives that event and opens (or focuses, if already open) a `workbench` tab for that connection — one tab per connection, tracked via `tab.created`/`tab.closed`.
+- A pinned `connections` panel (`panel/connections.html` → `src/connections-panel.jsx`) renders `ConnectionsScreen` and lists saved connections. Clicking one opens (or focuses, if already open) a `workbench` tab for that connection — one tab per connection (`src/lib/workbench-tabs.js`).
+- `background.js` tracks each connection's tab via `tab.created`/`tab.closed` and answers the panel's `extension.database.find-tab` with `extension.database.found-tab`. Background scripts have no `tabs.switchTo`, so the panel switches tabs itself.
 - The `workbench` tab (`panel/index.html` → `src/main.jsx` → `src/app/workbench-app.jsx`) is always opened with `muxy.data.connectionId` and hosts the schema browser, data grid, SQL editor, and structure views.
 - UI is React components (`src/**/*.jsx`); pure logic (drivers, SQL builders, parsing, storage, credentials, tunnels) stays framework-free under `src/lib/`. Workbench state lives in `src/workbench/session-context.jsx` (`SessionProvider`/`useSession`) over the mutable session object from `src/workbench/state.js`; shared UI primitives (`Icon`, `Modal`, `ContextMenu`, `EmptyState`) live in `src/ui/`.
 - All database access goes through CLI clients via `muxy.exec`, one buffered call per operation. Every call uses the argument-vector form (never a shell string) so Muxy remembers consent per client binary; `src/lib/exec.js` is the only exec wrapper.

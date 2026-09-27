@@ -2,8 +2,7 @@ import "./styles.css";
 import { createRoot } from "react-dom/client";
 import { ConnectionsScreen } from "./connections/connections-screen.jsx";
 import { sweepTunnels } from "./lib/tunnel.js";
-
-const EXT = "database";
+import { openConnection } from "./lib/workbench-tabs.js";
 
 function Root() {
     if (!window.muxy)
@@ -11,7 +10,7 @@ function Root() {
     return (
         <ConnectionsScreen
             variant="panel"
-            onOpen={(conn) => muxy.events.emit(`extension.${EXT}.open-connection`, { connectionId: conn.id }).catch(() => undefined)}
+            onOpen={(conn) => openConnection(conn.id).catch(() => undefined)}
         />
     );
 }
