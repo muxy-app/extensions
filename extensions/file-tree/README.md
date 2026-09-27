@@ -9,7 +9,7 @@ This is a small, file-system read-only first pass:
 - Lists the active worktree with `muxy.files.list`.
 - Expands and collapses directories.
 - Shows folder and common file type icons.
-- Opens files in the Files extension's editor. Muxy asks the first time, since the tab belongs to another extension.
+- Opens files in the Files extension's editor, so opening a file needs the Files extension. Muxy asks the first time, since the tab belongs to another extension.
 - Supports keyboard navigation with Up/Down, Enter, Home/End, and Escape to clear search.
 - Copies the selected relative path from the context menu, Cmd/Ctrl+C inside the tree, or the extension shortcut.
 - Adds a right-click menu for opening files in Muxy, copying relative/absolute paths, and inserting `@relative/path` into the focused agent pane for the active worktree.

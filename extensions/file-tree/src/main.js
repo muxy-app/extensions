@@ -147,7 +147,7 @@ function isKnownDirectory(path) {
   return entries.some((entry) => entry.path === normalized && entry.isDirectory);
 }
 
-function resolveEditorFilePath(path) {
+function resolveAbsolutePath(path) {
   const rawPath = String(path || '');
   if (!rawPath || rawPath === ROOT) {
     throw new Error('Cannot open the workspace root as a file.');
@@ -260,7 +260,7 @@ async function copyRelativePath(path) {
 }
 
 async function copyAbsolutePath(path) {
-  const absolutePath = resolveEditorFilePath(path);
+  const absolutePath = resolveAbsolutePath(path);
   await copyText(absolutePath, 'Copied absolute path');
 }
 
@@ -508,8 +508,6 @@ async function toggleDirectory(path) {
   await loadDir(normalized);
 }
 
-// Files open in the Files extension's editor, which takes paths relative to
-// the active worktree. Muxy asks before opening another extension's tab.
 async function openFile(path) {
   const normalized = normalizePath(path);
   try {
