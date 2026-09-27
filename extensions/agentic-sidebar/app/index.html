@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Agentic</title>
+  </head>
+  <body>
+    <div id="root" class="root" data-surface="panel">
+      <header class="header">
+        <div class="search">
+          <svg class="search-icon" viewBox="0 0 16 16" aria-hidden="true">
+            <circle cx="7" cy="7" r="4.25" />
+            <path d="M10.5 10.5 L14 14" />
+          </svg>
+          <input
+            id="search"
+            class="search-input"
+            type="text"
+            placeholder="Filter projects"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button id="search-clear" class="search-clear" type="button" hidden aria-label="Clear filter">
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M4 4 L12 12 M12 4 L4 12" />
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <main id="list" class="list" tabindex="-1">
+        <!-- project rows injected here -->
+      </main>
+
+      <div id="empty" class="empty" hidden>
+        <div class="empty-glyph">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 3 L19 7 V15 L12 19 L5 15 V7 Z" />
+            <circle cx="12" cy="11" r="2.5" />
+          </svg>
+        </div>
+        <p id="empty-text" class="empty-text">No projects</p>
+      </div>
+
+      <footer id="footer" class="footer" hidden>
+        <div class="footer-summary">
+          <span id="agent-dot" class="agent-summary-dot is-idle"></span>
+          <span id="agent-summary" class="footer-text">No active agents</span>
+        </div>
+        <button id="refresh" class="icon-btn" type="button" title="Refresh" aria-label="Refresh">
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M13 8 a5 5 0 1 1 -1.6 -3.7 M13 2.5 V5 H10.5" />
+          </svg>
+        </button>
+      </footer>
+    </div>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

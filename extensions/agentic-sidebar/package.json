@@ -1,0 +1,91 @@
+{
+  "name": "agentic-sidebar",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "scripts": {
+    "build": "vite build && node scripts/copy-manifest.mjs",
+    "dev": "vite"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "vite": "^7.3.5"
+  },
+  "muxy": {
+    "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
+    "description": "A minimal, agent-focused sidebar — navigate your projects and worktrees by what your AI agents are doing, with live status.",
+    "permissions": [
+      "projects:read",
+      "projects:write",
+      "worktrees:read",
+      "worktrees:write",
+      "agents:read",
+      "git:read",
+      "panels:write"
+    ],
+    "events": [
+      "project.switched",
+      "worktree.switched",
+      "agent.status",
+      "file.changed"
+    ],
+    "sidebar": {
+      "id": "agentic",
+      "title": "Agentic",
+      "icon": {
+        "svg": "icon.svg"
+      },
+      "entry": "app/index.html"
+    },
+    "panels": [
+      {
+        "id": "agentic",
+        "title": "Agentic",
+        "icon": {
+          "svg": "icon.svg"
+        },
+        "entry": "app/index.html",
+        "position": "right",
+        "mode": "pinned",
+        "hiddenControls": [
+          "icon"
+        ]
+      }
+    ],
+    "commands": [
+      {
+        "id": "toggle-agentic",
+        "title": "Toggle Agentic Sidebar",
+        "defaultShortcut": "cmd+shift+a",
+        "action": {
+          "kind": "togglePanel",
+          "panel": "agentic"
+        }
+      }
+    ],
+    "topbarItems": [
+      {
+        "id": "agentic",
+        "icon": {
+          "svg": "icon.svg"
+        },
+        "tooltip": "Toggle Agentic",
+        "command": "toggle-agentic"
+      }
+    ],
+    "marketplace": {
+      "author": "Saeed Vaziry",
+      "github": "saeedvaziry",
+      "repository": "https://github.com/muxy-app/extensions",
+      "categories": [
+        "productivity",
+        "agents"
+      ],
+      "icon": "icon.svg",
+      "screenshots": [
+        "screenshots/screenshot-1.png",
+        "screenshots/screenshot-2.png"
+      ]
+    }
+  }
+}
