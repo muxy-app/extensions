@@ -12,8 +12,8 @@ and get replies back — all without leaving the workspace.
 
 - **File browser + code viewer.** A `[All] / [Changed]` file tree (powered by
   `@pierre/trees`, with git-status badges) on one side; a read-only CodeMirror 6
-  viewer with syntax highlighting on the other. Binary files hand off to Muxy's
-  native editor.
+  viewer with syntax highlighting on the other. Binary files hand off to the
+  Files extension's editor.
 - **Inline git-diff.** Changed files paint their diff directly in the gutter and
   body: added/modified lines get a green wash, runs of removed lines collapse to
   a ▸ wedge you can expand. Clean files paint nothing.

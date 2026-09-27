@@ -2515,15 +2515,19 @@ function showBinary(path, message) {
   saveSession(); // a binary file is still "the open file" — reopen it (placeholder) next time
 }
 
-function absPath(rel) {
-  if (!state.root) return rel;
-  return state.root.replace(/\/$/, '') + '/' + rel;
-}
-
+// Hands a file to the Files extension's editor, which takes paths relative to
+// the project. Muxy asks before opening another extension's tab.
 async function openInMuxy(path) {
   if (!path) return;
   try {
-    await muxy.tabs.open({ kind: 'editor', filePath: absPath(path) });
+    await muxy.tabs.open({
+      kind: 'extensionWebView',
+      extension: {
+        id: 'files',
+        tabType: 'code-editor',
+        data: { filePath: path, replaceable: false },
+      },
+    });
   } catch (err) {
     muxy.toast({ title: 'Review', body: `Could not open editor: ${err}` });
   }

@@ -54,9 +54,9 @@ command) showing a file tree on the left and a code viewer on the right:
   position are remembered (per project root, in `localStorage`) and restored when you reopen the
   tab or switch back to it — not the empty placeholder. See "Session restore" below.
 - Binary / non-text files show a placeholder with an **Open in Muxy editor ↗** button that
-  hands the file to Muxy's native editor (`tabs.open({ kind: 'editor' })`) — that native
-  editor is AppKit and cannot be embedded in a webview, which is why the in-tab viewer is
-  CodeMirror.
+  hands the file (project-relative path) to the Files extension's `code-editor` tab via
+  `tabs.open({ kind: 'extensionWebView', extension: { id: 'files', ... } })`. Muxy has no
+  `editor` tab kind, and opening another extension's tab asks the user first.
 - **Per-line comment threads for agents.** Click a line number (or the 💬 gutter) to leave a
   review note — or **click-and-drag down the line-number gutter to comment on a span of lines**
   (a multi-line *range* thread; the dragged range previews live in an accent wash and clicking
