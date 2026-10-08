@@ -1,6 +1,6 @@
 {
   "name": "files",
-  "version": "1.21.5",
+  "version": "1.21.6",
   "scripts": {
     "dev": "vite",
     "build": "vite build && node scripts/copy-build-assets.mjs",
