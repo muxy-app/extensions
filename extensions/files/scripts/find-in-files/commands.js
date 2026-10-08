@@ -9,6 +9,10 @@ export function rg_request(variants, options) {
   return search_request(rg_argv(options), variants);
 }
 
+export function git_grep_request(variants, options) {
+  return search_request(git_grep_argv(options), variants);
+}
+
 export function grep_request(variants, options) {
   return search_request(grep_argv(options), variants);
 }
@@ -85,6 +89,51 @@ function rg_argv(options) {
   ];
 }
 
+const GIT_GREP_EXCLUDES = [
+  "node_modules/**",
+  "dist/**",
+  "build/**",
+  ".build/**",
+  "coverage/**",
+  ".next/**",
+  ".omo/**",
+  "**/package-lock.json",
+  "**/pnpm-lock.yaml",
+  "**/yarn.lock",
+  "**/bun.lockb",
+  "**/*.map",
+  "**/*.min.js",
+  "**/*.png",
+  "**/*.jpg",
+  "**/*.jpeg",
+  "**/*.gif",
+  "**/*.webp",
+  "**/*.svg",
+  "**/*.wasm",
+];
+
+// Without rg, git grep keeps searches fast by honoring .gitignore, so build
+// output such as target/ is skipped the way rg skips it.
+function git_grep_argv(options) {
+  return [
+    "git",
+    "grep",
+    "-n",
+    "-I",
+    "--null",
+    "--untracked",
+    "--no-color",
+    "--max-count",
+    "3",
+    ...git_grep_flags(options),
+    "-f",
+    "-",
+    "--",
+    ".",
+    ...GIT_GREP_EXCLUDES.map((glob) => `:(exclude,glob)${glob}`),
+  ];
+}
+
 function grep_argv(options) {
   return [
     "grep",
@@ -125,6 +174,16 @@ function rg_flags(options) {
   if (options.wholeWord) flags.push("-w");
   if (!options.regex) flags.push("-F");
   return flags;
+}
+
+// Perl regexes accept rg's \s, \d and \b; a git built without them exits 128
+// and the search falls back to grep.
+function git_grep_flags(options) {
+  return [
+    !options.caseSensitive ? "-i" : "",
+    options.wholeWord ? "-w" : "",
+    options.regex ? "-P" : "-F",
+  ].filter(Boolean);
 }
 
 function grep_flags(options) {
