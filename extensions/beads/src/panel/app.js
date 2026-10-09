@@ -46,6 +46,7 @@ export class BeadsBoardPanel {
   constructor(root) {
     this.root = root;
     this.issues = [];
+    this.boardData = null;
     this.filterText = "";
     this.selectedIssue = null;
     this.projectName = "Workspace";
@@ -88,6 +89,7 @@ export class BeadsBoardPanel {
     muxy.events.subscribe("command.refresh-beads-board", () => this.refresh());
     muxy.events.subscribe("project.switched", () => this.delayedRefresh());
     muxy.events.subscribe("worktree.switched", () => this.delayedRefresh());
+    muxy.events.subscribe("worktree.headChanged", () => this.delayedRefresh());
     muxy.onFocus?.((focused) => {
       if (focused && !this.selectedIssue) this.root.querySelector(".search-input")?.focus();
     });
@@ -107,6 +109,7 @@ export class BeadsBoardPanel {
     this.refreshGeneration += 1;
     if (this.workspaceRefreshTimer) clearTimeout(this.workspaceRefreshTimer);
     this.issues = [];
+    this.boardData = null;
     this.selectedIssue = null;
     this.error = null;
     this.loading = true;
@@ -126,8 +129,9 @@ export class BeadsBoardPanel {
     }, 300);
   }
 
-  async refresh(generation = this.refreshGeneration) {
-    if (this.activeRefreshGeneration === generation) return;
+  async refresh(generation = this.refreshGeneration, force = true) {
+    if (this.workspaceRefreshTimer || this.activeRefreshGeneration === generation) return;
+    let needsRender = true;
     this.activeRefreshGeneration = generation;
     this.refreshing = true;
     if (!this.hasLoaded) this.loading = true;
@@ -151,8 +155,13 @@ export class BeadsBoardPanel {
         }
       }
 
-      const data = await loadBoardData(context);
+      const data = await loadBoardData(context, { previous: this.boardData, force });
       if (!this.isCurrentRefresh(generation)) return;
+      this.boardData = data;
+      if (data.unchanged && !this.usingCache && !this.error) {
+        needsRender = false;
+        return;
+      }
 
       if (data.source === "none" && this.hasLoaded && this.source !== "none") {
         this.error = data.error;
@@ -178,7 +187,8 @@ export class BeadsBoardPanel {
         this.refreshing = false;
         this.loading = false;
         this.hasLoaded = true;
-        this.render();
+        if (needsRender) this.render();
+        else this.syncTopbar();
       }
     }
   }
@@ -1037,7 +1047,7 @@ export class BeadsBoardPanel {
   applyAutoRefreshTimer() {
     this.clearAutoRefreshTimer();
     if (this.autoRefreshMs <= 0) return;
-    this.pollTimer = setInterval(() => this.refresh(), this.autoRefreshMs);
+    this.pollTimer = setInterval(() => this.refresh(this.refreshGeneration, false), this.autoRefreshMs);
   }
 
   clearAutoRefreshTimer() {
