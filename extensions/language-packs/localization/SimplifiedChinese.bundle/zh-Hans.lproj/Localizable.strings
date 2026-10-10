@@ -71,7 +71,7 @@
 "Additional Prompt" = "附加提示词";
 "Additional prompt" = "附加提示词";
 "Advanced" = "高级";
-"Agents Focused" = "代理优先";
+"Agents Focused" = "智能体优先";
 "All Categories" = "所有类别";
 "All Projects" = "所有项目";
 "All split panes" = "所有拆分窗格";
@@ -84,7 +84,7 @@
 "Always Show Project Search" = "始终显示项目搜索";
 "Automatic updates are unavailable for this configuration." = "此配置无法使用自动更新。";
 "Anonymous crash reports help us fix bugs. Reports never include project paths, file contents, or personal data." = "匿名崩溃报告可帮助我们修复问题。报告从不包含项目路径、文件内容或个人数据。";
-"An agent is waiting for your attention." = "有代理正在等待你处理。";
+"An agent is waiting for your attention." = "有个智能体正在等待您的响应。";
 "App" = "App";
 "App & subprocess resource usage" = "App 与子进程资源占用";
 "App Default" = "应用默认";
@@ -527,7 +527,7 @@
 "Navigate Forward" = "前进";
 "Navigation" = "导航";
 "New %@ Tab" = "新建 %@ 标签页";
-"New Agent Tab" = "新建代理标签页";
+"New Agent Tab" = "新建智能体标签页";
 "New Browser Tab" = "新建浏览器标签页";
 "New Extension" = "新建扩展";
 "New Home Tab" = "新建主页标签页";
@@ -857,7 +857,7 @@
 "Stage resolved file %@" = "暂存已解决的文件 %@";
 "Staged" = "已暂存";
 "Start Voice Recording" = "开始语音录制";
-"Start an agent or open a terminal tab in this project." = "启动代理或在此项目中打开终端标签页。";
+"Start an agent or open a terminal tab in this project." = "启动一个智能体或在此项目中打开终端标签页。";
 "Start the five-second confirmation to merge PR #%lld." = "开始五秒确认以合并 PR #%lld。";
 "Amber" = "琥珀色";
 "App Badge" = "App 标记";
@@ -1067,7 +1067,7 @@
 "Choose the extension's project folder." = "选择扩展的项目文件夹。";
 "Choose the parent folder for the new extension." = "选择新扩展的父文件夹。";
 "Copies the vanilla JS + Tailwind starter kit (a working panel, topbar item, and command)" = "复制纯 JS + Tailwind 入门套件（含可用的面板、顶栏项目和命令）";
-"Could not check remote agent providers" = "无法检查远程代理提供商";
+"Could not check remote agent providers" = "检查远端可用的智能体失败";
 "Could not paste image on remote device" = "无法在远程设备上粘贴图像";
 "Could not upload attachment to remote device" = "无法将附件上传到远程设备";
 "The SSH destination changed during upload." = "上传期间 SSH 目标已更改。";
@@ -1485,7 +1485,7 @@
 "● LIVE" = "● 实时";
 "Nest Worktrees Inside Projects" = "将工作树嵌套在项目内";
 "Nest worktrees inside projects" = "将工作树嵌套在项目内";
-"Places worktrees under their project in Tab Focused and Agents Focused layouts." = "在“标签页优先”和“代理优先”布局中将工作树放在其项目下。";
+"Places worktrees under their project in Tab Focused and Agents Focused layouts." = "在"标签页优先"和"智能体优先"布局中将工作树放在其项目下。";
 "Enable Free idle inactive terminals in Settings → Terminal to reclaim memory. Local terminals without a background session reopen a fresh shell in the same folder; background-session terminals reattach." = "在“设置 → 终端”中启用“释放空闲的非活动终端”以回收内存。没有后台会话的本地终端会在同一文件夹中重新打开新的 shell；有后台会话的终端会重新附着。";
 "Enable Auto-copy selected text in Settings → Terminal to copy a terminal selection as soon as you release the mouse." = "在“设置 → 终端”中启用“自动复制所选文本”，以便松开鼠标时立即拷贝终端所选内容。";
 "Command-click a file path in a local terminal, or a link in any terminal, to open it." = "在本地终端中按住 Command 并点按文件路径，或在任意终端中点按链接即可打开。";
@@ -1505,7 +1505,7 @@
 "Assign a global shortcut in Settings → Quick Terminal to open it from any app while Muxy runs. Double Shift requires Input Monitoring; its shell stays alive while hidden." = "在“设置 → 快速终端”中分配全局快捷键，以便在 Muxy 运行时从任何 App 打开它。连按 Shift 需要“输入监控”；其 shell 在隐藏时仍保持运行。";
 "In a local workspace, open Add Project → Recently Removed to restore a removed project whose folder still exists, without changing its files." = "在本地工作区中，打开“添加项目 → 最近移除”可恢复文件夹仍存在的已移除项目，且不更改其文件。";
 "Install the muxy CLI from the Muxy menu to script splits, send keys, and read visible terminal output. [Read the CLI docs](https://muxy.app/docs/features/muxy-cli)." = "从 Muxy 菜单安装 muxy CLI，以编写拆分脚本、发送按键并读取可见的终端输出。[阅读 CLI 文档](https://muxy.app/docs/features/muxy-cli)。";
-"Muxy can track supported coding agents and notify you when a turn finishes or needs input. Check Settings → Notifications." = "Muxy 可以跟踪受支持的编程代理，并在一轮结束或需要输入时通知你。请查看“设置 → 通知”。";
+"Muxy can track supported coding agents and notify you when a turn finishes or needs input. Check Settings → Notifications." = "Muxy 可以跟踪受支持的编程智能体，并在一轮结束或需要输入时通知你。请查看"设置 → 通知"。";
 "Try Muxy 2 Beta, rewritten in Rust to be faster, more efficient, and a true multiplexer. It installs as a separate app next to this one. [Download Muxy 2 Beta](https://github.com/muxy-app/muxy/releases?q=v2.0.0-beta-)." = "试用 Muxy 2 Beta：它使用 Rust 重写，更快、更高效，并且是真正的多路复用器。它会作为独立 App 安装在当前 App 旁边。[下载 Muxy 2 Beta](https://github.com/muxy-app/muxy/releases?q=v2.0.0-beta-)。";
 "Muxy 2 Beta" = "Muxy 2 Beta";
 "Dismiss Muxy 2 Beta" = "关闭 Muxy 2 Beta 提示";
@@ -2054,7 +2054,7 @@
 "Muxy on %@ is %@" = "%@ 上的 Muxy 版本为 %@";
 "Muxy on %@ is %@, but its running server is another version. Restart it there, which ends its terminals: pkill -x muxy-server" = "%@ 上的 Muxy 版本为 %@，但其正在运行的服务器是另一个版本。请在该处重启服务器（这会结束其终端）：pkill -x muxy-server";
 "Muxy on %@ is another version" = "%@ 上的 Muxy 是另一个版本";
-"Muxy recognizes AI agents like Claude Code and Codex, marks panes, tabs, and projects when they're working or need you, and notifies you when they're in the background." = "Muxy 能识别 Claude Code 和 Codex 等 AI 代理，在它们工作或需要你处理时标记窗格、标签页和项目，并在它们位于后台时通知你。";
+"Muxy recognizes AI agents like Claude Code and Codex, marks panes, tabs, and projects when they're working or need you, and notifies you when they're in the background." = "Muxy 能识别 Claude Code 和 Codex 等智能体，在它们工作或需要你处理时标记窗格、标签页和项目，并在它们位于后台时通知你。";
 "Muxy updates" = "Muxy 更新";
 "Muxy uses your SSH config, keys, and agent. A password is never saved." = "Muxy 使用你的 SSH 配置、密钥和 agent。绝不会保存密码。";
 "Muxy will create \"%@\" on %@ and add it as a project." = "Muxy 将在 %2$@ 上创建“%1$@”并将其添加为项目。";
@@ -2265,7 +2265,7 @@
 "Show all" = "全部显示";
 "Show an enabled extension's sidebar in place of the built-in one." = "显示已启用扩展的边栏以替代内置边栏。";
 "Show connection and terminal information at the bottom of the workspace." = "在工作区底部显示连接和终端信息。";
-"Show project icons or hide the sidebar in Project Focused. Tab Focused and Agents Focused always hide it when collapsed." = "在“项目优先”中显示项目图标或隐藏边栏。“标签页优先”和“代理优先”在折叠时始终隐藏边栏。";
+"Show project icons or hide the sidebar in Project Focused. Tab Focused and Agents Focused always hide it when collapsed." = "在"项目优先"中显示项目图标或隐藏边栏。"标签页优先"和"智能体优先"在折叠时始终隐藏边栏。";
 "Show project names alongside their icons in the workspace sidebar." = "在工作区边栏中于图标旁显示项目名称。";
 "Show status bar" = "显示状态栏";
 "Show tips" = "显示提示";
