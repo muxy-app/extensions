@@ -7,6 +7,16 @@ const httpTimeoutMs = 25000;
 
 export class AuthError extends Error {}
 
+export class RateLimitError extends Error {
+  constructor(retryAt) {
+    super("rate limited");
+    this.retryAt = retryAt;
+  }
+}
+
+const defaultRateLimitMs = 5 * 60 * 1000;
+const rateLimitedUntil = new Map();
+
 export async function makeRuntimeContext(exec) {
   const env = await readEnvironment(exec);
   return {
@@ -31,12 +41,21 @@ export async function fetchProviderRows(context, provider, token, request) {
     if (!Array.isArray(rows) || rows.length === 0) return unavailable(provider, "No usage data");
     return snapshot(provider, "available", rows, "", formatPlanName(result?.planName || request.planName || ""));
   } catch (error) {
+    if (error instanceof RateLimitError) return rateLimited(provider, error.retryAt);
     return unavailable(provider, error instanceof AuthError ? request.unauthenticated : "Unable to fetch usage", error instanceof AuthError ? "unavailable" : "error");
   }
 }
 
 export function unavailable(provider, message, kind = "unavailable") {
   return snapshot(provider, kind, [], message);
+}
+
+export function rateLimited(provider, retryAt) {
+  return { ...snapshot(provider, "error", [], `Rate limited until ${formatClock(retryAt)}`), rateLimitedUntil: new Date(retryAt) };
+}
+
+export function formatClock(value) {
+  return new Date(value).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 export async function readJSONPath(context, path, keys) {
@@ -131,19 +150,49 @@ async function readKeychain(exec, service, account) {
   return result.exitCode === 0 ? result.stdout.trim() : "";
 }
 
+/*
+ * 변경 전 정책: HTTP 429도 일반 실패로 처리해 "Unable to fetch usage"를 표시했고, 다음 refresh에서
+ *   곧바로 같은 endpoint를 다시 호출했다.
+ * 변경 후 정책: 429면 retry-after(없거나 0이면 5분)까지 해당 host 호출을 건너뛰고 RateLimitError를 던진다.
+ * 변경 이유: Claude의 /api/oauth/usage는 계정 단위로 강하게 rate limit되어, 제한 중 재호출이 잠금을
+ *   연장하고 사용량 표시가 오류로 바뀌었다.
+ * 영향 범위: context.http를 쓰는 모든 provider. 같은 popover/background 런타임 안에서만 host별
+ *   쿨다운을 기억하며, 429가 아닌 응답 처리는 그대로다.
+ */
 async function httpJSON(exec, request) {
+  const host = requestHost(request.url);
+  const cooldownUntil = rateLimitedUntil.get(host) || 0;
+  if (Date.now() < cooldownUntil) throw new RateLimitError(cooldownUntil);
   const result = await exec(
-    [curlBinary, "--silent", "--show-error", "--location", "--max-time", "20", "--write-out", "\n%{http_code}", "--config", "-"],
+    [curlBinary, "--silent", "--show-error", "--location", "--max-time", "20", "--write-out", "\n%{http_code} %header{retry-after}", "--config", "-"],
     { stdin: curlConfig(request), timeoutMs: httpTimeoutMs },
   );
   if (result.exitCode !== 0) throw new Error(`request failed (curl exit ${result.exitCode})`);
   const trimmed = result.stdout.trimEnd();
   const split = trimmed.lastIndexOf("\n");
   if (split < 0) throw new Error("missing status");
-  const status = Number(trimmed.slice(split + 1));
+  const [statusText, retryAfter = ""] = trimmed.slice(split + 1).trim().split(/\s+/);
+  const status = Number(statusText);
+  if (status === 429) {
+    const retryAt = Date.now() + retryAfterMs(retryAfter);
+    rateLimitedUntil.set(host, retryAt);
+    throw new RateLimitError(retryAt);
+  }
   if (status === 401 || status === 403) throw new AuthError();
   if (!Number.isFinite(status) || status < 200 || status >= 300) throw new Error(`request failed (HTTP ${status})`);
   return JSON.parse(trimmed.slice(0, split) || "{}");
+}
+
+function requestHost(url) {
+  return String(url).split("/")[2] || String(url);
+}
+
+function retryAfterMs(value) {
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds > 0) return seconds * 1000;
+  const date = Date.parse(value);
+  if (Number.isFinite(date) && date > Date.now()) return date - Date.now();
+  return defaultRateLimitMs;
 }
 
 function curlConfig({ url, method = "GET", headers = {}, body = null }) {

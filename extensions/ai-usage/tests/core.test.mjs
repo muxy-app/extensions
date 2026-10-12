@@ -10,6 +10,7 @@ import {
   providerCatalog,
   rowDisplay,
   selectPreview,
+  keepCachedOnRateLimit,
   statusBarPresentation,
   usageIsCritical,
   visibleRows,
@@ -275,4 +276,22 @@ test("regression: critical usage color follows the selected display mode", () =>
   assert.equal(usageIsCritical(mostlyFree, "used"), false);
   assert.equal(usageIsCritical(nearlyFull, "remaining"), true);
   assert.equal(usageIsCritical(mostlyFree, "remaining"), false);
+});
+
+test("regression: rate-limited provider keeps its last cached usage with a notice", () => {
+  const cachedAt = new Date("2026-10-11T10:00:00.000Z");
+  const cached = [{ id: "claude", name: "Claude Code", icon: "claude", fetchedAt: cachedAt, planName: "Max", state: { kind: "available" }, rows: [{ id: "5h", label: "5h", percent: 40, resetAt: null, detail: "40% used", periodDuration: 18000 }] }];
+  const fetched = [
+    { id: "claude", name: "Claude Code", icon: "claude", fetchedAt: new Date(), state: { kind: "error", message: "Rate limited until 10:05" }, rows: [], rateLimitedUntil: new Date("2026-10-11T10:05:00.000Z") },
+    { id: "codex", name: "Codex", icon: "codex", fetchedAt: new Date(), state: { kind: "error", message: "Unable to fetch usage" }, rows: [] },
+  ];
+
+  const [claude, codex] = keepCachedOnRateLimit(fetched, cached);
+
+  assert.equal(claude.state.kind, "available");
+  assert.equal(claude.rows[0].percent, 40);
+  assert.equal(claude.fetchedAt, cachedAt);
+  assert.match(claude.refreshMessage, /^Rate limited · showing .+ data until .+$/);
+  assert.equal(codex, fetched[1]);
+  assert.equal(keepCachedOnRateLimit([fetched[0]], [])[0], fetched[0]);
 });

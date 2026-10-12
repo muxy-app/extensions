@@ -337,6 +337,94 @@ test("regression: live provider fetch parses MiniMax remains", async () => {
   assert.equal(minimax.planName, "Max_5.1");
 });
 
+test("regression: live provider fetch reads Alibaba Token Plan usage from the active bl profile", async () => {
+  const exec = async (argv, options = {}) => {
+    if (argv[0] === "/usr/bin/env") return ok("HOME=/tmp/home\n");
+    if (argv[0] === "/bin/cat" && argv[1] === "/tmp/home/.bailian/config.json") {
+      return ok(JSON.stringify({
+        active_config: "token-plan",
+        "token-plan": { access_token: "bailian-console-token", api_key: "sk-sp-unused", console_region: "ap-southeast-1", console_site: "international", console_switch_agent: 123456 }
+      }));
+    }
+    if (argv[0] === "/usr/bin/curl" && options.stdin.includes("bailian-singapore-cs.alibabacloud.com/cli/api.json")) {
+      assert.match(options.stdin, /action=IntlBroadScopeAspnGateway&product=sfm_bailian&api=zeldaHttp\.apikeyMgr\.%2Ftokenplan%2Fpersonal%2Fapi%2Fv2%2Fusage/);
+      assert.match(options.stdin, /Authorization: Bearer bailian-console-token/);
+      assert.match(options.stdin, /Content-Type: application\/x-www-form-urlencoded/);
+      assert.match(options.stdin, /region=ap-southeast-1/);
+      assert.doesNotMatch(options.stdin, /sk-sp-unused/);
+      const params = JSON.parse(decodeURIComponent(/params=([^&"]+)/.exec(options.stdin)[1]));
+      assert.equal(params.Api, "zeldaHttp.apikeyMgr./tokenplan/personal/api/v2/usage");
+      assert.equal(params.Data.cornerstoneParam.switchAgent, 123456);
+      return ok(`${JSON.stringify({ data: { DataV2: { data: { data: { per5HourPercentage: 0.4217, per5HourResetTime: 1793000000000, per1WeekPercentage: 0.1 } } } } })}\n200`);
+    }
+    return fail();
+  };
+
+  const snapshots = await fetchLiveSnapshots({ exec, providerIDs: ["alibaba"] });
+  const alibaba = snapshots.find((snapshot) => snapshot.id === "alibaba");
+
+  assert.equal(alibaba.state.kind, "available");
+  assert.deepEqual(alibaba.rows.map((row) => [row.label, row.percent]), [["5h", 42.17], ["7d", 10]]);
+  assert.equal(alibaba.rows[0].resetAt.getTime(), 1793000000000);
+  assert.equal(alibaba.planName, "Token Plan");
+});
+
+test("edge case: Alibaba Token Plan asks for console login when the session expired or no token exists", async () => {
+  const expired = async (argv) => {
+    if (argv[0] === "/usr/bin/env") return ok("HOME=/tmp/home\n");
+    if (argv[0] === "/bin/cat" && argv[1] === "/tmp/home/.bailian/config.json") return ok(JSON.stringify({ access_token: "stale" }));
+    if (argv[0] === "/usr/bin/curl") return ok(`${JSON.stringify({ code: "ConsoleNeedLogin.NotLogined", success: false })}\n200`);
+    return fail();
+  };
+  const missing = async (argv) => (argv[0] === "/usr/bin/env" ? ok("HOME=/tmp/home\n") : fail());
+
+  for (const exec of [expired, missing]) {
+    const [alibaba] = await fetchLiveSnapshots({ exec, providerIDs: ["alibaba"] });
+    assert.equal(alibaba.state.kind, "unavailable");
+    assert.equal(alibaba.state.message, "Run bl auth login --console");
+  }
+});
+
+test("regression: API keys saved from the popover win over env keys and reach only the provider", async () => {
+  const stored = JSON.stringify({ version: 1, keys: { openrouter: "sk-or-stored", zai: "zai-stored", minimax: "minimax-stored" } });
+  const curlConfigs = [];
+  const exec = async (argv, options = {}) => {
+    if (argv[0] === "/usr/bin/env") return ok("HOME=/tmp/home\nOPENROUTER_API_KEY=sk-or-env\nMINIMAX_CN_API_KEY=minimax-env\n");
+    if (argv[0] === "/bin/cat" && argv[1] === "/tmp/home/Library/Application Support/muxy-ai-usage/api-keys.json") return ok(stored);
+    if (argv[0] === "/usr/bin/curl") {
+      curlConfigs.push(options.stdin);
+      return ok(`${JSON.stringify({ data: {} })}\n200`);
+    }
+    return fail();
+  };
+
+  await fetchLiveSnapshots({ exec, providerIDs: ["openrouter", "zai", "minimax"] });
+
+  const byHost = (host) => curlConfigs.filter((config) => config.includes(host));
+  assert.ok(byHost("openrouter.ai").length > 0);
+  for (const config of byHost("openrouter.ai")) assert.match(config, /Bearer sk-or-stored/);
+  for (const config of byHost("api.z.ai")) assert.match(config, /zai-stored/);
+  // A key saved in the popover uses the international MiniMax endpoint even if a CN env key exists.
+  assert.ok(byHost("api.minimax.io").length > 0);
+  for (const config of byHost("api.minimax.io")) assert.match(config, /Bearer minimax-stored/);
+  for (const config of curlConfigs) {
+    for (const [key, host] of [["sk-or-stored", "openrouter.ai"], ["zai-stored", "api.z.ai"], ["minimax-stored", "minimax.io"]]) {
+      if (config.includes(key)) assert.ok(config.includes(host), `${key} leaked to another host`);
+    }
+  }
+});
+
+test("regression: missing API keys are flagged so the popover can offer to add one", async () => {
+  const exec = async (argv) => (argv[0] === "/usr/bin/env" ? ok("HOME=/tmp/home\nSHELL=/bin/zsh\n") : argv[0] === "/bin/zsh" ? ok("__MUXY_ZAI_API_KEY__") : fail());
+  const snapshots = await fetchLiveSnapshots({ exec, providerIDs: ["openrouter", "zai", "minimax"] });
+
+  assert.deepEqual(snapshots.map((snapshot) => [snapshot.id, snapshot.state.message, snapshot.apiKeyMissing]), [
+    ["openrouter", "API key needed", true],
+    ["minimax", "API key needed", true],
+    ["zai", "API key needed", true],
+  ]);
+});
+
 test("regression: live provider fetch parses Z.ai quota limits", async () => {
   const exec = async (argv, options = {}) => {
     if (argv[0] === "/usr/bin/env") return ok("HOME=/tmp/home\nZAI_API_KEY=zai-token\n");
@@ -387,7 +475,30 @@ test("regression: live provider fetch parses Z.ai GLM Coding Plan quota shape fr
   assert.equal(zai.planName, "GLM Coding Pro");
 });
 
-test("regression: live provider fetch asks for ZAI_API_KEY when Z.ai env is missing", async () => {
+test("regression: live provider fetch parses Z.ai CREDIT_LIMIT windows (GLM Coding Max)", async () => {
+  const exec = async (argv, options = {}) => {
+    if (argv[0] === "/usr/bin/env") return ok("HOME=/tmp/home\nZAI_API_KEY=zai-token\n");
+    if (argv[0] === "/usr/bin/curl" && options.stdin.includes("api.z.ai/api/biz/subscription/list")) {
+      return ok(`${JSON.stringify({ code: 200, data: [{ productName: "GLM Coding Max", status: "VALID" }], success: true })}\n200`);
+    }
+    if (argv[0] === "/usr/bin/curl" && options.stdin.includes("api.z.ai/api/monitor/usage/quota/limit")) {
+      return ok(`${JSON.stringify({ code: 200, data: { limits: [
+        { type: "CREDIT_LIMIT", unit: 3, number: 5, usage: 28000, currentValue: 1958, remaining: 26041, percentage: 6, nextResetTime: 1791744856004 },
+        { type: "CREDIT_LIMIT", unit: 6, number: 1, usage: 140000, currentValue: 76214, remaining: 63785, percentage: 54, nextResetTime: 1792205583999 },
+      ], level: "max" }, success: true })}\n200`);
+    }
+    return fail();
+  };
+
+  const [zai] = await fetchLiveSnapshots({ exec, providerIDs: ["zai"] });
+
+  assert.equal(zai.state.kind, "available");
+  assert.deepEqual(zai.rows.map((row) => [row.label, row.percent, row.detail]), [["Session", 6, "1958/28000"], ["Weekly", 54, "76214/140000"]]);
+  assert.equal(zai.rows[0].resetAt.getTime(), 1791744856004);
+  assert.equal(zai.planName, "GLM Coding Max");
+});
+
+test("regression: live provider fetch asks for an API key when Z.ai env is missing", async () => {
   const exec = async (argv) => {
     if (argv[0] === "/usr/bin/env") return ok("HOME=/tmp/home\n");
     if (argv[0] === "/bin/zsh") return ok("__MUXY_ZAI_API_KEY__");
@@ -398,7 +509,8 @@ test("regression: live provider fetch asks for ZAI_API_KEY when Z.ai env is miss
   const zai = snapshots.find((snapshot) => snapshot.id === "zai");
 
   assert.equal(zai.state.kind, "unavailable");
-  assert.equal(zai.state.message, "SET ZAI_API_KEY");
+  assert.equal(zai.state.message, "API key needed");
+  assert.equal(zai.apiKeyMissing, true);
 });
 
 test("regression: live provider fetch reads ZAI_API_KEY from the login shell when Muxy env misses it", async () => {
@@ -683,6 +795,34 @@ test("regression: parseOpenCodeGoRows falls back to UTC calendar month when no r
 
   // No rows → anchor is null → UTC calendar month: June 1 ~ July 1
   assert.equal(monthly.resetAt.toISOString(), "2026-07-01T00:00:00.000Z");
+});
+
+// Kept last: the cooldown is module state, so it would block later Claude tests in this file.
+test("regression: Claude 429 backs off for retry-after instead of re-calling the usage endpoint", async () => {
+  let usageCalls = 0;
+  const exec = async (argv, options = {}) => {
+    if (argv[0] === "/usr/bin/env") return ok("HOME=/tmp/home-ratelimit\nUSER=me\n");
+    if (argv[0] === "/bin/cat" && argv[1] === "/tmp/home-ratelimit/.claude/.credentials.json") {
+      return ok(JSON.stringify({ claudeAiOauth: { accessToken: "claude-token" } }));
+    }
+    if (argv[0] === "/usr/bin/curl" && options.stdin.includes("api.anthropic.com/api/oauth/usage")) {
+      usageCalls += 1;
+      assert.ok(argv.includes("\n%{http_code} %header{retry-after}"));
+      return ok(`${JSON.stringify({ error: { type: "rate_limit_error" } })}\n429 238`);
+    }
+    return fail();
+  };
+
+  const before = Date.now();
+  const [first] = await fetchLiveSnapshots({ exec, providerIDs: ["claude"] });
+  const [second] = await fetchLiveSnapshots({ exec, providerIDs: ["claude"] });
+
+  assert.equal(usageCalls, 1);
+  for (const claude of [first, second]) {
+    assert.equal(claude.state.kind, "error");
+    assert.match(claude.state.message, /^Rate limited until /);
+    assert.ok(claude.rateLimitedUntil.getTime() >= before + 238000);
+  }
 });
 
 function ok(stdout) {

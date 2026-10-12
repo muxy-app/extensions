@@ -1,19 +1,20 @@
-import { parseCodexRows, parseKimiRows, parseOpenCodeGoRows, parseGrokRows, parseFactoryRows, parseClaudeRows } from "./live-parsers.mjs";
-import { parseJSON, formatPlanName } from "./live-runtime.mjs";
+import { serializeSnapshots } from "./cache.mjs";
+import { fetchLiveSnapshots } from "./live.mjs";
 import { providerCatalog } from "./providers.mjs";
-import { statusCachePath } from "./status-cache.mjs";
+import { statusCacheDir, statusCachePath } from "./status-cache.mjs";
 
 try {
   muxy.events.subscribe("extension.ai-usage.keepalive", () => {});
 
   const home = readHome();
   const startMs = Date.now();
+  let polling = false;
 
   // ── Startup: restore status bar from cache ──
   let autoRefreshSeconds = 300;
   let cachePayload = null;
   try {
-    cachePayload = readCache();
+    cachePayload = readCache(home);
     if (cachePayload) {
       autoRefreshSeconds = cachePayload.autoRefreshSeconds || 300;
       const presentation = statusBarPresentation(cachePayload);
@@ -30,16 +31,27 @@ try {
     console.warn("ai-usage background restore failed", error);
   }
 
-  // ── Polling loop ──
-  function poll() {
+  /*
+   * 변경 전 정책: background는 popover와 별개인 동기 수집 코드(codex, opencode-go, kimi, claude,
+   *   grok, factory)만 갖고 있었고, 나머지 provider는 popover를 열 때만 갱신됐다. 복제 코드가 live
+   *   경로와 어긋나 codex/kimi/factory/claude는 응답 형식 불일치로 항상 null을 반환해 캐시가 멈춰 있었다.
+   * 변경 후 정책: popover와 같은 live collector(fetchLiveSnapshots)를 muxy.exec 동기 결과를 감싼
+   *   exec로 호출해, 캐시에 available로 남아 있는 모든 provider를 갱신한다.
+   * 변경 이유: provider별 background 복제 구현이 계속 drift되어 조용히 실패했다. 수집 경로를 하나로
+   *   합쳐 새 provider도 별도 작업 없이 background에서 갱신되게 한다.
+   * 영향 범위: background poll 대상 provider 전체. token을 회전시키는 kimi/claude는 popover가 활성일
+   *   때 계속 건너뛰고, 실패하거나 사용 가능한 값이 없으면 이전 snapshot을 유지한다. poll이 겹치면 건너뛴다.
+   */
+  async function poll() {
+    if (polling) return;
+    polling = true;
     try {
       const nowMs = Date.now();
-      const payload = readCache();
+      const payload = readCache(home);
 
       // No cache yet — nothing to refresh
       if (!payload || !Array.isArray(payload.snapshots)) return;
 
-      const oldSnapshots = payload.snapshots;
       const displayMode = payload.displayMode === "remaining" ? "remaining" : "used";
       const pinnedPreview = payload.pinnedPreview || "";
       const currentInterval = payload.autoRefreshSeconds || 300;
@@ -54,18 +66,20 @@ try {
         ? (id) => tracked.includes(id)
         : () => true; // backward compat — no tracked list means allow all
 
-      // Re-fetch each previously-available provider in sequence.
+      // Re-fetch each previously-available provider through the live collectors.
       // On failure the old snapshot is kept so the status bar doesn't flicker.
       // Token-refresh providers (kimi, claude) are skipped when popover is active.
-      // Untracked providers are also excluded (cleaned from cache).
-      const updatedSnapshots = oldSnapshots.filter((snapshot) => isTracked(snapshot.id)).map((snapshot) => {
-        if (snapshot.state && snapshot.state.kind !== "available") return snapshot;
-        const provider = providerCatalog.find((p) => p.id === snapshot.id);
-        if (!provider) return snapshot;
-        if (popoverActive && needsTokenRefresh(provider.id)) return snapshot;
-        const fresh = syncFetch(home, provider, nowMs);
-        return fresh || snapshot;
-      });
+      const oldSnapshots = payload.snapshots.filter((snapshot) => isTracked(snapshot.id));
+      const refreshIDs = oldSnapshots
+        .filter((snapshot) => snapshot.state && snapshot.state.kind === "available")
+        .map((snapshot) => snapshot.id)
+        .filter((id) => providerCatalog.some((provider) => provider.id === id))
+        .filter((id) => !(popoverActive && needsTokenRefresh(id)));
+      const fetched = refreshIDs.length > 0 ? await fetchLiveSnapshots({ exec: backgroundExec, providerIDs: refreshIDs }) : [];
+      const freshByID = new Map(fetched
+        .filter((snapshot) => snapshot.state.kind === "available" && snapshot.rows.length > 0)
+        .map((snapshot) => [snapshot.id, snapshot]));
+      const updatedSnapshots = oldSnapshots.map((snapshot) => freshByID.get(snapshot.id) || snapshot);
 
       // Build new cache payload (no popoverHeartbeat — distinguishes background writes)
       const newPayload = JSON.stringify({
@@ -74,14 +88,18 @@ try {
         pinnedPreview,
         autoRefreshSeconds: currentInterval,
         trackedProviderIDs: tracked,
-        snapshots: updatedSnapshots,
+        snapshots: JSON.parse(serializeSnapshots(updatedSnapshots)).snapshots,
       });
 
       // Write atomically: temp → rename
-      const tmpPath = `${statusCachePath}.tmp`;
-      const tee = muxy.exec(["/usr/bin/tee", tmpPath], { stdin: newPayload, timeoutMs: 3000 });
-      if (tee && tee.exitCode === 0) {
-        muxy.exec(["/bin/mv", "-f", tmpPath, statusCachePath], { timeoutMs: 3000 });
+      const cachePath = statusCachePath(home);
+      const dir = muxy.exec(["/bin/mkdir", "-p", statusCacheDir(home)], { timeoutMs: 3000 });
+      if (dir && dir.exitCode === 0) {
+        const tmpPath = `${cachePath}.tmp`;
+        const tee = muxy.exec(["/usr/bin/tee", tmpPath], { stdin: newPayload, timeoutMs: 3000 });
+        if (tee && tee.exitCode === 0) {
+          muxy.exec(["/bin/mv", "-f", tmpPath, cachePath], { timeoutMs: 3000 });
+        }
       }
 
       // Update status bar
@@ -91,6 +109,8 @@ try {
       }
     } catch (error) {
       console.warn("ai-usage background poll failed", error);
+    } finally {
+      polling = false;
     }
   }
 
@@ -117,24 +137,29 @@ try {
 //  Helpers
 // ═══════════════════════════════════════════════════
 
-function readCache() {
-  const result = muxy.exec(["/bin/cat", statusCachePath], { timeoutMs: 3000 });
+// Background muxy.exec is synchronous; the live collectors expect a Promise of
+// { exitCode, stdout }. Promise.resolve also covers a host that returns one.
+function backgroundExec(argv, options) {
+  try {
+    return Promise.resolve(muxy.exec(argv, options)).then(normalizeExecResult, () => normalizeExecResult(null));
+  } catch {
+    return Promise.resolve(normalizeExecResult(null));
+  }
+}
+
+function normalizeExecResult(result) {
+  if (!result) return { exitCode: 1, stdout: "", stderr: "" };
+  return { ...result, exitCode: Number.isFinite(result.exitCode) ? result.exitCode : 1, stdout: String(result.stdout ?? ""), stderr: String(result.stderr ?? "") };
+}
+
+function readCache(home) {
+  const path = statusCachePath(home);
+  if (!path) return null;
+  const result = muxy.exec(["/bin/cat", path], { timeoutMs: 3000 });
   if (!result || result.exitCode !== 0) return null;
   const trimmed = String(result.stdout || "").trim();
   if (!trimmed) return null;
   return JSON.parse(trimmed);
-}
-
-function readFile(path) {
-  const result = muxy.exec(["/bin/cat", path], { timeoutMs: 3000 });
-  if (!result || result.exitCode !== 0) return "";
-  return String(result.stdout || "");
-}
-
-function readJSON(path) {
-  const raw = readFile(path);
-  if (!raw) return null;
-  try { return JSON.parse(raw); } catch { return null; }
 }
 
 function readHome() {
@@ -142,414 +167,6 @@ function readHome() {
   if (!result || result.exitCode !== 0) return "";
   const line = String(result.stdout || "").split("\n").find((entry) => entry.startsWith("HOME="));
   return line ? line.slice(5) : "";
-}
-
-function readEnv(key) {
-  const result = muxy.exec(["/usr/bin/env"], { timeoutMs: 3000 });
-  if (!result || result.exitCode !== 0) return "";
-  const lines = String(result.stdout || "").split("\n");
-  for (const line of lines) {
-    if (line.startsWith(`${key}=`)) return line.slice(key.length + 1);
-  }
-  return "";
-}
-
-// ── Synchronous curl ──
-
-function syncCurl(url, method, headers, body) {
-  const lines = [`url = "${escapeCurl(url)}"`, `request = "${escapeCurl(method)}"`];
-  if (headers) {
-    for (const [key, value] of Object.entries(headers)) {
-      lines.push(`header = "${escapeCurl(`${key}: ${value}`)}"`);
-    }
-  }
-  if (body != null) {
-    lines.push(`data = "${escapeCurl(typeof body === "string" ? body : JSON.stringify(body))}"`);
-  }
-  const config = `${lines.join("\n")}\n`;
-
-  const result = muxy.exec(
-    ["/usr/bin/curl", "--silent", "--show-error", "--location", "--max-time", "20", "--write-out", "\n%{http_code}", "--config", "-"],
-    { stdin: config, timeoutMs: 30000 },
-  );
-  if (!result || result.exitCode !== 0) return null;
-  const trimmed = String(result.stdout || "").trimEnd();
-  const split = trimmed.lastIndexOf("\n");
-  if (split < 0) return null;
-  const status = Number(trimmed.slice(split + 1));
-  if (!Number.isFinite(status) || status < 200 || status >= 300) return null;
-  try { return JSON.parse(trimmed.slice(0, split) || "{}"); } catch { return null; }
-}
-
-function escapeCurl(value) {
-  return String(value).replaceAll("\\", "\\\\").replaceAll("\"", "\\\"").replaceAll("\n", "\\n");
-}
-
-// ── Provider sync fetch ──
-
-function syncFetch(home, provider, nowMs) {
-  switch (provider.id) {
-    case "opencode-go":
-      return fetchOpenCodeGoSync(home, provider, nowMs);
-    case "codex":
-      return fetchCodexSync(home, provider);
-    case "kimi":
-      return fetchKimiSync(home, provider);
-    case "claude":
-      return fetchClaudeSync(home, provider);
-    case "grok":
-      return fetchGrokSync(home, provider);
-    case "factory":
-      return fetchFactorySync(provider);
-    default:
-      return null; // not implemented in background → keep cached data
-  }
-}
-
-function makeSnapshot(provider, rows, planName) {
-  return {
-    id: provider.id,
-    name: provider.name,
-    icon: provider.icon,
-    fetchedAt: new Date().toISOString(),
-    state: { kind: "available" },
-    planName: planName || undefined,
-    rows: rows.map((r) => ({
-      ...r,
-      resetAt: r.resetAt instanceof Date ? r.resetAt.toISOString() : r.resetAt,
-    })),
-  };
-}
-
-// ── opencode-go (local sqlite, no network) ──
-
-function fetchOpenCodeGoSync(home, provider, nowMs) {
-  const dbPath = `${home}/.local/share/opencode/opencode.db`;
-  const result = muxy.exec(["/usr/bin/sqlite3", dbPath, "SELECT usage_json FROM usage ORDER BY id DESC LIMIT 1"], { timeoutMs: 3000 });
-  if (!result || result.exitCode !== 0) return null;
-  const payload = parseJSON(result.stdout);
-  if (!payload) return null;
-  const rows = parseOpenCodeGoRows(payload, nowMs);
-  if (!Array.isArray(rows) || rows.length === 0) return null;
-  const planName = formatPlanName(payload?.plan?.display_name || payload?.plan_name || payload?.tier || "");
-  return makeSnapshot(provider, rows, planName);
-}
-
-// ── codex ──
-
-const codexCredPaths = [
-  (home) => `${home}/.codex/auth.json`,
-  (home) => `${home}/.config/codex/auth.json`,
-];
-
-function fetchCodexSync(home, provider) {
-  const cred = readCodexCreds(home);
-  if (!cred) return null;
-  const headers = { Authorization: `Bearer ${cred.token}`, Accept: "application/json" };
-  if (cred.accountID) headers["ChatGPT-Account-Id"] = cred.accountID;
-  const payload = syncCurl("https://chatgpt.com/backend-api/wham/usage", "GET", headers);
-  if (!payload) return null;
-  const rows = parseCodexRows(payload);
-  if (!Array.isArray(rows) || rows.length === 0) return null;
-  return makeSnapshot(provider, rows);
-}
-
-function readCodexCreds(home) {
-  for (const path of codexCredPaths) {
-    const data = readJSON(path(home));
-    if (data && data.accessToken) {
-      return { token: data.accessToken, accountID: data.accountID || data.account_id || "" };
-    }
-  }
-  return null;
-}
-
-// ── kimi ──
-
-const kimiCredPaths = [
-  (home) => `${home}/.kimi-code/credentials/kimi-code.json`,
-  (home) => `${home}/.kimi/credentials/kimi-code.json`,
-];
-
-function fetchKimiSync(home, provider) {
-  let cred = readKimiCreds(home);
-  if (!cred) return null;
-
-  // Refresh expired token in background (rename is atomic, safe vs popover write)
-  if (cred.expiresAt && Date.now() > cred.expiresAt * 1000) {
-    if (!cred.refreshToken) return null;
-    const refreshed = refreshKimiCredsSync(home, cred);
-    if (!refreshed) return null;
-    cred = refreshed;
-  }
-
-  const payload = syncCurl("https://api.kimi.com/coding/v1/usages", "GET", {
-    Authorization: `Bearer ${cred.token}`,
-    Accept: "application/json",
-  });
-  if (!payload) return null;
-  const rows = parseKimiRows(payload);
-  if (!Array.isArray(rows) || rows.length === 0) return null;
-  return makeSnapshot(provider, rows);
-}
-
-function readKimiCreds(home) {
-  for (const path of kimiCredPaths) {
-    const data = readJSON(path(home));
-    if (data && data.access_token) {
-      return {
-        token: data.access_token,
-        refreshToken: data.refresh_token || null,
-        expiresAt: Number(data.expires_at) || null,
-        credentialPath: path(home),
-      };
-    }
-  }
-  return null;
-}
-
-function refreshKimiCredsSync(home, cred) {
-  const body = `client_id=17e5f671-d194-4dfb-9706-5516cb48c098&grant_type=refresh_token&refresh_token=${escapeCurl(cred.refreshToken)}`;
-  const config = `url = "https://auth.kimi.com/api/oauth/token"\nrequest = "POST"\nheader = "Content-Type: application/x-www-form-urlencoded"\nheader = "Accept: application/json"\ndata = "${escapeCurl(body)}"\n`;
-
-  const result = muxy.exec(
-    ["/usr/bin/curl", "--silent", "--show-error", "--location", "--max-time", "20", "--write-out", "\n%{http_code}", "--config", "-"],
-    { stdin: config, timeoutMs: 30000 },
-  );
-  if (!result || result.exitCode !== 0) return null;
-  const trimmed = String(result.stdout || "").trimEnd();
-  const split = trimmed.lastIndexOf("\n");
-  if (split < 0) return null;
-  const status = Number(trimmed.slice(split + 1));
-  if (!Number.isFinite(status) || status < 200 || status >= 300) return null;
-
-  let response;
-  try { response = JSON.parse(trimmed.slice(0, split) || "{}"); } catch { return null; }
-  if (!response?.access_token) return null;
-
-  const newAccessToken = response.access_token;
-  const newExpiresIn = response.expires_in || 900;
-  const newExpiresAt = Math.floor(Date.now() / 1000) + newExpiresIn;
-  const newRefreshToken = response.refresh_token || cred.refreshToken;
-
-  // Atomic write: temp → rename (same pattern as popover, safe under contention)
-  const updated = JSON.stringify({
-    access_token: newAccessToken,
-    refresh_token: newRefreshToken,
-    expires_at: newExpiresAt,
-    expires_in: newExpiresIn,
-    scope: response.scope || "kimi-code",
-    token_type: response.token_type || "Bearer",
-  });
-  const tmpPath = `${cred.credentialPath}.tmp`;
-  const tee = muxy.exec(["/usr/bin/tee", tmpPath], { stdin: updated, timeoutMs: 3000 });
-  if (tee && tee.exitCode === 0) {
-    muxy.exec(["/bin/mv", "-f", tmpPath, cred.credentialPath], { timeoutMs: 3000 });
-  }
-
-  return {
-    token: newAccessToken,
-    refreshToken: newRefreshToken,
-    expiresAt: newExpiresAt,
-    credentialPath: cred.credentialPath,
-  };
-}
-
-// ── claude ──
-
-// Declared as a hoisted function, not a const array: the startup block at the
-// top of this module calls poll() before module-level bindings initialize, so a
-// const here is still in its temporal dead zone on the first poll.
-function claudeCredPaths(home) {
-  const configDir = readEnv("CLAUDE_CONFIG_DIR");
-  return [
-    `${configDir || `${home}/.claude`}/.credentials.json`,
-    `${home}/.config/claude/.credentials.json`,
-  ];
-}
-
-function fetchClaudeSync(home, provider) {
-  let cred = readClaudeCreds(home);
-  if (!cred) return null;
-
-  // Refresh expired token in background (expiresAt is in ms). Keychain-sourced
-  // credentials have no credentialPath to write the rotated token back to, so
-  // they are used as-is and left for Claude Code itself to refresh — matching
-  // the popover, which guards on credentialPath for the same reason.
-  if (cred.credentialPath && cred.refreshToken && cred.expiresAt && Date.now() > cred.expiresAt) {
-    const refreshed = refreshClaudeCredsSync(home, cred);
-    if (refreshed) cred = refreshed;
-  }
-
-  const payload = syncCurl("https://api.anthropic.com/api/oauth/usage", "GET", {
-    Authorization: `Bearer ${cred.token}`,
-    Accept: "application/json",
-    "Content-Type": "application/json",
-    "anthropic-beta": "oauth-2025-04-20",
-    "User-Agent": "claude-code/2.1.69",
-  });
-  if (!payload) return null;
-  const parsed = parseClaudeRows(payload);
-  const rows = parsed && Array.isArray(parsed.rows) ? parsed.rows : [];
-  if (rows.length === 0) return null;
-  return makeSnapshot(provider, rows, (parsed && parsed.planName) || "");
-}
-
-function readClaudeKeychainCreds() {
-  const user = readEnv("USER");
-  for (const account of [user, ""]) {
-    const argv = ["/usr/bin/security", "find-generic-password", "-s", "Claude Code-credentials", "-w"];
-    if (account) argv.splice(2, 0, "-a", account);
-    const result = muxy.exec(argv, { timeoutMs: 3000 });
-    if (!result || result.exitCode !== 0) continue;
-    const raw = String(result.stdout || "").trim();
-    if (!raw) continue;
-    let data;
-    try {
-      data = JSON.parse(raw);
-    } catch {
-      continue;
-    }
-    const oauth = data && data.claudeAiOauth;
-    if (oauth && oauth.accessToken) {
-      return {
-        token: oauth.accessToken,
-        refreshToken: oauth.refreshToken || null,
-        expiresAt: Number(oauth.expiresAt) || null,
-        credentialPath: null,
-        raw: data,
-      };
-    }
-  }
-  return null;
-}
-
-function readClaudeCreds(home) {
-  const keychain = readClaudeKeychainCreds();
-  if (keychain) return keychain;
-  for (const path of claudeCredPaths(home)) {
-    const data = readJSON(path);
-    if (data && data.claudeAiOauth) {
-      const oauth = data.claudeAiOauth;
-      if (oauth.accessToken) {
-        return {
-          token: oauth.accessToken,
-          refreshToken: oauth.refreshToken || null,
-          expiresAt: Number(oauth.expiresAt) || null,
-          credentialPath: path,
-          raw: data,
-        };
-      }
-    }
-  }
-  return null;
-}
-
-function refreshClaudeCredsSync(home, cred) {
-  const body = JSON.stringify({
-    grant_type: "refresh_token",
-    refresh_token: cred.refreshToken,
-    client_id: "9d1c250a-e61b-44d9-88ed-5944d1962f5e",
-    scope: "user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload",
-  });
-  const config =
-    `url = "https://platform.claude.com/v1/oauth/token"\n` +
-    `request = "POST"\n` +
-    `header = "Content-Type: application/json"\n` +
-    `header = "Accept: application/json"\n` +
-    `data = "${escapeCurl(body)}"\n`;
-
-  const result = muxy.exec(
-    ["/usr/bin/curl", "--silent", "--show-error", "--location", "--max-time", "20", "--write-out", "\n%{http_code}", "--config", "-"],
-    { stdin: config, timeoutMs: 30000 },
-  );
-  if (!result || result.exitCode !== 0) return null;
-  const trimmed = String(result.stdout || "").trimEnd();
-  const split = trimmed.lastIndexOf("\n");
-  if (split < 0) return null;
-  const status = Number(trimmed.slice(split + 1));
-  if (!Number.isFinite(status) || status < 200 || status >= 300) return null;
-
-  let response;
-  try { response = JSON.parse(trimmed.slice(0, split) || "{}"); } catch { return null; }
-  if (!response?.access_token) return null;
-
-  const newAccessToken = response.access_token;
-  const newExpiresIn = response.expires_in || 3600;
-  const newExpiresAt = Date.now() + newExpiresIn * 1000;
-  const newRefreshToken = response.refresh_token || cred.refreshToken;
-
-  // Atomic write: temp → rename (same pattern as popover, safe under contention)
-  const updated = JSON.stringify({
-    ...cred.raw,
-    claudeAiOauth: {
-      ...cred.raw.claudeAiOauth,
-      accessToken: newAccessToken,
-      refreshToken: newRefreshToken,
-      expiresAt: newExpiresAt,
-    },
-  });
-  const tmpPath = `${cred.credentialPath}.tmp`;
-  const tee = muxy.exec(["/usr/bin/tee", tmpPath], { stdin: updated, timeoutMs: 3000 });
-  if (tee && tee.exitCode === 0) {
-    muxy.exec(["/bin/mv", "-f", tmpPath, cred.credentialPath], { timeoutMs: 3000 });
-  }
-
-  return {
-    token: newAccessToken,
-    refreshToken: newRefreshToken,
-    expiresAt: newExpiresAt,
-    credentialPath: cred.credentialPath,
-    raw: cred.raw,
-  };
-}
-
-// ── grok ──
-
-const grokCredPaths = [
-  (home) => `${home}/.grok/auth.json`,
-  (home) => `${home}/.grok-cli/credentials.json`,
-];
-
-function fetchGrokSync(home, provider) {
-  const apiKey = readGrokKey(home);
-  if (!apiKey) return null;
-  const payload = syncCurl("https://cli-chat-proxy.grok.com/v1/billing", "GET", {
-    "x-api-key": apiKey,
-    Accept: "application/json",
-  });
-  if (!payload) return null;
-  const rows = parseGrokRows(payload);
-  if (!Array.isArray(rows) || rows.length === 0) return null;
-  const planName = formatPlanName(payload?.plan || payload?.plan_name || payload?.name || "");
-  return makeSnapshot(provider, rows, planName);
-}
-
-function readGrokKey(home) {
-  for (const path of grokCredPaths) {
-    const data = readJSON(path(home));
-    if (data && data.api_key) return data.api_key;
-    if (data && data.apiKey) return data.apiKey;
-    if (data && data.x_api_key) return data.x_api_key;
-    if (data && data["x-api-key"]) return data["x-api-key"];
-  }
-  return null;
-}
-
-// ── factory ──
-
-function fetchFactorySync(provider) {
-  const token = readEnv("FACTORY_ACCESS_TOKEN");
-  if (!token) return null;
-  const payload = syncCurl("https://api.factory.ai/api/organization/subscription/usage", "POST", {
-    Authorization: `Bearer ${token}`,
-    "Content-Type": "application/json",
-  });
-  if (!payload) return null;
-  const rows = parseFactoryRows(payload);
-  if (!Array.isArray(rows) || rows.length === 0) return null;
-  const planName = formatPlanName(payload?.plan_name || payload?.planName || payload?.usage?.plan_name || "");
-  return makeSnapshot(provider, rows, planName);
 }
 
 // ═══════════════════════════════════════════════════

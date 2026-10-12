@@ -12,7 +12,8 @@ export const providerCatalog = [
   { id: "opencode-go", name: "OpenCode Go", icon: "opencode-go", integrated: false },
   { id: "kimi", name: "Kimi", icon: "kimi", integrated: false },
   { id: "minimax", name: "MiniMax", icon: "minimax", integrated: false },
-  { id: "zai", name: "Z.ai", icon: "zai", integrated: false }
+  { id: "zai", name: "Z.ai", icon: "zai", integrated: false },
+  { id: "alibaba", name: "Alibaba", icon: "alibaba", integrated: false }
 ];
 
 export function canonicalProviderID(value) {
