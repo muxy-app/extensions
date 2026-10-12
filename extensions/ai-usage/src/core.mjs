@@ -1,5 +1,6 @@
 import { parseFixture, fixtureFromSearch } from "./fixture.mjs";
 import { rowDisplay, statusBarPresentation, usageIsCritical } from "./format.mjs";
+import { formatClock } from "./live-runtime.mjs";
 import { computePace } from "./pace.mjs";
 import { canonicalProviderID, defaultPreferences, providerCatalog } from "./providers.mjs";
 
@@ -21,6 +22,20 @@ export function composeSnapshots({ catalog, fetchedSnapshots, preferences }) {
       if (rows.length === 0) return unavailableSnapshot(provider, fetched.fetchedAt);
       return { ...fetched, rows };
     });
+}
+
+// A rate-limited provider keeps its last good snapshot (with a notice) instead
+// of flipping to an error while the provider asks us to back off.
+export function keepCachedOnRateLimit(fetchedSnapshots, cachedSnapshots) {
+  const cachedByID = new Map(cachedSnapshots
+    .filter((snapshot) => snapshot.state.kind === "available" && snapshot.rows.length > 0)
+    .map((snapshot) => [canonicalProviderID(snapshot.id), snapshot]));
+  return fetchedSnapshots.map((snapshot) => {
+    if (!snapshot.rateLimitedUntil) return snapshot;
+    const cached = cachedByID.get(canonicalProviderID(snapshot.id));
+    if (!cached) return snapshot;
+    return { ...cached, refreshMessage: `Rate limited · showing ${formatClock(cached.fetchedAt)} data until ${formatClock(snapshot.rateLimitedUntil)}` };
+  });
 }
 
 export function visibleRows(rows, includeSecondary) {

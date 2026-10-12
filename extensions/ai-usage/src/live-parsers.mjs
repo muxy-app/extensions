@@ -208,7 +208,8 @@ export function parseMiniMaxRows(payload) {
 
 export function parseZaiRows(payload, planName) {
   const limits = payload?.data?.limits || payload?.limits || (Array.isArray(payload?.data) ? payload.data : []);
-  const tokenLimits = limits.filter((item) => upperString(item, ["limitType", "type", "name"]) === "TOKENS_LIMIT");
+  // GLM Coding plans report the 5h/weekly windows as TOKENS_LIMIT; newer accounts report them as CREDIT_LIMIT.
+  const tokenLimits = limits.filter((item) => ["TOKENS_LIMIT", "CREDIT_LIMIT"].includes(upperString(item, ["limitType", "type", "name"])));
   const session = tokenLimits.find((item) => Number(item.unit) === 3 || windowText(item).includes("5")) || tokenLimits[0];
   const weekly = tokenLimits.find((item) => Number(item.unit) === 6 || windowText(item).includes("7") || windowText(item).includes("WEEK"));
   const mcp = limits.find((item) => upperString(item, ["limitType", "type", "name"]) === "TIME_LIMIT");
@@ -448,4 +449,36 @@ function zaiQuotaDetail(item, value) {
 
 function windowText(item) {
   return String(item?.window || item?.period || item?.duration || item?.label || "").toUpperCase();
+}
+
+// Alibaba Bailian Token Plan console gateway (`zeldaHttp.apikeyMgr./tokenplan/personal/api/v2/usage`).
+// Percentages are 0–1 ratios and reset times are epoch milliseconds. A missing
+// window means no limit data (possibly unlimited), not 0% used.
+export function parseAlibabaTokenPlanRows(payload) {
+  if (payload?.success === false || payload?.data?.success === false) {
+    const code = String(payload?.code || payload?.errorCode || payload?.data?.errorCode || payload?.data?.code || "");
+    if (/NotLogin|Unauthor|TokenExpired|InvalidToken/i.test(code)) return { rows: [], planName: "", unauthenticated: true };
+    return { rows: [], planName: "" };
+  }
+  const usage = unwrapBailianResponse(payload);
+  const rows = [
+    ["per5Hour", "5h", 18000],
+    ["per1Week", "7d", 604800],
+    ["per1Month", "Monthly", null],
+  ].flatMap(([key, label, periodDuration]) => {
+    const ratio = numberOrNull(usage?.[`${key}Percentage`]);
+    const resetAt = firstDate(usage, [`${key}ResetTime`]);
+    if (ratio === null) return [];
+    const value = clamp(ratio * 100, 0, 100);
+    return [row(label, value, resetAt, `${formatNumber(value)}% used`, periodDuration)];
+  });
+  return { rows, planName: "Token Plan" };
+}
+
+function unwrapBailianResponse(payload) {
+  const data = payload?.data;
+  if (!data || typeof data !== "object") return payload;
+  const dataV2 = data.DataV2;
+  if (dataV2 && typeof dataV2 === "object") return dataV2.data?.data ?? dataV2.data ?? dataV2;
+  return data.data ?? data;
 }

@@ -301,3 +301,99 @@ select {
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
 }
+
+.api-key-form,
+.api-key-empty,
+.api-key-saved {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+  margin-top: var(--s5);
+  padding-top: var(--s5);
+  border-top: 1px solid var(--line-soft);
+}
+
+.api-key-saved {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--s3);
+}
+
+.api-key-empty { align-items: flex-start; }
+
+.api-key-label {
+  color: var(--muxy-foreground);
+  font-size: var(--font-footnote);
+  font-weight: 600;
+}
+
+.api-key-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+}
+
+.api-key-input {
+  flex: 1;
+  min-width: 0;
+  height: var(--control);
+  padding: 0 var(--s4);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  color: var(--muxy-foreground);
+  letter-spacing: 0.08em;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.api-key-input:focus {
+  outline: none;
+  border-color: var(--muxy-accent);
+}
+
+.api-key-button {
+  height: var(--control);
+  padding: 0 var(--s5);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: var(--surface-soft);
+  color: var(--muxy-foreground);
+  font-size: var(--font-footnote);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.api-key-button:hover:not(:disabled) {
+  background: var(--muxy-hover);
+  border-color: var(--muxy-accent);
+}
+
+.api-key-button.api-key-primary {
+  border-color: color-mix(in srgb, var(--provider-accent, var(--muxy-accent)) 60%, var(--muxy-border));
+  background: color-mix(in srgb, var(--provider-accent, var(--muxy-accent)) 16%, transparent);
+}
+
+.api-key-button:disabled { opacity: 0.6; cursor: default; }
+
+.api-key-hint {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted-soft);
+  font-size: var(--font-footnote);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.api-key-note {
+  color: var(--muted-soft);
+  font-size: var(--font-caption);
+  line-height: 1.4;
+}
+
+.api-key-error {
+  color: var(--muxy-diff-remove);
+  font-size: var(--font-caption);
+}

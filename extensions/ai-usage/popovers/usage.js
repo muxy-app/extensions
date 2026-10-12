@@ -1,6 +1,7 @@
 import {
   composeSnapshots,
   computePace,
+  keepCachedOnRateLimit,
   fixtureFromSearch,
   parseFixture,
   providerCatalog,
@@ -12,7 +13,8 @@ import {
 import { parseCachedSnapshots, serializeSnapshots } from "../src/cache.mjs";
 import { fetchLiveSnapshots } from "../src/live.mjs";
 import { preferencesFromStorage } from "../src/preferences.mjs";
-import { writeStatusCache } from "../src/status-cache.mjs";
+import { readHome, writeStatusCache } from "../src/status-cache.mjs";
+import { apiKeyProviders, apiKeysPath, maskApiKey, parseStoredApiKeys, saveStoredApiKey } from "../src/api-keys.mjs";
 
 const storagePrefix = "ai-usage.";
 const popoverWidth = 360;
@@ -38,11 +40,14 @@ const providerAccents = {
   kimi: "#4f7cff",
   minimax: "#ff6b6b",
   "opencode-go": "#e879f9",
-  zai: "#22c55e"
+  zai: "#22c55e",
+  alibaba: "#ff6a00"
 };
 
 let snapshots = [];
 let timer = null;
+let storedKeyHints = {};
+let keyEditor = { id: null, draft: "", error: "", saving: false };
 
 function readPreferences() {
   const storageKey = (key) => `${storagePrefix}${key}`;
@@ -79,6 +84,7 @@ async function readFixture() {
 async function refresh() {
   const preferences = readPreferences();
   syncControls(preferences);
+  await loadStoredKeyHints();
   const cacheApplied = await applyCachedUsage(preferences);
   if (!cacheApplied) elements.status.textContent = "Refreshing usage data...";
   const fixture = await readFixture();
@@ -99,7 +105,8 @@ async function applyCachedUsage(preferences) {
   return true;
 }
 
-async function applyFetchedUsage(fetched, preferences, cacheApplied) {
+async function applyFetchedUsage(fetchedSnapshots, preferences, cacheApplied) {
+  const fetched = keepCachedOnRateLimit(fetchedSnapshots, parseCachedSnapshots(localStorage.getItem(`${storagePrefix}snapshots`)));
   const nextSnapshots = composeSnapshots({ catalog: providerCatalog, fetchedSnapshots: fetched, preferences });
   if (hasAvailableUsage(nextSnapshots)) {
     localStorage.setItem(`${storagePrefix}snapshots`, serializeSnapshots(fetched));
@@ -187,7 +194,147 @@ refresh();
   if (!collapsed && snapshot?.state.kind === "available") {
     section.append(...snapshot.rows.map((row) => metricView(snapshot, row, preferences)));
   }
+  if (!collapsed && apiKeyProviders[provider.id]) {
+    const keyView = apiKeyView(provider, snapshot);
+    if (keyView) section.append(keyView);
+  }
   return section;
+}
+
+// ── API keys (saved to an owner-only file on this Mac) ──
+
+async function loadStoredKeyHints() {
+  const exec = window.muxy?.exec;
+  if (typeof exec !== "function") return;
+  try {
+    const path = apiKeysPath(await readHome(exec));
+    if (!path) return;
+    const result = await exec(["/bin/cat", path], { timeoutMs: 3000 });
+    const keys = parseStoredApiKeys(result && result.exitCode === 0 ? result.stdout : "");
+    storedKeyHints = Object.fromEntries(Object.entries(keys).map(([id, key]) => [id, maskApiKey(key)]));
+  } catch {
+    storedKeyHints = {};
+  }
+}
+
+function apiKeyView(provider, snapshot) {
+  const meta = apiKeyProviders[provider.id];
+  if (keyEditor.id === provider.id) return apiKeyForm(provider, meta);
+  const hint = storedKeyHints[provider.id];
+  if (hint) {
+    const row = document.createElement("div");
+    row.className = "api-key-saved";
+    row.append(
+      textSpan(`🔒 Saved locally ${hint}`, "api-key-hint"),
+      keyButton("Change", () => openKeyEditor(provider.id)),
+      keyButton("Remove", () => removeApiKey(provider, meta)),
+    );
+    return row;
+  }
+  if (!snapshot?.apiKeyMissing) return null;
+  const wrap = document.createElement("div");
+  wrap.className = "api-key-empty";
+  wrap.append(
+    keyButton(`Add ${meta.label}`, () => openKeyEditor(provider.id), "api-key-primary"),
+    textSpan("Stays on this Mac — never synced or shared.", "api-key-note"),
+  );
+  return wrap;
+}
+
+function apiKeyForm(provider, meta) {
+  const form = document.createElement("form");
+  form.className = "api-key-form";
+  form.noValidate = true;
+  const input = document.createElement("input");
+  input.type = "password";
+  input.className = "api-key-input";
+  input.placeholder = meta.placeholder;
+  input.autocomplete = "off";
+  input.spellcheck = false;
+  input.setAttribute("autocapitalize", "off");
+  input.setAttribute("aria-label", meta.label);
+  input.value = keyEditor.draft;
+  input.disabled = keyEditor.saving;
+  input.addEventListener("input", () => {
+    keyEditor.draft = input.value;
+  });
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeKeyEditor();
+  });
+  const save = keyButton(keyEditor.saving ? "Saving…" : "Save", null, "api-key-primary");
+  save.type = "submit";
+  save.disabled = keyEditor.saving;
+  const cancel = keyButton("Cancel", closeKeyEditor);
+  const row = document.createElement("div");
+  row.className = "api-key-row";
+  row.append(input, save, cancel);
+  form.append(textSpan(meta.label, "api-key-label"), row);
+  if (keyEditor.error) form.append(textSpan(keyEditor.error, "api-key-error"));
+  form.append(textSpan(`🔒 Saved only on this Mac in an owner-only file and sent only to ${meta.host} to read usage.`, "api-key-note"));
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    saveApiKey(provider);
+  });
+  requestAnimationFrame(() => {
+    if (keyEditor.id === provider.id && !keyEditor.saving) input.focus();
+  });
+  return form;
+}
+
+function keyButton(label, onClick, className = "") {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = `api-key-button ${className}`.trim();
+  button.textContent = label;
+  if (onClick) button.addEventListener("click", onClick);
+  return button;
+}
+
+function openKeyEditor(id) {
+  keyEditor = { id, draft: "", error: "", saving: false };
+  render(readPreferences(), elements.status.textContent);
+}
+
+function closeKeyEditor() {
+  keyEditor = { id: null, draft: "", error: "", saving: false };
+  render(readPreferences(), elements.status.textContent);
+}
+
+async function saveApiKey(provider) {
+  const value = keyEditor.draft.trim();
+  if (!value) {
+    keyEditor.error = "Paste a key first.";
+    render(readPreferences(), elements.status.textContent);
+    return;
+  }
+  keyEditor.saving = true;
+  keyEditor.error = "";
+  render(readPreferences(), elements.status.textContent);
+  try {
+    const exec = window.muxy?.exec;
+    await saveStoredApiKey(exec, await readHome(exec), provider.id, value);
+    keyEditor = { id: null, draft: "", error: "", saving: false };
+    await refresh();
+  } catch {
+    keyEditor = { ...keyEditor, saving: false, error: "Couldn't save the key. Try again." };
+    render(readPreferences(), elements.status.textContent);
+  }
+}
+
+async function removeApiKey(provider, meta) {
+  const confirm = window.muxy?.dialog?.confirm;
+  if (typeof confirm === "function") {
+    const choice = await confirm({ title: `Remove ${meta.label}?`, message: "The key is deleted from this Mac. Usage for this provider stops until you add a key again.", buttons: ["Remove", "Cancel"], default: "Remove", cancel: "Cancel" });
+    if (choice !== "Remove") return;
+  }
+  try {
+    const exec = window.muxy?.exec;
+    await saveStoredApiKey(exec, await readHome(exec), provider.id, "");
+  } catch {
+    elements.status.textContent = "Couldn't remove the key. Try again.";
+    return;
+  }
+  await refresh();
 }
 
 function metricView(snapshot, row, preferences) {

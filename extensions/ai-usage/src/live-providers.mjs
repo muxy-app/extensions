@@ -1,7 +1,10 @@
 import { nonEmptyString } from "./values.mjs";
 import { providerCatalog } from "./providers.mjs";
+import { bailianConfigPath, bailianTokenPlanRequest, selectBailianProfile } from "./bailian.mjs";
+import { readStoredApiKeys } from "./api-keys.mjs";
 import { AuthError, fetchProviderRows, firstString, formatPlanName, jsonPath, parseJSON, readJSONPath, unavailable } from "./live-runtime.mjs";
-import { parseAmpRows, parseAntigravityRows, parseClaudeRows, parseCodexRows, parseCopilotRows, parseCursorRows, parseDevinRows, parseFactoryRows, parseGrokRows, parseKimiRows, parseMiniMaxRows, parseOpenCodeGoRows, parseOpenRouterCreditsRows, parseOpenRouterKeyRows, parseZaiPlanName, parseZaiRows } from "./live-parsers.mjs";
+import { applyClaudeRefresh, claudeKeychainService, claudeKeychainWriteCommand, claudeRefreshReserve, claudeRefreshRequest, isSafeKeychainAccount } from "./claude-auth.mjs";
+import { parseAlibabaTokenPlanRows, parseAmpRows, parseAntigravityRows, parseClaudeRows, parseCodexRows, parseCopilotRows, parseCursorRows, parseDevinRows, parseFactoryRows, parseGrokRows, parseKimiRows, parseMiniMaxRows, parseOpenCodeGoRows, parseOpenRouterCreditsRows, parseOpenRouterKeyRows, parseZaiPlanName, parseZaiRows } from "./live-parsers.mjs";
 
 const providerByID = new Map(providerCatalog.map((provider) => [provider.id, provider]));
 
@@ -20,6 +23,7 @@ export const providerFetchers = [
   { id: "kimi", fetch: fetchKimiUsage },
   { id: "minimax", fetch: fetchMiniMaxUsage },
   { id: "zai", fetch: fetchZaiUsage },
+  { id: "alibaba", fetch: fetchAlibabaTokenPlanUsage },
 ];
 
 async function fetchAntigravityUsage(context) {
@@ -74,18 +78,14 @@ async function fetchClaudeCredentialUsage(context, provider, credentials) {
   let token = credentials?.accessToken;
   if (!token) return unavailable(provider, "Sign in to Claude");
 
-  // If the access token is stale, try to refresh it using the refresh_token.
-  if (credentials.refreshToken && credentials.expiresAt && Date.now() > credentials.expiresAt && credentials.credentialPath) {
-    try {
-      const refreshed = await refreshClaudeAccessToken(context, credentials);
-      if (refreshed?.accessToken) {
-        token = refreshed.accessToken;
-        credentials = refreshed;
-      }
-    } catch {
-      // Fall through to the API call with the expired token
-      // so the user sees the provider's error (e.g. 401 → "Sign in to Claude").
+  // If the access token is stale, refresh it and store the rotated tokens where Claude Code reads them.
+  if (credentials.refreshToken && credentials.expiresAt && Date.now() > credentials.expiresAt) {
+    const refreshed = await refreshClaudeAccessToken(context, credentials);
+    if (refreshed?.accessToken) {
+      token = refreshed.accessToken;
+      credentials = refreshed;
     }
+    // On failure, fall through with the expired token so the user sees the provider's error (e.g. 401 → "Sign in to Claude").
   }
 
   const result = await fetchProviderRows(context, provider, token, {
@@ -99,53 +99,41 @@ async function fetchClaudeCredentialUsage(context, provider, credentials) {
 }
 
 async function refreshClaudeAccessToken(context, credentials) {
-  if (!credentials.refreshToken || !credentials.credentialPath) return null;
+  // Refresh tokens rotate. Refresh only if the new tokens can be stored where Claude Code reads them,
+  // or Claude Code is left with a spent refresh token.
+  if (credentials.keychainAccount) {
+    if (!claudeKeychainWriteCommand(credentials.keychainAccount, credentials.payload, claudeRefreshReserve)) return null;
+  } else if (!credentials.credentialPath) {
+    return null;
+  }
 
+  let payload;
   try {
-    const response = await context.http({
-      url: "https://platform.claude.com/v1/oauth/token",
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: {
-        grant_type: "refresh_token",
-        refresh_token: credentials.refreshToken,
-        client_id: "9d1c250a-e61b-44d9-88ed-5944d1962f5e",
-        scope: "user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload",
-      },
-    });
-
-    if (!response?.access_token) return null;
-
-    const newAccessToken = response.access_token;
-    const newExpiresIn = response.expires_in || 3600;
-    const newExpiresAt = Date.now() + newExpiresIn * 1000;
-
-    // Update only the access_token (and derived fields) in the credentials file.
-    const raw = await context.readText(credentials.credentialPath);
-    const payload = parseJSON(raw);
-    if (payload?.claudeAiOauth) {
-      payload.claudeAiOauth.accessToken = newAccessToken;
-      payload.claudeAiOauth.expiresAt = newExpiresAt;
-      if (response.refresh_token) {
-        payload.claudeAiOauth.refreshToken = response.refresh_token;
-      }
-
-      // Atomic write: write to a temp file, then rename.
-      const tmpPath = `${credentials.credentialPath}.tmp`;
-      await context.writeText(tmpPath, JSON.stringify(payload, null, 2));
-      await context.rename(tmpPath, credentials.credentialPath);
-    }
-
-    return {
-      accessToken: newAccessToken,
-      refreshToken: response.refresh_token || credentials.refreshToken,
-      expiresAt: newExpiresAt,
-      planName: credentials.planName,
-      credentialPath: credentials.credentialPath,
-    };
+    payload = applyClaudeRefresh(credentials.payload, await context.http(claudeRefreshRequest(credentials.payload.claudeAiOauth)));
   } catch {
     return null;
   }
+  if (!payload) return null;
+
+  try {
+    await saveClaudeCredentials(context, credentials, payload);
+  } catch {
+    // The old refresh token is already spent, so still use the new token for this fetch.
+  }
+  return claudeCredentials(payload, { credentialPath: credentials.credentialPath, keychainAccount: credentials.keychainAccount });
+}
+
+async function saveClaudeCredentials(context, credentials, payload) {
+  if (credentials.keychainAccount) {
+    const command = claudeKeychainWriteCommand(credentials.keychainAccount, payload);
+    if (!command) throw new Error("keychain payload too long for security -i");
+    await context.writeKeychain(command);
+    return;
+  }
+  // Atomic write: write to a temp file, then rename.
+  const tmpPath = `${credentials.credentialPath}.tmp`;
+  await context.writeText(tmpPath, JSON.stringify(payload, null, 2));
+  await context.rename(tmpPath, credentials.credentialPath);
 }
 
 async function fetchCodexUsage(context) {
@@ -328,7 +316,7 @@ async function fetchKimiUsage(context) {
 async function fetchOpenRouterUsage(context) {
   const provider = providerByID.get("openrouter");
   const apiKey = await readOpenRouterKey(context);
-  if (!apiKey) return unavailable(provider, "Set OPENROUTER_API_KEY");
+  if (!apiKey) return apiKeyMissing(provider);
   try {
     const [credits, key] = await Promise.all([
       context.http({ url: "https://openrouter.ai/api/v1/credits", headers: { Authorization: `Bearer ${apiKey}`, Accept: "application/json" } }),
@@ -344,6 +332,8 @@ async function fetchOpenRouterUsage(context) {
 }
 
 async function readOpenRouterKey(context) {
+  const storedKey = (await storedApiKeys(context)).openrouter;
+  if (storedKey) return storedKey;
   const envKey = nonEmptyString(context.env.OPENROUTER_API_KEY) || nonEmptyString(context.env.OPENROUTER_KEY);
   if (envKey) return envKey;
   for (const path of [`${context.home}/.config/openusage/openrouter.json`, `${context.home}/.config/openrouter/key.json`]) {
@@ -544,7 +534,9 @@ async function readOpenCodeGoCredentials(context) {
 }
 
 async function fetchMiniMaxUsage(context) {
+  const storedKey = (await storedApiKeys(context)).minimax || "";
   const token = await firstString([
+    storedKey,
     context.env.MINIMAX_CN_API_KEY,
     context.env.MINIMAX_API_KEY,
     context.env.MINIMAX_API_TOKEN,
@@ -553,8 +545,10 @@ async function fetchMiniMaxUsage(context) {
     readJSONPath(context, `${context.home}/.mmx/config.json`, ["token"]),
     readJSONPath(context, `${context.home}/.mmx/credentials.json`, ["auth", "access_token"]),
   ]);
-  const domains = context.env.MINIMAX_CN_API_KEY ? ["api.minimaxi.com"] : ["api.minimax.io", "www.minimax.io"];
-  const endpointPath = context.env.MINIMAX_CN_API_KEY ? "/v1/token_plan/remains" : "/v1/api/openplatform/coding_plan/remains";
+  if (!token) return apiKeyMissing(providerByID.get("minimax"));
+  const china = Boolean(context.env.MINIMAX_CN_API_KEY) && !storedKey;
+  const domains = china ? ["api.minimaxi.com"] : ["api.minimax.io", "www.minimax.io"];
+  const endpointPath = china ? "/v1/token_plan/remains" : "/v1/api/openplatform/coding_plan/remains";
   for (const host of domains) {
     const snapshot = await fetchProviderRows(context, providerByID.get("minimax"), token, {
       unauthenticated: "Sign in to MiniMax",
@@ -567,10 +561,24 @@ async function fetchMiniMaxUsage(context) {
   return unavailable(providerByID.get("minimax"), "Unable to fetch usage");
 }
 
+async function fetchAlibabaTokenPlanUsage(context) {
+  const provider = providerByID.get("alibaba");
+  const credentials = selectBailianProfile(parseJSON(await context.readText(bailianConfigPath(context.home, context.env.BAILIAN_CONFIG_DIR))));
+  if (!credentials) return unavailable(provider, "Run bl auth login --console");
+  try {
+    const result = parseAlibabaTokenPlanRows(await context.http(bailianTokenPlanRequest(credentials)));
+    if (result.unauthenticated) return unavailable(provider, "Run bl auth login --console");
+    if (result.rows.length === 0) return unavailable(provider, "No usage data");
+    return { id: provider.id, name: provider.name, icon: provider.icon, fetchedAt: new Date(), state: { kind: "available" }, rows: result.rows, planName: result.planName };
+  } catch (error) {
+    return error instanceof AuthError ? unavailable(provider, "Run bl auth login --console") : unavailable(provider, "Unable to fetch usage", "error");
+  }
+}
+
 async function fetchZaiUsage(context) {
   const provider = providerByID.get("zai");
   const credentials = await readZaiCredentials(context);
-  if (!credentials.token) return unavailable(provider, "SET ZAI_API_KEY");
+  if (!credentials.token) return apiKeyMissing(provider);
   const headers = { Authorization: credentials.authorization, Accept: "application/json" };
   try {
     const [subscription, quota] = await Promise.all([
@@ -586,7 +594,7 @@ async function fetchZaiUsage(context) {
 }
 
 async function readZaiCredentials(context) {
-  const token = nonEmptyString(context.env.ZAI_API_KEY) || await readZaiShellToken(context);
+  const token = (await storedApiKeys(context)).zai || nonEmptyString(context.env.ZAI_API_KEY) || await readZaiShellToken(context);
   return { token, authorization: token ? bearerAuthorization(token) : "", baseURL: "https://api.z.ai" };
 }
 
@@ -745,46 +753,32 @@ async function readClaudeCredentialCandidates(context) {
 }
 
 async function readClaudeFileCredentials(context) {
-  let subscriptionType = "";
-  let rateLimitTier = "";
-  let refreshToken = "";
-  let expiresAt = null;
   const filePath = `${context.env.CLAUDE_CONFIG_DIR || `${context.home}/.claude`}/.credentials.json`;
-  const fileRaw = await context.readText(filePath);
-  const filePayload = parseJSON(fileRaw);
-  const oauth = filePayload?.claudeAiOauth;
-  if (!oauth?.accessToken) return null;
-  subscriptionType = oauth.subscriptionType || "";
-  rateLimitTier = oauth.rateLimitTier || "";
-  refreshToken = oauth.refreshToken || "";
-  expiresAt = oauth.expiresAt || null;
-  return {
-    accessToken: oauth.accessToken,
-    planName: formatClaudeCredentialPlan(subscriptionType, rateLimitTier),
-    refreshToken,
-    expiresAt,
-    credentialPath: filePath,
-  };
+  return claudeCredentials(parseJSON(await context.readText(filePath)), { credentialPath: filePath, keychainAccount: null });
 }
 
 async function readClaudeKeychainCredentials(context) {
-  for (const account of [context.env.USER || "", ""]) {
-    const raw = await context.keychain("Claude Code-credentials", account);
-    const payload = parseJSON(raw);
-    if (payload?.claudeAiOauth) {
-      const oauth = payload.claudeAiOauth;
-      if (oauth.accessToken) {
-        return {
-          accessToken: oauth.accessToken,
-          planName: formatClaudeCredentialPlan(oauth.subscriptionType || "", oauth.rateLimitTier || ""),
-          refreshToken: oauth.refreshToken || "",
-          expiresAt: oauth.expiresAt || null,
-          credentialPath: null,
-        };
-      }
-    }
+  const user = context.env.USER || "";
+  for (const account of [user, ""]) {
+    const raw = await context.keychain(claudeKeychainService, account);
+    // Write back only to the account Claude Code uses ($USER).
+    const credentials = claudeCredentials(parseJSON(raw), { credentialPath: null, keychainAccount: account && isSafeKeychainAccount(account) ? account : null });
+    if (credentials) return credentials;
   }
   return null;
+}
+
+function claudeCredentials(payload, location) {
+  const oauth = payload?.claudeAiOauth;
+  if (!oauth?.accessToken) return null;
+  return {
+    accessToken: oauth.accessToken,
+    planName: formatClaudeCredentialPlan(oauth.subscriptionType || "", oauth.rateLimitTier || ""),
+    refreshToken: oauth.refreshToken || "",
+    expiresAt: oauth.expiresAt || null,
+    payload,
+    ...location,
+  };
 }
 
 function formatClaudeCredentialPlan(subscriptionType, rateLimitTier) {
@@ -867,4 +861,14 @@ function tokenFromCredentialRaw(raw) {
 function hexDecode(value) {
   if (!/^[0-9a-f]+$/i.test(value) || value.length % 2 !== 0) return "";
   return String.fromCharCode(...value.match(/.{2}/g).map((pair) => Number.parseInt(pair, 16)));
+}
+
+// Keys saved from the popover (owner-only local file) are read once per refresh.
+function storedApiKeys(context) {
+  if (!context.storedApiKeys) context.storedApiKeys = readStoredApiKeys(context);
+  return context.storedApiKeys;
+}
+
+function apiKeyMissing(provider) {
+  return { ...unavailable(provider, "API key needed"), apiKeyMissing: true };
 }
