@@ -1,0 +1,109 @@
+{
+  "name": "ollama",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Ollama servers and models, with one-click agent launches in Muxy",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && node scripts/copy-manifest.mjs",
+    "test": "node --test test/*.test.js"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.0",
+    "tailwindcss": "^4.3.0",
+    "vite": "^7.3.5"
+  },
+  "muxy": {
+    "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
+    "description": "Track Ollama servers, browse models, and launch coding agents with local models",
+    "background": "background.js",
+    "permissions": [
+      "commands:exec",
+      "storage:read",
+      "storage:write",
+      "tabs:write",
+      "notifications:write",
+      "panels:write"
+    ],
+    "panels": [
+      {
+        "id": "ollama",
+        "title": "Ollama",
+        "entry": "panel/index.html",
+        "icon": { "svg": "ollama.svg" },
+        "position": "right",
+        "mode": "pinned",
+        "headerButtons": [
+          {
+            "id": "refresh",
+            "icon": { "symbol": "arrow.clockwise" },
+            "tooltip": "Refresh status",
+            "command": "ollama-refresh"
+          },
+          {
+            "id": "add-server",
+            "icon": { "symbol": "plus" },
+            "tooltip": "Add server",
+            "command": "ollama-add-server"
+          }
+        ]
+      }
+    ],
+    "commands": [
+      {
+        "id": "ollama-toggle-panel",
+        "title": "Ollama: Toggle Panel",
+        "defaultShortcut": "cmd+shift+o",
+        "action": { "kind": "togglePanel", "panel": "ollama" }
+      },
+      {
+        "id": "ollama-refresh",
+        "title": "Ollama: Refresh",
+        "subtitle": "Re-poll servers and integrations"
+      },
+      {
+        "id": "ollama-add-server",
+        "title": "Ollama: Add Server…",
+        "subtitle": "Add an Ollama server endpoint"
+      },
+      {
+        "id": "ollama-launch",
+        "title": "Ollama: Launch Agent…",
+        "subtitle": "Pick a server, integration, and model, then launch in a new terminal",
+        "action": {
+          "kind": "openModal",
+          "entry": "launcher/index.html",
+          "width": 480,
+          "height": 520
+        }
+      }
+    ],
+    "topbarItems": [
+      {
+        "id": "ollama",
+        "icon": { "svg": "ollama.svg" },
+        "tooltip": "Ollama",
+        "command": "ollama-toggle-panel"
+      }
+    ],
+    "statusBarItems": [
+      {
+        "id": "ollama",
+        "icon": { "svg": "ollama.svg" },
+        "side": "right",
+        "visible": false,
+        "tooltip": "Ollama servers online",
+        "command": "ollama-toggle-panel"
+      }
+    ],
+    "marketplace": {
+      "author": "Eric Marchand",
+      "github": "phimage",
+      "repository": "https://github.com/muxy-app/extensions",
+      "categories": ["developer-tools", "ai"],
+      "icon": "ollama.svg",
+      "screenshots": ["screenshot-1.png"]
+    }
+  }
+}
