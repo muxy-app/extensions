@@ -1,0 +1,118 @@
+{
+  "name": "himalaya",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Browse and read your email from the sidebar, powered by the Himalaya CLI",
+  "muxy": {
+    "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
+    "description": "Browse and read your email from the sidebar, powered by the Himalaya CLI",
+    "permissions": [
+      "panels:write",
+      "commands:exec"
+    ],
+    "panels": [
+      {
+        "id": "mail",
+        "title": "Mail",
+        "entry": "panel/index.html",
+        "position": "right",
+        "mode": "pinned",
+        "icon": {
+          "symbol": "envelope"
+        },
+        "headerButtons": [
+          {
+            "id": "refresh",
+            "command": "refresh-mail",
+            "icon": {
+              "symbol": "arrow.clockwise"
+            },
+            "tooltip": "Refresh"
+          }
+        ]
+      }
+    ],
+    "commands": [
+      {
+        "id": "toggle-mail",
+        "title": "Mail: Toggle Panel",
+        "subtitle": "Show or hide the mail panel",
+        "defaultShortcut": "cmd+shift+m",
+        "action": {
+          "kind": "togglePanel",
+          "panel": "mail"
+        }
+      },
+      {
+        "id": "refresh-mail",
+        "title": "Mail: Refresh",
+        "subtitle": "Reload the current mailbox"
+      }
+    ],
+    "topbarItems": [
+      {
+        "id": "mail",
+        "icon": {
+          "symbol": "envelope"
+        },
+        "tooltip": "Toggle Mail Panel",
+        "command": "toggle-mail"
+      }
+    ],
+    "statusBarItems": [
+      {
+        "id": "mail",
+        "icon": {
+          "symbol": "envelope"
+        },
+        "side": "right",
+        "tooltip": "Mail",
+        "command": "toggle-mail"
+      }
+    ],
+    "settings": [
+      {
+        "key": "account",
+        "type": "string",
+        "title": "Default account",
+        "description": "Himalaya account name to open on load. Leave empty to use Himalaya's default account.",
+        "defaultValue": ""
+      },
+      {
+        "key": "pageSize",
+        "type": "number",
+        "title": "Messages per page",
+        "description": "How many envelopes to fetch per page in a mailbox.",
+        "defaultValue": 25
+      },
+      {
+        "key": "binary",
+        "type": "string",
+        "title": "Himalaya binary path",
+        "description": "Full path to the himalaya executable. Leave empty to auto-detect it on your PATH and in common install locations.",
+        "defaultValue": ""
+      }
+    ],
+    "marketplace": {
+      "author": "Eric Marchand",
+      "github": "phimage",
+      "repository": "https://github.com/muxy-app/extensions",
+      "categories": [
+        "productivity",
+        "developer-tools"
+      ],
+      "icon": "icon.svg",
+      "screenshots": [
+        "screenshots/screenshot-1.png"
+      ]
+    }
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && node -e \"require('fs').copyFileSync('package.json','dist/package.json')\""
+  },
+  "devDependencies": {
+    "vite": "^7.3.5"
+  }
+}
