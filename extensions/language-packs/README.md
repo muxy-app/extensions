@@ -28,6 +28,15 @@ Each language is a resource-only Apple `.bundle` under `localization/`, containi
 
 Missing keys fall back to English automatically. Format placeholders (`%@`, `%lld`, etc.) are kept in the same position and type as the English source — see [`docs/extensions/localizations.md`](https://github.com/muxy-app/muxy/blob/main/docs/extensions/localizations.md) in the Muxy app repo for the exact rules.
 
+In `.strings` values, use typographic quotes (`“…”`) or escape literal double
+quotes (`\"`). Unescaped double quotes terminate the value and prevent the
+entire language pack from loading.
+
+On macOS, run `npm test --prefix extensions/language-packs` from the repository
+root to parse every declared language's property lists with `plutil`. This
+syntax regression check is skipped on other platforms; it does not replace
+Muxy's format-placeholder validation.
+
 ## Adding a new language
 
 1. Add `localization/<Language>.bundle/<lang>.lproj/Localizable.strings` (and optionally `Localizable.stringsdict`), plus a minimal `Info.plist` with no `CFBundleExecutable`.
