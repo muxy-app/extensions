@@ -117,7 +117,7 @@ function hasAvailableUsage(items) {
 
 async function persistStatusCache(preferences) {
   if (hasAvailableUsage(snapshots)) {
-    await writeStatusCache(window.muxy?.exec, snapshots, preferences);
+    await writeStatusCache(window.muxy?.storage, snapshots, preferences);
   }
   await updateStatusBar(preferences);
 }

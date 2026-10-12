@@ -1,6 +1,6 @@
 {
   "name": "ai-usage",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "private": true,
   "type": "module",
   "scripts": {
@@ -15,7 +15,7 @@
     "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
     "description": "AI usage status bar and popover with live collectors for common AI coding providers.",
     "background": "background.js",
-    "permissions": ["commands:exec", "panels:write"],
+    "permissions": ["commands:exec", "panels:write", "storage:read", "storage:write"],
     "popovers": [
       { "id": "usage", "title": "AI Usage", "entry": "popovers/usage.html", "width": 360, "height": 460 }
     ],

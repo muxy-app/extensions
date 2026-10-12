@@ -1,10 +1,10 @@
 import { serializeSnapshots } from "./cache.mjs";
 
-export const statusCachePath = "status-cache.json";
+export const statusCacheKey = "status-cache";
 
 export function statusCachePayload(snapshots, preferences) {
   const serialized = JSON.parse(serializeSnapshots(snapshots));
-  return JSON.stringify({
+  return {
     version: 1,
     displayMode: preferences.displayMode,
     pinnedPreview: preferences.pinnedPreview,
@@ -14,19 +14,13 @@ export function statusCachePayload(snapshots, preferences) {
     // Store tracked provider IDs so background can skip untracked (hidden) providers
     trackedProviderIDs: preferences.trackedProviderIDs ? [...preferences.trackedProviderIDs] : [],
     snapshots: serialized.snapshots
-  });
+  };
 }
 
-export async function writeStatusCache(exec, snapshots, preferences) {
-  if (typeof exec !== "function") return;
+export async function writeStatusCache(storage, snapshots, preferences) {
+  if (typeof storage?.set !== "function") return;
   try {
-    const tmpPath = `${statusCachePath}.tmp`;
-    const written = await exec(["/usr/bin/tee", tmpPath], {
-      stdin: statusCachePayload(snapshots, preferences),
-      timeoutMs: 3000
-    });
-    if (!written || written.exitCode !== 0) return;
-    await exec(["/bin/mv", "-f", tmpPath, statusCachePath], { timeoutMs: 3000 });
+    await storage.set(statusCacheKey, statusCachePayload(snapshots, preferences));
   } catch (error) {
     console.warn("ai-usage status cache write failed", error);
   }

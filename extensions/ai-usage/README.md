@@ -6,11 +6,12 @@ Status bar and popover usage view for common AI coding providers.
 
 - `commands:exec` reads local provider credentials and sends read-only usage requests through `/usr/bin/curl --config -`.
 - `panels:write` resizes the popover and updates the status bar item icon and text.
+- `storage:read` and `storage:write` keep the last usage snapshot in Muxy extension storage, so the status bar can show it again after a reload.
 - A background script restores the last cached status bar badge when Muxy reloads the extension.
 
 ## Network access
 
-Live usage refreshes call provider quota endpoints for Antigravity, Claude Code, Codex, Amp, Copilot, Cursor, Devin, Factory, Grok, OpenRouter, OpenCode Go, Kimi, MiniMax, and Z.ai. Requests send only the provider credential already present on the local machine plus the provider-required usage request body. Usage snapshots are cached locally in the extension folder so the status bar can restore immediately after reload.
+Live usage refreshes call provider quota endpoints for Antigravity, Claude Code, Codex, Amp, Copilot, Cursor, Devin, Factory, Grok, OpenRouter, OpenCode Go, Kimi, MiniMax, and Z.ai. Requests send only the provider credential already present on the local machine plus the provider-required usage request body. Usage snapshots are cached locally in Muxy extension storage so the status bar can restore immediately after reload.
 
 ## Providers
 

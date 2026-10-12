@@ -16,7 +16,7 @@ import {
 } from "../src/core.mjs";
 import { parseCachedSnapshots, serializeSnapshots } from "../src/cache.mjs";
 import { preferencesFromStorage } from "../src/preferences.mjs";
-import { statusCachePayload } from "../src/status-cache.mjs";
+import { statusCacheKey, statusCachePayload, writeStatusCache } from "../src/status-cache.mjs";
 
 test("happy path: fixture can be supplied through the popover URL search string for browser QA", () => {
   const raw = JSON.stringify({ providers: [{ id: "codex", state: "available", rows: [{ label: "5h", percent: 50 }] }] });
@@ -145,7 +145,7 @@ test("regression: cache round-trip preserves planName when present, omits when a
 
 test("regression: status bar cache stores the selected state for background restore", () => {
   const now = new Date("2026-06-04T12:00:00.000Z");
-  const payload = JSON.parse(statusCachePayload([{
+  const payload = statusCachePayload([{
     id: "codex",
     name: "Codex",
     icon: "codex",
@@ -155,12 +155,30 @@ test("regression: status bar cache stores the selected state for background rest
   }], {
     displayMode: "remaining",
     pinnedPreview: "codex::Monthly"
-  }));
+  });
 
   assert.equal(payload.version, 1);
   assert.equal(payload.displayMode, "remaining");
   assert.equal(payload.pinnedPreview, "codex::Monthly");
   assert.equal(payload.snapshots[0].rows[0].percent, 75);
+});
+
+test("regression: status cache is kept in extension storage, not in the project folder", async () => {
+  const stored = new Map();
+  const storage = { set: async (key, value) => { stored.set(key, value); } };
+
+  await writeStatusCache(storage, [{
+    id: "codex",
+    name: "Codex",
+    icon: "codex",
+    fetchedAt: new Date("2026-06-04T12:00:00.000Z"),
+    state: { kind: "available" },
+    rows: [{ id: "monthly", label: "Monthly", percent: 75, resetAt: null, detail: "75% used", periodDuration: null }]
+  }], { displayMode: "used", pinnedPreview: "" });
+
+  assert.deepEqual([...stored.keys()], [statusCacheKey]);
+  assert.equal(stored.get(statusCacheKey).version, 1);
+  assert.equal(stored.get(statusCacheKey).snapshots[0].rows[0].percent, 75);
 });
 
 test("edge case: malformed fixture and invalid rows degrade to no usage data", () => {

@@ -24,7 +24,8 @@ test("regression: background restores the cached status bar text on activation",
 
   assert.equal(manifest.muxy.background, "background.js");
   assert.match(background, /muxy\.events\.subscribe\("extension\.ai-usage\.keepalive"/);
-  assert.match(cacheCode, /status-cache\.json/);
+  assert.deepEqual(manifest.muxy.permissions.filter((name) => name.startsWith("storage:")), ["storage:read", "storage:write"]);
+  assert.doesNotMatch(cacheCode, /status-cache\.json/);
   assert.match(background, /muxy\.statusbar\.set/);
   assert.match(background, /typeof setInterval === "function"/);
   assert.doesNotMatch(cacheCode, /\.config\/muxy\/extensions\/ai-usage/);
@@ -98,6 +99,51 @@ test("regression: background activation survives runtimes without timers", async
   assert.doesNotThrow(() => vm.runInNewContext(source, context));
   assert.deepEqual(calls[0], ["subscribe", "extension.ai-usage.keepalive", "function"]);
   assert.equal(calls.some((call) => call[0] === "warn" && call[1] === "ai-usage background polling timer unavailable"), true);
+});
+
+test("regression: background keeps the status cache in extension storage, not in the project folder", async () => {
+  const source = await readFile(new URL("../dist/background.js", import.meta.url), "utf8");
+  const execs = [];
+  const statusbar = [];
+  const stored = new Map([["status-cache", {
+    version: 1,
+    displayMode: "used",
+    pinnedPreview: "",
+    autoRefreshSeconds: 300,
+    trackedProviderIDs: ["amp"],
+    snapshots: [{
+      id: "amp",
+      name: "Amp",
+      icon: "amp",
+      fetchedAt: "2026-06-04T12:00:00.000Z",
+      state: { kind: "available" },
+      rows: [{ id: "daily", label: "Daily", percent: 40, resetAt: null }]
+    }]
+  }]]);
+  const context = {
+    muxy: {
+      events: { subscribe: () => {} },
+      exec: (argv) => {
+        execs.push(argv);
+        if (argv[0] === "/usr/bin/env") return { exitCode: 0, stdout: "HOME=/tmp/home\n" };
+        return { exitCode: 1, stdout: "", stderr: "missing" };
+      },
+      storage: {
+        get: (key) => stored.get(key) ?? null,
+        set: (key, value) => { stored.set(key, value); }
+      },
+      statusbar: { set: (payload) => statusbar.push(payload) }
+    },
+    console: { log: () => {}, warn: () => {} },
+    setInterval: () => 0,
+    Date, JSON, Math, Number, String, Array, Object, Infinity
+  };
+
+  vm.runInNewContext(source, context);
+
+  assert.equal(statusbar[0].text, "40%");
+  assert.equal(stored.get("status-cache").snapshots[0].rows[0].percent, 40);
+  assert.equal(execs.some((argv) => argv.some((arg) => String(arg).includes("status-cache"))), false);
 });
 
 test("regression: popover exposes only useful top controls and keeps fixed host width", async () => {

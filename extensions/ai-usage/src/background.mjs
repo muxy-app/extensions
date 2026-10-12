@@ -1,7 +1,7 @@
 import { parseCodexRows, parseKimiRows, parseOpenCodeGoRows, parseGrokRows, parseFactoryRows, parseClaudeRows } from "./live-parsers.mjs";
 import { parseJSON, formatPlanName } from "./live-runtime.mjs";
 import { providerCatalog } from "./providers.mjs";
-import { statusCachePath } from "./status-cache.mjs";
+import { statusCacheKey } from "./status-cache.mjs";
 
 try {
   muxy.events.subscribe("extension.ai-usage.keepalive", () => {});
@@ -68,24 +68,18 @@ try {
       });
 
       // Build new cache payload (no popoverHeartbeat — distinguishes background writes)
-      const newPayload = JSON.stringify({
+      const newPayload = {
         version: 1,
         displayMode,
         pinnedPreview,
         autoRefreshSeconds: currentInterval,
         trackedProviderIDs: tracked,
         snapshots: updatedSnapshots,
-      });
-
-      // Write atomically: temp → rename
-      const tmpPath = `${statusCachePath}.tmp`;
-      const tee = muxy.exec(["/usr/bin/tee", tmpPath], { stdin: newPayload, timeoutMs: 3000 });
-      if (tee && tee.exitCode === 0) {
-        muxy.exec(["/bin/mv", "-f", tmpPath, statusCachePath], { timeoutMs: 3000 });
-      }
+      };
+      muxy.storage.set(statusCacheKey, newPayload);
 
       // Update status bar
-      const presentation = statusBarPresentation(JSON.parse(newPayload));
+      const presentation = statusBarPresentation(newPayload);
       if (presentation) {
         muxy.statusbar.set({ id: "ai-usage", icon: presentation.icon, text: presentation.text });
       }
@@ -118,11 +112,7 @@ try {
 // ═══════════════════════════════════════════════════
 
 function readCache() {
-  const result = muxy.exec(["/bin/cat", statusCachePath], { timeoutMs: 3000 });
-  if (!result || result.exitCode !== 0) return null;
-  const trimmed = String(result.stdout || "").trim();
-  if (!trimmed) return null;
-  return JSON.parse(trimmed);
+  return muxy.storage.get(statusCacheKey);
 }
 
 function readFile(path) {
