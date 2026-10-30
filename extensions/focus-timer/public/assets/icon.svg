@@ -1,10 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
-  <!-- Rendered as a template image: currentColor picks up the chrome tint. -->
-  <g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="12" cy="13" r="8" />
-    <path d="M9.5 2.5h5" />
-    <path d="M12 2.5v2" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="Focus Timer">
+  <defs>
+    <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FB7185"/>
+      <stop offset="1" stop-color="#DC2626"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="56" fill="url(#ft-bg)"/>
+  <g transform="translate(48 44) scale(6.667)">
+    <g fill="none" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="13" r="8"/>
+      <path d="M9.5 2.5h5"/>
+      <path d="M12 2.5v2"/>
+    </g>
+    <!-- Elapsed wedge: 12 o'clock sweeping to ~4 o'clock. -->
+    <path d="M12 13 L12 7 A6 6 0 0 1 17.2 16 Z" fill="#FFFFFF"/>
   </g>
-  <!-- Elapsed wedge: 12 o'clock sweeping to ~4 o'clock. -->
-  <path d="M12 13 L12 7 A6 6 0 0 1 17.2 16 Z" fill="currentColor" />
 </svg>
