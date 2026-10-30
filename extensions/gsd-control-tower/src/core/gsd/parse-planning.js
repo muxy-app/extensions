@@ -299,6 +299,7 @@ function emptySnapshot(extra, now) {
     warnings: [],
     errors: [],
     parserVersion: PARSER_VERSION,
+    ...extra,
   };
 }
 

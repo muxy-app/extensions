@@ -1,0 +1,339 @@
+/* Panel chrome. Tokens (--s*, --font-*, --radius*) and --muxy-* colors come
+   from @muxy/ui, imported before this file. */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--muxy-background);
+  color: var(--muxy-foreground);
+  font-family: var(--font-ui);
+  font-size: var(--font-body);
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* --- toolbar ------------------------------------------------------------ */
+
+.mail-toolbar {
+  display: flex;
+  gap: var(--s3);
+  padding: var(--s4) var(--s5);
+  border-bottom: 1px solid var(--muxy-border);
+  flex: 0 0 auto;
+}
+
+.mail-toolbar .mx-select {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.mail-account {
+  flex: 0 1 auto;
+  max-width: 40%;
+}
+
+/* --- envelope list ------------------------------------------------------ */
+
+.mail-scroll {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.mail-scroll .mx-list {
+  flex: 1 1 auto;
+}
+
+.mail-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s4);
+  cursor: pointer;
+}
+
+.mail-dot {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  margin-top: 7px;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.mail-dot.is-on {
+  background: var(--muxy-accent);
+}
+
+.mail-row-main {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.mail-row-top {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s4);
+}
+
+.mail-from {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mail-row.is-unread .mail-from {
+  font-weight: 600;
+}
+
+.mail-date {
+  flex: 0 0 auto;
+  font-size: var(--font-caption);
+  color: var(--muxy-foreground-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.mail-row-sub {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  margin-top: 2px;
+  color: var(--muxy-foreground-muted);
+}
+
+.mail-row.is-unread .mail-subject {
+  color: var(--muxy-foreground);
+}
+
+.mail-subject {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mail-clip {
+  flex: 0 0 auto;
+  color: var(--muxy-foreground-muted);
+}
+
+/* --- pager -------------------------------------------------------------- */
+
+.mail-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s4);
+  padding: var(--s4);
+  border-top: 1px solid var(--muxy-border);
+  flex: 0 0 auto;
+}
+
+.mail-page-label {
+  font-size: var(--font-footnote);
+  color: var(--muxy-foreground-muted);
+  min-width: 64px;
+  text-align: center;
+}
+
+/* --- message view ------------------------------------------------------- */
+
+.mail-message {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.mail-msg-header {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s4) var(--s5);
+  border-bottom: 1px solid var(--muxy-border);
+  flex: 0 0 auto;
+}
+
+.mail-msg-title {
+  font-size: var(--font-title);
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mail-msg-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s4);
+  padding: var(--s4) var(--s5);
+  border-bottom: 1px solid var(--muxy-border);
+  color: var(--muxy-foreground-muted);
+  font-size: var(--font-footnote);
+  flex: 0 0 auto;
+}
+
+.mail-msg-from {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mail-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: var(--s3) var(--s5);
+  border-bottom: 1px solid var(--muxy-border);
+  flex: 0 0 auto;
+}
+
+.mail-action-copy {
+  color: var(--muxy-accent);
+}
+
+.mail-flash {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s1);
+  font-size: var(--font-caption);
+  color: var(--muxy-foreground-muted);
+}
+
+.mail-view-switch {
+  margin: var(--s4) var(--s5) 0;
+  flex: 0 0 auto;
+}
+
+.mail-msg-body {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: var(--s5);
+}
+
+.mail-msg-body.is-html {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+
+.mail-html-note {
+  flex: 0 0 auto;
+  padding: var(--s2) var(--s5);
+  font-size: var(--font-caption);
+  color: var(--muxy-foreground-muted);
+  background: var(--muxy-surface);
+  border-bottom: 1px solid var(--muxy-border);
+}
+
+.mail-html-frame {
+  flex: 1 1 auto;
+  width: 100%;
+  border: 0;
+  background: #fff;
+}
+
+/* --- context menu + toast ---------------------------------------------- */
+
+.mail-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 190px;
+}
+
+.mail-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  transform: translate(-50%, 8px);
+  z-index: 1001;
+  padding: var(--s3) var(--s5);
+  border-radius: var(--radius);
+  background: var(--muxy-foreground);
+  color: var(--muxy-background);
+  font-size: var(--font-footnote);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+  opacity: 0;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  pointer-events: none;
+}
+
+.mail-toast.is-on {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mail-toast {
+    transition: opacity 0.18s ease;
+    transform: translate(-50%, 0);
+  }
+}
+
+.mail-msg-text {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--font-body);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* --- states ------------------------------------------------------------- */
+
+.mail-center {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s5);
+  padding: var(--s8);
+}
+
+.mail-center-text {
+  color: var(--muxy-foreground-muted);
+  font-size: var(--font-footnote);
+}
+
+.mail-empty {
+  flex: 1 1 auto;
+  gap: var(--s4);
+}
+
+.mail-empty-icon {
+  color: var(--muxy-foreground-muted);
+  margin-bottom: var(--s2);
+}
+
+.mail-hint {
+  font-family: var(--font-mono);
+  font-size: var(--font-footnote);
+  background: var(--muxy-surface);
+  border: 1px solid var(--muxy-border);
+  border-radius: var(--radius);
+  padding: var(--s2) var(--s4);
+  color: var(--muxy-foreground);
+}
+
+.mail-retry {
+  margin-top: var(--s4);
+}

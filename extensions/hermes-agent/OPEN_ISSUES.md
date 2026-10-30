@@ -4,14 +4,14 @@
 
 **Status:** Open
 
-**Target:** Next release after `0.1.0`
-**Release impact:** Non-blocking for the documented `0.1.0` beta matrix; Muxy SSH workspaces are explicitly unsupported.
+**Target:** Future release after the full native remote-workspace gate passes
+**Release impact:** Non-blocking for the documented `0.2.0` matrix; Muxy SSH workspaces remain explicitly unsupported.
 
 ### Problem
 
 On Muxy 1.5.0 (945), an extension command approved inside an SSH workspace fails before Hermes receives a request. Muxy's native remote executor reports `posix_spawn("/usr/bin/ssh", …): ENOENT` even though `/usr/bin/ssh` exists on the Mac. An untouched official ARM64 DMG with the published hash exhibited the same invalid signature/entitlements result as the installed app.
 
-### Safe behavior in `0.1.0`
+### Safe behavior in `0.2.0`
 
 - The extension displays a bounded unsupported-workspace message.
 - It does not move cookies or request bodies into argv, weaken TLS, or add a topology-specific transport workaround.

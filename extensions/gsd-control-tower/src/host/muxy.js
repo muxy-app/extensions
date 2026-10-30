@@ -52,7 +52,7 @@ export function deniedPermission(message) {
 
 /**
  * Build a GSD {@link FileSource} over `muxy.files` for one project.
- * Paths stay relative to that project's active worktree root.
+ * Paths stay relative to the selected project/worktree root.
  * @param {string} project project id/name/path selector
  */
 export function fileSource(project) {

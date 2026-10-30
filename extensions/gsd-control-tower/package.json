@@ -1,6 +1,6 @@
 {
   "name": "gsd-control-tower",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "description": "Read-only Muxy panel for GSD next steps, roadmap progress, and agent activity.",
@@ -12,14 +12,14 @@
     "build": "vite build && node scripts/copy-manifest.mjs",
     "test": "node --test",
     "validate:dist": "node scripts/validate-dist.mjs",
-    "validate": "node scripts/validate-release.mjs"
+    "validate": "node scripts/validate-release.mjs",
+    "demo": "node scripts/create-demo.mjs"
   },
   "devDependencies": {
     "ajv": "^8.17.1",
     "vite": "^7.3.5"
   },
   "muxy": {
-    "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
     "description": "Read GSD next steps, roadmap progress, and live agent activity across Muxy projects.",
     "permissions": [
       "projects:read",
@@ -58,7 +58,9 @@
       {
         "id": "control-tower",
         "title": "GSD Control Tower",
-        "icon": { "symbol": "tower.broadcast" },
+        "icon": {
+          "symbol": "tower.broadcast"
+        },
         "entry": "panel/index.html",
         "position": "right",
         "mode": "pinned",
@@ -68,13 +70,17 @@
         "headerButtons": [
           {
             "id": "refresh",
-            "icon": { "symbol": "arrow.clockwise" },
+            "icon": {
+              "symbol": "arrow.clockwise"
+            },
             "tooltip": "Refresh all workstreams",
             "command": "refresh-tower"
           },
           {
             "id": "diagnostics",
-            "icon": { "symbol": "info.circle" },
+            "icon": {
+              "symbol": "info.circle"
+            },
             "tooltip": "Toggle diagnostics",
             "command": "toggle-diagnostics"
           }
@@ -84,7 +90,9 @@
     "statusBarItems": [
       {
         "id": "tower",
-        "icon": { "symbol": "circle.dashed" },
+        "icon": {
+          "symbol": "circle.dashed"
+        },
         "text": "",
         "tooltip": "GSD Control Tower",
         "side": "right",
@@ -96,7 +104,18 @@
         "id": "toggle-tower",
         "title": "Control Tower: Toggle Panel",
         "defaultShortcut": "cmd+shift+g",
-        "action": { "kind": "togglePanel", "panel": "control-tower" }
+        "action": {
+          "kind": "togglePanel",
+          "panel": "control-tower"
+        }
+      },
+      {
+        "id": "open-tower",
+        "title": "Control Tower: Open Panel",
+        "action": {
+          "kind": "openPanel",
+          "panel": "control-tower"
+        }
       },
       {
         "id": "refresh-tower",
@@ -107,5 +126,6 @@
         "title": "Control Tower: Toggle Diagnostics View"
       }
     ]
-  }
+  },
+  "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json"
 }

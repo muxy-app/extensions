@@ -1,8 +1,8 @@
 # GSD Control Tower for Muxy
 
-GSD Control Tower is a read-only Muxy panel for projects that use [GSD](https://github.com/open-gsd/gsd-core). It reads the active worktree's `.planning/` files and puts the recorded next action, roadmap progress, phase details, and Muxy agent activity in one place.
+GSD Control Tower is a read-only Muxy panel for projects that use [GSD](https://github.com/open-gsd/gsd-core). It reads each registered worktree's `.planning/` files and puts the recorded next action, roadmap progress, phase details, and Muxy agent activity in one place.
 
-Open the panel with **⌘⇧G** or run **Control Tower: Toggle Panel** from Muxy's command palette.
+Run **Control Tower: Open Panel** from Muxy's command palette (**⌘⇧P**). **Control Tower: Toggle Panel** and its default **⌘⇧G** shortcut are also available; Muxy may leave the shortcut unassigned if it conflicts with an existing binding.
 
 ![GSD Control Tower showing the next recorded action and phase progress for the current project](./assets/readme/active-project.png)
 
@@ -36,7 +36,7 @@ Control Tower does not rank projects or manufacture an attention state. Muxy age
 
 ### From the Muxy marketplace
 
-Open Muxy → **Extensions** → **Marketplace**, find **GSD Control Tower**, and choose **Install**.
+Open Muxy → **Settings → Extensions → Browse**, find **GSD Control Tower**, and choose **Install**.
 
 ### From source
 
@@ -51,7 +51,7 @@ In Muxy, open **Extensions**, choose **Load Unpacked**, and select this reposito
 
 ## Requirements
 
-- Muxy on macOS. Version `0.1.0` was tested with **Muxy 1.5.0 (945)**.
+- Muxy **2.1 or newer** on macOS for this release. Version `0.1.0` was tested with **Muxy 1.5.0 (945)**; `0.3.0` targets the 2.x project/worktree model.
 - A GSD project with `.planning/STATE.md`. The parser supports `gsd_state_version: 1.0` plus the classic and milestone-era planning layouts covered by the test suite.
 - Agent activity requires the agent session to be running inside Muxy.
 
@@ -63,7 +63,7 @@ Use the gear button in the panel to:
 - Set cross-project refresh to Manual, 1, 5, 15, or 30 minutes
 - Include non-GSD projects or hide individual projects
 
-Planning files for the current project refresh when Muxy reports a relevant file change. Agent activity updates from Muxy events. Use the refresh button whenever you want to reread every project immediately.
+Planning files for the current project and its worktrees refresh when Muxy reports a relevant file change. Agent activity updates from Muxy events. Use the refresh button whenever you want to reread every project immediately.
 
 ## Access and privacy
 
@@ -75,9 +75,10 @@ Diagnostics may contain relative planning paths and error messages. They do not 
 
 ## Current limitations
 
-- GSD planning data comes from each project's active worktree. Other worktrees still show their Muxy agent and Git context.
+- Only worktrees registered in Muxy appear. Child worktrees have independent planning and Git context. Muxy 2.1 routes a primary project selector to its selected worktree; when that is a child, the primary row explicitly asks you to select the primary worktree in Muxy and refresh. It never displays the child's data as primary.
 - Agent sessions running outside Muxy do not appear.
-- Remote workspaces are not supported in `0.1.0`.
+- Remote servers have not been qualified for this release. File and Git calls use Muxy's project selectors, but native testing covers local projects only.
+- Linux and Muxy 1.x have not been qualified for `0.3.0`.
 
 ## Troubleshooting
 
@@ -90,6 +91,10 @@ Diagnostics may contain relative planning paths and error messages. They do not 
 ## Uninstall
 
 Disable or uninstall GSD Control Tower from Muxy's Extensions screen. The extension never changes project files or Git state, so there is no project-side cleanup.
+
+## Demo
+
+Run `npm run demo -- /tmp/harbor-notes-demo` to create **Harbor Notes**, a fictional project with three independent worktrees: active implementation, a paused handoff, and failed release verification. The generator refuses to overwrite existing folders. See [the demo walkthrough](demo/README.md) for Muxy registration and presentation steps.
 
 ## Development
 

@@ -150,7 +150,7 @@ export async function validateReleaseGovernance() {
   ]) assert.match(releasing, contract, "release guide lacks a required immutable-release contract");
   assert.match(readme, /Muxy 1\.5\.0 \(945\)/);
   assert.match(readme, /gsd_state_version: 1\.0/);
-  assert.match(readme, /Remote workspaces are not supported/);
+  assert.match(readme, /Remote servers have not been qualified/);
 
   const workflows = (await readdir(resolve(root, ".github/workflows"))).filter((file) => /\.ya?ml$/.test(file));
   assert.deepEqual(workflows, ["ci.yml"], "one bounded CI workflow is allowed");

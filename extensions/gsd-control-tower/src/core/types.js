@@ -95,8 +95,9 @@ export const BOUNDS = {
  * @property {string} worktreePath
  * @property {boolean} isActiveWorktree      True when this is the project's active worktree
  * @property {boolean} isGsd                 `.planning/` detected
- * @property {GsdSnapshot} [gsd]             Present when isActiveWorktree && isGsd
- * @property {string} [gsdUnavailableReason] Why planning state is missing (non-active worktree, read error)
+ * @property {boolean} [dataUnavailable]    Host could not read this worktree safely
+ * @property {GsdSnapshot|null} [gsd]        Present for each readable GSD worktree
+ * @property {string} [gsdUnavailableReason] Why planning state is missing (host targeting, read error)
  * @property {string} [inventoryWarning]      Worktree inventory could not be queried; row is project-scoped
  * @property {AgentState} agent
  * @property {GitContext} [git]

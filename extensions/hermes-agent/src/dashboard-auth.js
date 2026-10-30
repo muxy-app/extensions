@@ -98,13 +98,33 @@ export class DashboardAuthSession {
     this.cookies = new Map();
     this.providers = Object.freeze([]);
     this.requestQueue = Promise.resolve();
+    this.requestGeneration = 0;
+    this.released = false;
     this.snapshot = Object.freeze({ state: "disconnected", providers: this.providers, identity: null, label: "" });
   }
 
   #serialize(operation) {
-    const queued = this.requestQueue.then(operation, operation);
+    const generation = this.requestGeneration;
+    const run = () => {
+      if (this.released || generation !== this.requestGeneration) throw new DashboardAuthError("relay_cancelled");
+      return operation();
+    };
+    const queued = this.requestQueue.then(run, run);
     this.requestQueue = queued.then(() => undefined, () => undefined);
     return queued;
+  }
+
+  async #relayRequest(request) {
+    const generation = this.requestGeneration;
+    if (this.released) throw new DashboardAuthError("relay_cancelled");
+    const response = await this.relay.requestSessionJson(request);
+    if (this.released || generation !== this.requestGeneration) throw new DashboardAuthError("relay_cancelled");
+    return response;
+  }
+
+  cancelPending() {
+    this.requestGeneration += 1;
+    this.relay.cancelPending?.();
   }
 
   #publish(state, identity = null) {
@@ -167,7 +187,7 @@ export class DashboardAuthSession {
 
   async #discover() {
     this.#publish("checking");
-    const status = await this.relay.requestSessionJson({ url: `${this.baseUrl}/api/status` });
+    const status = await this.#relayRequest({ url: `${this.baseUrl}/api/status` });
     if (status.status < 200 || status.status >= 300 || !status.body || typeof status.body !== "object") {
       return this.#publish("auth_unavailable");
     }
@@ -175,7 +195,7 @@ export class DashboardAuthSession {
       this.providers = Object.freeze([]);
       return this.#publish("auth_unavailable");
     }
-    const providerResponse = await this.relay.requestSessionJson({ url: `${this.baseUrl}/api/auth/providers` });
+    const providerResponse = await this.#relayRequest({ url: `${this.baseUrl}/api/auth/providers` });
     if (providerResponse.status < 200 || providerResponse.status >= 300) return this.#publish("auth_unavailable");
     this.providers = normalizeProviders(providerResponse.body);
     const hasPassword = this.providers.some((provider) => provider.supportsPassword);
@@ -196,7 +216,7 @@ export class DashboardAuthSession {
     this.#clear("checking");
     let response;
     try {
-      response = await this.relay.requestSessionJson({
+      response = await this.#relayRequest({
         url: `${this.baseUrl}/auth/password-login`,
         method: "POST",
         body: { provider: supported.name, username: safeUsername, password },
@@ -237,7 +257,7 @@ export class DashboardAuthSession {
       this.#clear("logged_out");
       throw new DashboardAuthError("session_expired", 401);
     }
-    const response = await this.relay.requestSessionJson({ url: `${this.baseUrl}/api/auth/me`, cookie });
+    const response = await this.#relayRequest({ url: `${this.baseUrl}/api/auth/me`, cookie });
     this.#mergeCookies(response.setCookies);
     if (response.status === 401 || response.status === 403) {
       this.#clear("session_expired");
@@ -265,7 +285,7 @@ export class DashboardAuthSession {
       this.#clear("session_expired");
       throw new DashboardAuthError("session_expired", 401);
     }
-    const response = await this.relay.requestSessionJson({ url, method, body, cookie: this.#cookieHeader() });
+    const response = await this.#relayRequest({ url, method, body, cookie: this.#cookieHeader() });
     this.#mergeCookies(response.setCookies);
     if (response.status === 401 || response.status === 403) {
       this.#clear("session_expired");
@@ -302,13 +322,14 @@ export class DashboardAuthSession {
   }
 
   logout() {
+    this.cancelPending();
     return this.#serialize(() => this.#logout());
   }
 
   async #logout() {
     const cookie = this.#cookieHeader();
     try {
-      if (cookie) await this.relay.requestSessionJson({ url: `${this.baseUrl}/auth/logout`, cookie, method: "POST" });
+      if (cookie) await this.#relayRequest({ url: `${this.baseUrl}/auth/logout`, cookie, method: "POST" });
     } finally {
       this.#clear("logged_out");
     }
@@ -316,6 +337,8 @@ export class DashboardAuthSession {
   }
 
   release() {
+    this.released = true;
+    this.cancelPending();
     this.#clear("logged_out");
   }
 }

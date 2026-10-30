@@ -7,12 +7,13 @@ export function h(tag, attrs, ...children) {
   const el = document.createElement(tag);
   if (attrs) {
     for (const [key, value] of Object.entries(attrs)) {
-      if (value == null || value === false) continue;
+      const stringBoolean = key.startsWith("aria-") || key.startsWith("data-");
+      if (value == null || (value === false && !stringBoolean)) continue;
       if (key === "class") el.className = value;
       else if (key === "dataset") Object.assign(el.dataset, value);
       else if (key.startsWith("on") && typeof value === "function")
         el.addEventListener(key.slice(2).toLowerCase(), value);
-      else if (value === true) el.setAttribute(key, "");
+      else if (value === true && !stringBoolean) el.setAttribute(key, "");
       else el.setAttribute(key, String(value));
     }
   }

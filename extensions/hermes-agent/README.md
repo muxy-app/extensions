@@ -31,17 +31,17 @@ Use **View board** to inspect any available board without changing your project.
 
 ## What you need
 
-- Muxy
+- Muxy 2.1 or newer on macOS
 - A Hermes Dashboard that is already running and reachable from your Mac
 - At least one password login provider enabled in Hermes
 
-Version `0.1.0` was tested with **Muxy 1.5.0 (945)** and **Hermes 0.20.2**. Other versions may work, but have not been tested yet. If a Dashboard response is not compatible, you will see an error instead of a broken or misleading view.
+Version `0.2.0` was checked natively with **Muxy 2.1.0 (1143)** and **Hermes 0.22.0**: sign-in, saved-session reuse, health and schedules, board access, and a completed live response. The automated connection matrix uses pinned **Hermes 0.20.2** fixtures for loopback, SSH forwarding, and HTTPS, including approvals, steering, stop, and reconnect. Core request contracts were also checked against Muxy 2.2.0's bridge source; its native UI and Linux builds have not been qualified. If a Dashboard response is incompatible, the extension shows an error.
 
 ## Install and connect
 
 1. Install **Hermes Agent** from the Muxy marketplace.
 2. Make sure your Hermes Dashboard is running.
-3. In Muxy, run **Hermes: Toggle Agent Panel**.
+3. In Muxy 2, run **Hermes: Open Agent Panel**. **Hermes: Toggle Agent Panel** remains available to show or hide it.
 4. Enter the same Dashboard address you use in a browser, select your password provider, and sign in.
 5. To use a project board, run **Hermes: Open Project Board**.
 
@@ -55,7 +55,7 @@ If you previously loaded a development build of this extension, remove it before
 | In Docker on your Mac | Publish the Dashboard port to `127.0.0.1` and use that address |
 | On another machine through SSH | Set up a local `ssh -L` forward, then connect to its `127.0.0.1` address |
 | At a private HTTPS address | Use its HTTPS address from a trusted network, VPN, or secure access layer you control |
-| Inside a Muxy SSH workspace | Not supported in version `0.1.0`; follow [the open issue](./OPEN_ISSUES.md) for progress |
+| Inside a Muxy SSH workspace | Not supported in version `0.2.0`; follow [the open issue](./OPEN_ISSUES.md) for progress |
 
 The extension does not need to know whether Hermes is native, in Docker, or behind an SSH forward. It only needs a Dashboard address that is reachable from Muxy.
 
@@ -66,7 +66,7 @@ The extension does not need to know whether Hermes is native, in Docker, or behi
 - The Agent panel must stay open for live responses, approvals, guidance, and stop controls; it does not keep a background connection
 - Kanban workers run in Hermes independently, so closing the Muxy board does not stop them
 - The extension does not translate Muxy workspace paths into Hermes filesystem paths
-- Muxy SSH workspaces are not supported in version `0.1.0`
+- Muxy SSH workspaces are not supported in version `0.2.0`
 
 ## Security
 
@@ -109,7 +109,7 @@ Prompts and controls you submit are sent directly to the Hermes Dashboard you co
 
 ## Uninstalling
 
-Disable or uninstall the extension from Muxy. This removes the Muxy integration and its access to saved extension data. It does not stop Hermes, delete Hermes data, or change your Hermes installation.
+Log out first if you want to clear the saved Dashboard session, then disable or uninstall the extension from Muxy. Muxy 2 retains extension storage after uninstall. Removing the extension does not stop Hermes, delete Hermes data, or change your Hermes installation.
 
 ## Development
 

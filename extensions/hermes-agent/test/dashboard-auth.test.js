@@ -2,10 +2,75 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { DashboardAuthError, DashboardAuthSession } from "../src/dashboard-auth.js";
+import { CurlRelay } from "../src/curl-relay.js";
 
 function response(status, body, setCookies = []) {
   return { status, body, setCookies };
 }
+
+function savedAuth(relay) {
+  return DashboardAuthSession.fromSession({
+    baseUrl: "https://hermes.example", relay,
+    session: {
+      version: 1,
+      providers: [{ name: "basic", displayName: "Password", supportsPassword: true }],
+      identity: { userId: "user-1", provider: "basic", expiresAt: 4_000_000_000 },
+      cookies: [["hermes_session_at", "fixture-access"], ["hermes_session_rt", "fixture-refresh"]],
+    },
+  });
+}
+
+test("session release rejects in-flight and queued work without accepting late cookies or identity", async () => {
+  let finish;
+  let calls = 0;
+  const auth = savedAuth({ requestSessionJson() { calls += 1; return new Promise((resolve) => { finish = resolve; }); } });
+  const verifying = assert.rejects(auth.verify(), { code: "relay_cancelled" });
+  const queued = assert.rejects(auth.requestJson({ url: "https://hermes.example/queued" }), { code: "relay_cancelled" });
+  await new Promise((resolve) => setImmediate(resolve));
+  auth.release();
+  finish(response(200, { user_id: "late-user", provider: "basic", expires_at: 4_000_000_000 }, [{ name: "hermes_session_at", value: "late-cookie" }]));
+  await Promise.all([verifying, queued]);
+  assert.equal(calls, 1);
+  assert.equal(auth.snapshot.state, "logged_out");
+  assert.equal(auth.exportSession(), null);
+  assert.equal(auth.cookieHeaderForTest(), "");
+  await assert.rejects(auth.discover(), { code: "relay_cancelled" });
+  assert.equal(calls, 1, "a released session cannot start another native request");
+});
+
+test("logout cancels native work and skips old queued requests before revoking the saved cookie", async () => {
+  const calls = [];
+  let cancelled = 0;
+  const relay = new CurlRelay({ execAsync(argv, options) {
+    calls.push({ url: argv.at(-1), stdin: options.stdin });
+    if (argv.at(-1).endsWith("/auth/logout")) {
+      return { result: Promise.resolve({ stdout: "HTTP/1.1 302 Found\r\n\r\n__MUXY_HERMES_STATUS__:302", exitCode: 0 }), cancel() {} };
+    }
+    return { result: new Promise(() => {}), cancel() { cancelled += 1; } };
+  } });
+  const auth = savedAuth(relay);
+  const active = assert.rejects(auth.requestJson({ url: "https://hermes.example/active" }), { code: "relay_cancelled" });
+  const queued = assert.rejects(auth.requestJson({ url: "https://hermes.example/queued" }), { code: "relay_cancelled" });
+  await new Promise((resolve) => setImmediate(resolve));
+  await auth.logout();
+  await Promise.all([active, queued]);
+  assert.equal(cancelled, 1);
+  assert.deepEqual(calls.map((call) => call.url), ["https://hermes.example/active", "https://hermes.example/auth/logout"]);
+  assert.match(calls[1].stdin, /hermes_session_at=fixture-access/);
+  assert.equal(auth.cookieHeaderForTest(), "");
+  assert.equal(auth.snapshot.state, "logged_out");
+});
+
+test("connection cancellation permits fresh requests on the same authenticated session", async () => {
+  let calls = 0;
+  const auth = savedAuth({ async requestSessionJson() { calls += 1; return response(200, { ok: true }); } });
+  const queued = assert.rejects(auth.requestJson({ url: "https://hermes.example/old" }), { code: "relay_cancelled" });
+  auth.cancelPending();
+  assert.deepEqual((await auth.requestJson({ url: "https://hermes.example/new" })).body, { ok: true });
+  await queued;
+  assert.equal(calls, 1);
+  assert.equal(auth.snapshot.state, "logged_in");
+});
 
 test("dashboard auth discovers password providers before accepting credentials", async () => {
   const calls = [];

@@ -72,4 +72,4 @@ Tag the exact reviewed source commit as `hermes-agent-vX.Y.Z`, then smoke-test t
 
 ## Rollback
 
-Do not rewrite a published package, tag, or store version. If a release needs to be withdrawn, use the Muxy store's supported listing control if available, revert the source change on a new reviewed commit, and ship a corrective immutable version. Users can disable or uninstall the extension to remove its integration and saved extension data.
+Do not rewrite a published package, tag, or store version. If a release needs to be withdrawn, use the Muxy store's supported listing control if available, revert the source change on a new reviewed commit, and ship a corrective immutable version. Users should log out before disabling or uninstalling to clear the saved Dashboard session; Muxy 2 retains extension storage after uninstall.

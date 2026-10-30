@@ -7,7 +7,7 @@ const root = new URL("../", import.meta.url);
 test("marketplace identity, metadata, and permissions are frozen", async () => {
   const manifest = JSON.parse(await readFile(new URL("package.json", root), "utf8"));
   assert.equal(manifest.name, "hermes-agent");
-  assert.equal(manifest.version, "0.1.0");
+  assert.equal(manifest.version, "0.2.0");
   assert.equal(manifest.engines.node, ">=20");
   assert.equal(Object.keys(manifest.dependencies ?? {}).length, 0);
   assert.deepEqual(manifest.muxy.marketplace, {
@@ -24,6 +24,8 @@ test("marketplace identity, metadata, and permissions are frozen", async () => {
     ],
   });
   assert.deepEqual(manifest.muxy.permissions, ["commands:exec", "panels:write", "projects:read", "storage:read", "storage:write", "tabs:write"]);
+  assert.deepEqual(manifest.muxy.commands.find((command) => command.id === "open-hermes-gateway")?.action, { kind: "openPanel", panel: "hermes-gateway" });
+  assert.deepEqual(manifest.muxy.commands.find((command) => command.id === "toggle-hermes-gateway")?.action, { kind: "togglePanel", panel: "hermes-gateway" });
   for (const forbidden of ["background", "events", "scripts", "topbarItems", "statusbarItems"]) {
     assert.equal(Object.hasOwn(manifest.muxy, forbidden), false);
   }
@@ -39,7 +41,9 @@ test("product source contains only the Dashboard session relay contract", async 
   ]);
   assert.match(relay, /requestSessionJson/);
   assert.match(relay, /const stdin = buildSessionConfig/);
-  assert.match(relay, /this\.exec\(argv, \{\s*stdin,/);
+  assert.match(relay, /const options = \{ stdin, timeoutMs:/);
+  assert.match(relay, /this\.execAsync\(argv, options\)/);
+  assert.match(relay, /this\.exec\(argv, options\)/);
   assert.doesNotMatch(relay, /bearer|text\/event-stream|streamJournal|journal|Authorization:/i);
   assert.match(auth, /requestWebSocketTicket/);
   assert.match(gateway, /authSession\.requestWebSocketTicket\(\)/);
@@ -66,7 +70,8 @@ test("OAuth-only providers and password security boundaries are explicit in both
   assert.match(readme, /Hermes Agent.*is an open-source AI agent/);
   assert.match(readme, /This extension connects Muxy to the Hermes Dashboard you already have/);
   assert.doesNotMatch(readme, /candidate Muxy marketplace beta|support contract/i);
-  assert.match(readme, /Muxy 1\.5\.0 \(945\)/);
+  assert.match(readme, /Muxy 2\.1\.0 \(1143\)/);
+  assert.match(readme, /Hermes 0\.22\.0/);
   assert.match(readme, /Hermes 0\.20\.2/);
   assert.match(readme, /No analytics or telemetry/);
   assert.match(readme, /assets\/readme\/operations\.png/);

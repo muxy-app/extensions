@@ -179,9 +179,11 @@ export class HermesGatewayPanel {
     this.lastSessionCheckAt = 0;
     this.restorePromise = null;
     this.connectionGeneration = 0;
+    this.released = false;
   }
 
   start() {
+    this.released = false;
     this.render();
     void this.sessionBroker.clearGateway();
     void this.restoreSavedSession();
@@ -203,6 +205,7 @@ export class HermesGatewayPanel {
   }
 
   render() {
+    if (this.released) return;
     const focused = document.activeElement && this.root.contains(document.activeElement)
       ? {
         id: document.activeElement.id,
@@ -652,6 +655,8 @@ export class HermesGatewayPanel {
     event.preventDefault();
     if (["restoring", "discovering", "authenticating"].includes(this.state)) return;
     await this.releaseConnection();
+    if (this.released) return;
+    this.authSession?.release();
     this.state = "discovering";
     this.message = "";
     this.render();
@@ -661,6 +666,7 @@ export class HermesGatewayPanel {
       this.authSnapshot = await this.authSession.discover();
       this.state = "signed_out";
     } catch (error) {
+      this.authSession?.release();
       this.authSession = null;
       this.authSnapshot = emptyAuthSnapshot();
       this.state = "signed_out";
@@ -712,6 +718,7 @@ export class HermesGatewayPanel {
     this.state = "restoring";
     this.render();
     const saved = await this.sessionBroker.readDashboard();
+    if (this.released) return;
     if (!saved) {
       this.state = "signed_out";
       this.render();
@@ -720,6 +727,7 @@ export class HermesGatewayPanel {
     }
     this.urlValue = saved.baseUrl;
     try {
+      this.authSession?.release();
       this.authSession = DashboardAuthSession.fromSession({ baseUrl: saved.baseUrl, session: saved.auth });
       this.authSnapshot = await this.authSession.verify();
       this.lastSessionCheckAt = Date.now();
@@ -738,7 +746,7 @@ export class HermesGatewayPanel {
   async connectAgent() {
     const generation = ++this.connectionGeneration;
     await this.releaseConnection({ preserveGeneration: true });
-    if (generation !== this.connectionGeneration || this.authSnapshot.state !== "logged_in") return;
+    if (this.released || generation !== this.connectionGeneration || this.authSnapshot.state !== "logged_in") return;
     this.state = "authenticated";
     this.gateway = new DashboardGatewayClient({
       authSession: this.authSession,
@@ -968,6 +976,7 @@ export class HermesGatewayPanel {
 
   async releaseConnection({ preserveGeneration = false } = {}) {
     if (!preserveGeneration) this.connectionGeneration += 1;
+    this.authSession?.cancelPending?.();
     this.invalidateOperationsRefresh();
     this.operations?.release();
     this.operations = null;
@@ -985,6 +994,8 @@ export class HermesGatewayPanel {
   }
 
   async release() {
+    this.released = true;
+    this.authSession?.release();
     if (this.sessionCheckTimer) globalThis.clearInterval(this.sessionCheckTimer);
     this.sessionCheckTimer = null;
     if (this.operationsRefreshTimer) globalThis.clearInterval(this.operationsRefreshTimer);

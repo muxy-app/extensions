@@ -69,11 +69,11 @@ def pill(draw: ImageDraw.ImageDraw, box: tuple[int, int, int, int], text: str, s
 
 
 def crop_project(source: Image.Image) -> Image.Image:
-    return source.crop((819, 24, 1360, 746))
+    return source.crop((850, 32, 1471, 860))
 
 
 def crop_phase(source: Image.Image) -> Image.Image:
-    return source.crop((819, 84, 1360, 501))
+    return source.crop((850, 74, 1471, 554))
 
 
 def marketplace_project(capture: Image.Image) -> Image.Image:
@@ -92,19 +92,21 @@ def marketplace_project(capture: Image.Image) -> Image.Image:
     return image
 
 
-def marketplace_phase(capture: Image.Image) -> Image.Image:
+def marketplace_worktrees(workstreams: Image.Image, verification: Image.Image) -> Image.Image:
     image = background((1600, 1000))
     draw = ImageDraw.Draw(image)
-    label(draw, (96, 116), "PHASE EVIDENCE", 27)
-    draw.multiline_text((96, 220), "Inspect the work\nbehind each phase.", font=font(67, True), fill=FG, spacing=6)
+    label(draw, (96, 116), "BUILT FOR MUXY 2", 27)
+    draw.multiline_text((96, 220), "Every worktree.\nIts own progress.", font=font(67, True), fill=FG, spacing=6)
     draw.multiline_text(
         (100, 430),
-        "Expand a phase to see which workflow artifacts\nexist, completed plans, and recorded verification.",
+        "Search across branches, then inspect each\nworktree's own planning and verification.",
         font=font(31), fill=MUTED, spacing=14,
     )
-    pill(draw, (100, 650, 478, 76), "Evidence from .planning", 26)
-    draw.text((100, 886), "ARTIFACTS · PLANS · VERIFICATION", font=font(21, True), fill=(154, 147, 168))
-    rounded_capture(image, capture, (822, 160, 690, 532), 28)
+    pill(draw, (100, 650, 478, 76), "Read-only · per worktree", 26)
+    draw.text((100, 886), "PLANS · HANDOFFS · VERIFICATION", font=font(21, True), fill=(154, 147, 168))
+    # Both images are direct native panel crops. No application content is redrawn.
+    rounded_capture(image, workstreams, (822, 72, 690, 350), 22)
+    rounded_capture(image, verification, (822, 452, 690, 414), 22)
     return image
 
 
@@ -127,7 +129,7 @@ def readme_phase(capture: Image.Image) -> Image.Image:
     image = background((760, 475))
     draw = ImageDraw.Draw(image)
     label(draw, (42, 48), "PHASE EVIDENCE", 13)
-    draw.multiline_text((42, 91), "Inspect the work\nbehind each phase.", font=font(32, True), fill=FG, spacing=2)
+    draw.multiline_text((42, 91), "Inspect each\nphase’s evidence.", font=font(28, True), fill=FG, spacing=2)
     draw.multiline_text(
         (42, 198),
         "Workflow artifacts, plan counts,\nand recorded verification —\ndirectly from .planning.",
@@ -147,12 +149,16 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--project-capture", type=Path, required=True)
     parser.add_argument("--phase-capture", type=Path, required=True)
+    parser.add_argument("--workstreams-capture", type=Path, required=True)
+    parser.add_argument("--verification-capture", type=Path, required=True)
     args = parser.parse_args()
 
     project = crop_project(Image.open(args.project_capture).convert("RGB"))
     phase = crop_phase(Image.open(args.phase_capture).convert("RGB"))
     save(marketplace_project(project), ROOT / "assets/screenshots/screenshot-1.png")
-    save(marketplace_phase(phase), ROOT / "assets/screenshots/screenshot-2.png")
+    workstreams = Image.open(args.workstreams_capture).convert("RGB").crop((850, 32, 1471, 347))
+    verification = Image.open(args.verification_capture).convert("RGB").crop((850, 197, 1471, 570))
+    save(marketplace_worktrees(workstreams, verification), ROOT / "assets/screenshots/screenshot-2.png")
     save(readme_project(project), ROOT / "assets/readme/active-project.png")
     save(readme_phase(phase), ROOT / "assets/readme/phase-details.png")
 

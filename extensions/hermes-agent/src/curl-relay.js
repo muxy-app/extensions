@@ -17,6 +17,7 @@ function relayError(code) {
 }
 
 function executionRejection(error) {
+  if (error?.cancelled || error?.code === "cancelled" || error?.code === "relay_cancelled") return relayError("relay_cancelled");
   const message = typeof error?.message === "string" ? error.message.toLowerCase() : "";
   if (message.includes("too many concurrent commands")) return relayError("relay_concurrency_limit");
   if (message.includes("user denied consent") || message.includes("permission denied (commands:exec)")) {
@@ -106,6 +107,7 @@ function parseCookies(rawHeaders) {
 
 function parseResponse(result) {
   if (!result || typeof result !== "object") throw relayError("relay_result_unavailable");
+  if (result.cancelled) throw relayError("relay_cancelled");
   if (result.timedOut || result.exitCode === 28) throw relayError("relay_timeout");
   if (result.truncated) throw relayError("relay_response_too_large");
   if (typeof result.stdout !== "string") throw relayError("relay_output_unavailable");
@@ -136,8 +138,17 @@ function defaultExec() {
 }
 
 export class CurlRelay {
-  constructor({ exec } = {}) {
-    this.exec = exec ?? defaultExec();
+  constructor({ exec, execAsync } = {}) {
+    const muxy = globalThis.window?.muxy;
+    // Explicit executors belong to fixtures/callers, so do not mix them with
+    // the host's executor. Older hosts retain the bounded exec path.
+    this.execAsync = execAsync ?? (!exec && typeof muxy?.execAsync === "function" ? muxy.execAsync.bind(muxy) : null);
+    this.exec = exec ?? (this.execAsync ? null : defaultExec());
+    this.pending = new Set();
+  }
+
+  cancelPending() {
+    for (const cancel of this.pending) cancel();
   }
 
   async requestSessionJson({ url, cookie = "", method = "GET", body = null, timeoutMs = 15_000 }) {
@@ -163,14 +174,37 @@ export class CurlRelay {
       url,
     ];
     const stdin = buildSessionConfig({ cookie, body });
+    const options = { stdin, timeoutMs: timeoutMs + 2_000 };
+    let handle;
+    let cancelled = false;
+    let rejectCancellation;
+    const cancellation = new Promise((resolve, reject) => { rejectCancellation = reject; });
+    const cancel = () => {
+      if (cancelled) return;
+      cancelled = true;
+      rejectCancellation(relayError("relay_cancelled"));
+      try { Promise.resolve(handle?.cancel()).catch(() => {}); } catch { /* cancellation errors never expose host details */ }
+    };
+    this.pending.add(cancel);
     let result;
     try {
-      result = await this.exec(argv, {
-        stdin,
-        timeoutMs: timeoutMs + 2_000,
-      });
+      let completion;
+      if (this.execAsync) {
+        handle = this.execAsync(argv, options);
+        if (!handle || typeof handle.result?.then !== "function" || typeof handle.cancel !== "function") {
+          throw relayError("relay_result_unavailable");
+        }
+        completion = handle.result;
+      } else {
+        completion = this.exec(argv, options);
+      }
+      result = await Promise.race([completion, cancellation]);
+      if (cancelled) throw relayError("relay_cancelled");
     } catch (error) {
+      if (error?.code === "relay_result_unavailable") throw relayError("relay_result_unavailable");
       throw executionRejection(error);
+    } finally {
+      this.pending.delete(cancel);
     }
     return parseResponse(result);
   }

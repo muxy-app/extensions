@@ -12,7 +12,7 @@ import { icon } from "../lib/icons.js";
 import {
   initialState, wsKey,
   applyInventory, applyAgentEvent, applyAgentHydration, applyFileChanged,
-  applyHeadChanged, applyWorkstreamData, pushDiagnostic, setDiagnostics,
+  applyHeadChanged, applyWorkstreamData, pushDiagnostic, setDiagnostics, isPlanningChange,
 } from "../core/reducer.js";
 import { buildRows, filterRows } from "../core/selectors.js";
 import {
@@ -95,11 +95,11 @@ export class ControlTowerApp {
 
     sub("projects.changed", () => this.debounce("projects.changed", () => this.fullRefresh(), 600));
 
-    sub("project.switched", () => this.debounce("project.switched", () => this.refreshActiveFlags(), 300));
+    sub("project.switched", () => this.debounce("project.switched", () => this.fullRefresh(), 300));
 
     sub("worktree.switched", (evt) => {
-      // The project's active worktree changed → its planning view must be re-read.
-      this.debounce(`wt.${evt?.projectID}`, () => this.refreshProjectById(evt?.projectID), 300);
+      // Muxy 2 worktrees are projects with their own IDs; refresh membership too.
+      this.debounce(`wt.${evt?.projectID}`, () => this.fullRefresh(), 300);
     });
 
     sub("worktree.headChanged", (evt) => {
@@ -114,6 +114,7 @@ export class ControlTowerApp {
         if (!focused) return;
         this.maybeAutoRefresh();
         this.render();
+        if (!this.overlay && this.view === "list") this.root.querySelector("#ct-search")?.focus();
       });
     }
   }
@@ -171,8 +172,7 @@ export class ControlTowerApp {
 
   /** `file.changed` only covers the active project — reparse just that one (FR-031). */
   scheduleTargetedReparse(evt) {
-    const path = String(evt?.path ?? "");
-    if (!isPlanningPath(path)) return;
+    if (!isPlanningChange(evt)) return;
     const project = this.findProjectByPath(evt?.projectPath);
     if (!project) return;
     this.debounce(`reparse.${project.id}`, () => this.refreshProject(project, { quiet: true }), 350);
@@ -181,7 +181,8 @@ export class ControlTowerApp {
   findProjectByPath(projectPath) {
     if (!projectPath) return this.state.projects.find((p) => p.isActive) ?? null;
     const norm = String(projectPath).replace(/\/+$/, "");
-    return this.state.projects.find((p) => String(p.path).replace(/\/+$/, "") === norm) ?? null;
+    return this.state.projects.find((p) => String(p.path).replace(/\/+$/, "") === norm
+      || (this.state.worktreesByProject.get(p.id) ?? []).some((wt) => String(wt.path).replace(/\/+$/, "") === norm)) ?? null;
   }
 
   // --------------------------------------------------------------- refresh --
@@ -227,6 +228,7 @@ export class ControlTowerApp {
       return false;
     }
     this.recordProbe("projects.list", null);
+    this.banner = null;
     const projects = normalizeProjects(projectsRes.value);
 
     const worktreesByProject = new Map();
@@ -317,101 +319,86 @@ export class ControlTowerApp {
     this.selectedKey = target.key;
   }
 
-  /** Re-read inventory flags (active project) without full reparse. */
-  async refreshActiveFlags() {
-    const m = bridge();
-    const res = await call("projects.list", () => m.projects.list());
-    if (!res.ok) return;
-    const projects = normalizeProjects(res.value);
-    const worktreesByProject = new Map();
-    for (const project of projects) {
-      const existing = this.state.worktreesByProject.get(project.id);
-      worktreesByProject.set(project.id, existing ?? [{ id: null, name: "root", path: project.path }]);
+  /** Read each registered worktree by its own project selector (Muxy 2.x). */
+  async refreshProject(project, { quiet = false } = {}) {
+    const trees = this.state.worktreesByProject.get(project.id)
+      ?? [{ id: null, name: "root", path: project.path }];
+    const active = trees.find((wt) => wt.isActive)
+      ?? trees.find((wt) => wt.path === project.path)
+      ?? trees[0];
+    for (const wt of trees) {
+      await this.refreshWorktree(project, wt, {
+        quiet, isActive: wt === active, verifyRoot: trees.length > 1 && wt.path === project.path,
+      });
     }
-    this.state = applyInventory(this.state, projects, worktreesByProject);
     this.render();
   }
 
-  async refreshProjectById(projectId) {
-    const project = this.state.projects.find((p) => p.id === projectId);
-    if (project) await this.refreshProject(project, { quiet: true });
-  }
-
-  /**
-   * Parse one project's `.planning/` + git context and merge into the store.
-   * Reads target the project's active worktree via the `{ project }` selector.
-   */
-  async refreshProject(project, { quiet = false } = {}) {
+  async refreshWorktree(project, wt, { quiet = false, isActive = false, verifyRoot = false } = {}) {
     const m = bridge();
-    const trees = this.state.worktreesByProject.get(project.id)
-      ?? [{ id: null, name: "root", path: project.path }];
-
-    // Which worktree is active? git.repoInfo().root is the active worktree root.
-    let activeRoot;
-    const repoRes = await call("git.repoInfo", () => m.git.repoInfo({ project: project.id }));
-    this.recordProbe("git.repoInfo", repoRes.error);
-    if (repoRes.ok && repoRes.value?.root) activeRoot = String(repoRes.value.root).replace(/\/+$/, "");
-
+    const selector = wt.id ?? project.id;
+    const key = wsKey(project.id, wt.id ?? null);
     const at = new Date().toISOString();
+    const unavailableRoot = () => {
+      this.state = applyWorkstreamData(this.state, key, {
+        isGsd: false, gsd: null, dataUnavailable: true,
+        gsdUnavailableReason: "Primary worktree unavailable — select it in Muxy and refresh. Muxy targets the selected worktree for this project.",
+        git: { branch: wt.branch ?? undefined }, at, isActiveWorktree: isActive,
+      });
+    };
+    const rootMatches = async () => {
+      const res = await call("git.repoInfo", () => m.git.repoInfo({ project: selector }));
+      this.recordProbe("git.repoInfo", res.error);
+      return res.ok && String(res.value?.root ?? "").replace(/\/+$/, "") === String(wt.path).replace(/\/+$/, "");
+    };
+    // Parent IDs follow Muxy's preferred child; child IDs are fixed selectors.
+    // Never put that child's planning or Git under the primary worktree row.
+    if (verifyRoot && !await rootMatches()) { unavailableRoot(); return; }
     let gsd = null;
     let gsdError = null;
     try {
-      const result = await buildGsdSnapshot(fileSource(project.id), { now: new Date(at) });
+      const result = await buildGsdSnapshot(fileSource(selector), { now: new Date(at) });
       if (result.recognized) gsd = result.gsd;
+      // The parser records access errors rather than throwing them.
+      if (!result.recognized && result.gsd.errors.length) {
+        gsdError = new Error(result.gsd.errors.join("; "));
+      }
     } catch (e) {
       gsdError = e;
-      if (!quiet) this.banner = { kind: e.kind === "permission" ? "permission" : "error", message: `${project.name}: ${e.message}` };
+    }
+    if (gsdError) {
+      if (!quiet) this.banner = { kind: gsdError.kind === "permission" ? "permission" : "error", message: `${project.name}: ${gsdError.message}` };
       this.state = pushDiagnostic(this.state, {
-        at, message: `${project.name}: ${e.message}`, context: "gsd-parse",
+        at, message: `${project.name} / ${wt.name ?? "root"}: ${gsdError.message}`, context: "gsd-parse",
       });
     }
     if (gsdError?.kind === "permission") this.recordProbe("files.read", gsdError);
+    else if (!gsdError) this.recordProbe("files.read", null);
 
     const git = {};
-    const statusRes = await call("git.status", () => m.git.status({ local: true, project: project.id }));
+    const statusRes = await call("git.status", () => m.git.status({ local: true, project: selector }));
     this.recordProbe("git.status", statusRes.error);
     if (statusRes.ok && statusRes.value) {
       git.branch = statusRes.value.branch;
-      git.dirtyCount =
-        (statusRes.value.stagedFiles?.length ?? 0) + (statusRes.value.unstagedFiles?.length ?? 0);
-    }
-    const logRes = await call("git.log", () => m.git.log({ maxCount: 1, project: project.id }));
+      git.dirtyCount = new Set([
+        ...(statusRes.value.stagedFiles ?? []), ...(statusRes.value.unstagedFiles ?? []),
+      ].map((file) => file.path)).size;
+    } else if (wt.branch) git.branch = wt.branch;
+    const logRes = await call("git.log", () => m.git.log({ maxCount: 1, project: selector }));
     if (logRes.ok && Array.isArray(logRes.value) && logRes.value[0]) {
       git.lastCommitAt = logRes.value[0].authorDate;
       git.lastCommitSubject = logRes.value[0].subject;
     }
-
-    let matched = false;
-    for (const wt of trees) {
-      const key = wsKey(project.id, wt.id ?? null);
-      const isActive = activeRoot
-        ? String(wt.path ?? "").replace(/\/+$/, "") === activeRoot
-        : !!wt.isPrimary || trees.length === 1;
-      if (isActive && !matched) {
-        matched = true;
-        this.state = applyWorkstreamData(this.state, key, {
-          isGsd: !!gsd,
-          gsd: gsd ?? undefined,
-          gsdUnavailableReason: gsd
-            ? undefined
-            : (gsdError
-              ? `Planning data unavailable — ${gsdError.message}`
-              : "No .planning/ directory — not a GSD project"),
-          git,
-          at,
-          isActiveWorktree: true,
-        });
-      } else {
-        this.state = applyWorkstreamData(this.state, key, {
-          isGsd: false,
-          gsdUnavailableReason: "Planning state is read from this project's active worktree",
-          git: { ...git, branch: wt.branch ?? git.branch },
-          at,
-          isActiveWorktree: false,
-        });
-      }
-    }
-    this.render();
+    if (verifyRoot && !await rootMatches()) { unavailableRoot(); return; }
+    this.state = applyWorkstreamData(this.state, key, {
+      dataUnavailable: !!gsdError,
+      isGsd: !!gsd,
+      gsd: gsd ?? null,
+      gsdUnavailableReason: gsd ? null : (gsdError
+        ? `Planning data unavailable — ${gsdError.message}`
+        : "No .planning/ directory — not a GSD project"),
+      git, at, isActiveWorktree: isActive,
+    });
   }
 
   async forEachLimited(items, limit, fn) {
@@ -550,7 +537,7 @@ export class ControlTowerApp {
 
   renderHeader(rows) {
     const visibleCount = this.view === "list" && !this.overlay
-      ? filterRows(rows, this.prefs?.filters ?? {}).filter((row) => this.prefs?.showNonGsd || row.isGsd).length
+      ? filterRows(rows, this.prefs?.filters ?? {}).filter((row) => this.prefs?.showNonGsd || row.isGsd || row.dataUnavailable).length
       : null;
     const overlayBtn = (id, iconName, label, name) =>
       h("button", {
@@ -667,8 +654,8 @@ export class ControlTowerApp {
 
     const visible = filterRows(rows, this.prefs?.filters ?? {});
     const showNonGsd = !!this.prefs?.showNonGsd;
-    const listed = visible.filter((row) => showNonGsd || row.isGsd);
-    const hiddenNonGsd = visible.filter((row) => !row.isGsd).length;
+    const listed = visible.filter((row) => showNonGsd || row.isGsd || row.dataUnavailable);
+    const hiddenNonGsd = visible.filter((row) => !row.isGsd && !row.dataUnavailable).length;
 
     if (listed.length) {
       body.appendChild(h("div", { class: "ct-section-label" }, "All workstreams", h("span", null, `· ${listed.length}`)));
@@ -716,7 +703,7 @@ export class ControlTowerApp {
 
     return h("button", {
       class: "ct-row", role: "listitem", "data-selected": this.selectedKey === row.key,
-      "aria-label": `${row.projectName}: ${formatRuntime(runtime)}`,
+      "aria-label": `${row.projectName} / ${row.worktreeName ?? "root"}: ${formatRuntime(runtime)}`,
       onclick: () => this.openProject(row),
     },
       h("span", {
@@ -760,7 +747,7 @@ export class ControlTowerApp {
       h("button", { class: "ct-backbtn", onclick: () => this.goHome() },
         icon("chevronLeft", 13), "All projects"),
       h("span", { class: "ct-spacer" }),
-      h("span", { class: "ct-detail-title" }, row.projectName),
+      h("span", { class: "ct-detail-title" }, row.git?.branch ?? row.worktreeName ?? row.projectName),
     ));
 
     // -- recorded state summary; displayed verbatim, never interpreted

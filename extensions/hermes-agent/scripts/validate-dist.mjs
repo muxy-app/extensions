@@ -52,7 +52,7 @@ async function parseJson(path) {
 
 function assertManifest(manifest, label) {
   assert.equal(manifest.name, "hermes-agent", `${label} must use the marketplace extension ID`);
-  assert.equal(manifest.version, "0.1.0", `${label} must use the immutable beta version`);
+  assert.equal(manifest.version, "0.2.0", `${label} must use the reviewed release version`);
   assert.equal(manifest.engines?.node, ">=20", `${label} must declare Node 20 compatibility`);
   assert.equal(Object.keys(manifest.dependencies ?? {}).length, 0, `${label} must not add runtime dependencies`);
   assert.ok(manifest.muxy && typeof manifest.muxy === "object", `${label} must contain a muxy manifest`);
@@ -73,6 +73,7 @@ function assertManifest(manifest, label) {
     for (const key of Object.keys(tab)) assert.ok(allowedTabTypeKeys.has(key), `${label} tab contains unauthorized surface: ${key}`);
   }
   assert.deepEqual(manifest.muxy.commands, [
+    { id: "open-hermes-gateway", title: "Hermes: Open Agent Panel", action: { kind: "openPanel", panel: panel.id } },
     { id: "toggle-hermes-gateway", title: "Hermes: Toggle Agent Panel", action: { kind: "togglePanel", panel: panel.id } },
     { id: "open-hermes-project-board", title: "Hermes: Open Project Board", action: { kind: "openTab", tabType: "hermes-project-board" } },
   ]);

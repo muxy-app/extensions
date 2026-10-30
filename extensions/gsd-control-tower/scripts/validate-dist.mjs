@@ -30,7 +30,6 @@ const README_IMAGES = [
 
 function expectedMuxy() {
   return {
-    $schema: "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
     description: "Read GSD next steps, roadmap progress, and live agent activity across Muxy projects.",
     permissions: PERMISSIONS,
     events: EVENTS,
@@ -58,6 +57,7 @@ function expectedMuxy() {
     }],
     commands: [
       { id: "toggle-tower", title: "Control Tower: Toggle Panel", defaultShortcut: "cmd+shift+g", action: { kind: "togglePanel", panel: "control-tower" } },
+      { id: "open-tower", title: "Control Tower: Open Panel", action: { kind: "openPanel", panel: "control-tower" } },
       { id: "refresh-tower", title: "Control Tower: Refresh All Workstreams" },
       { id: "toggle-diagnostics", title: "Control Tower: Toggle Diagnostics View" },
     ],
@@ -146,7 +146,7 @@ async function validateSchema(manifest) {
 
 function assertManifest(manifest, label) {
   assert.equal(manifest.name, "gsd-control-tower", `${label}: frozen marketplace ID changed`);
-  assert.equal(manifest.version, "0.2.0", `${label}: immutable release version changed`);
+  assert.equal(manifest.version, "0.3.0", `${label}: immutable release version changed`);
   assert.equal(manifest.private, true, `${label}: npm package must remain private`);
   assert.equal(manifest.engines?.node, ">=20", `${label}: Node contract changed`);
   assert.equal(Object.keys(manifest.dependencies ?? {}).length, 0, `${label}: runtime dependencies are forbidden`);

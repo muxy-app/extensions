@@ -152,3 +152,85 @@ test("Dashboard request rejects oversized bodies before command execution", asyn
   await assert.rejects(relay.requestSessionJson({ url: "https://hermes.example/api/test", method: "POST", body: { value: "x".repeat(70_000) } }), /relay_request_too_large/);
   assert.equal(called, false);
 });
+
+test("Muxy 2 requests prefer execAsync and keep credential material in stdin", async () => {
+  const previousWindow = globalThis.window;
+  const calls = [];
+  const muxy = {
+    exec() { assert.fail("exec must not run when execAsync is available"); },
+    execAsync(argv, options) {
+      assert.equal(this, muxy, "the native executor keeps its host binding");
+      calls.push({ argv, options });
+      return { result: Promise.resolve(response()), cancel() { assert.fail("completed requests are not cancelled"); } };
+    },
+  };
+  globalThis.window = { muxy };
+  try {
+    const relay = new CurlRelay();
+    await relay.requestSessionJson({ url: "https://hermes.example/auth/password-login", method: "POST", cookie: "hermes_session_at=fixture-access", body: { password: "fixture-password" }, timeoutMs: 5000 });
+    relay.cancelPending();
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].argv[0], "/usr/bin/curl");
+    assert.doesNotMatch(JSON.stringify(calls[0].argv), /fixture-access|fixture-password/);
+    assert.match(calls[0].options.stdin, /fixture-access/);
+    assert.match(calls[0].options.stdin, /fixture-password/);
+    assert.equal(calls[0].options.timeoutMs, 7000);
+    assert.equal(relay.pending.size, 0);
+  } finally {
+    globalThis.window = previousWindow;
+  }
+});
+
+test("older Muxy hosts retain exec and explicit fixture executors stay isolated", async () => {
+  const previousWindow = globalThis.window;
+  let calls = 0;
+  globalThis.window = { muxy: { exec: async () => { calls += 1; return response(); } } };
+  try {
+    await new CurlRelay().requestSessionJson({ url: "https://hermes.example/api/status" });
+    globalThis.window.muxy.execAsync = () => assert.fail("explicit fixtures cannot use the host bridge");
+    await new CurlRelay({ exec: async () => { calls += 1; return response(); } }).requestSessionJson({ url: "https://hermes.example/api/status" });
+    assert.equal(calls, 2);
+  } finally {
+    globalThis.window = previousWindow;
+  }
+});
+
+test("cancellation stops every native request once and discards even successful late results", async () => {
+  const completions = [];
+  let cancellations = 0;
+  const relay = new CurlRelay({ execAsync: () => ({
+    result: new Promise((resolve) => completions.push(resolve)),
+    cancel() { cancellations += 1; return Promise.reject(new Error("private host details")); },
+  }) });
+  const requests = [1, 2].map(() => assert.rejects(relay.requestSessionJson({ url: "https://hermes.example/api/status" }), { code: "relay_cancelled", message: "relay_cancelled" }));
+  relay.cancelPending();
+  relay.cancelPending();
+  await Promise.all(requests);
+  assert.equal(cancellations, 2);
+  assert.equal(relay.pending.size, 0);
+  for (const resolve of completions) resolve(response());
+  await new Promise((resolve) => setImmediate(resolve));
+});
+
+test("cancelled fallback requests settle promptly even when legacy exec cannot be interrupted", async () => {
+  let complete;
+  const relay = new CurlRelay({ exec: () => new Promise((resolve) => { complete = resolve; }) });
+  const rejected = assert.rejects(relay.requestSessionJson({ url: "https://hermes.example/api/status" }), { code: "relay_cancelled" });
+  relay.cancelPending();
+  await rejected;
+  complete(response());
+});
+
+test("execAsync rejection never retries through exec and host cancellation stays sanitized", async () => {
+  for (const error of [Object.assign(new Error("private host details"), { cancelled: true }), new Error("exec cancelled")]) {
+    const relay = new CurlRelay({
+      exec: () => assert.fail("a failed native job must not be retried"),
+      execAsync: () => ({ result: Promise.reject(error), cancel() {} }),
+    });
+    await assert.rejects(relay.requestSessionJson({ url: "https://hermes.example/api/status" }), { code: "relay_cancelled", message: "relay_cancelled" });
+  }
+  const denied = new CurlRelay({ exec: () => assert.fail("do not bypass consent"), execAsync: () => { throw new Error("permission denied (commands:exec)"); } });
+  await assert.rejects(denied.requestSessionJson({ url: "https://hermes.example/api/status" }), { code: "relay_permission_denied" });
+  const invalid = new CurlRelay({ execAsync: () => ({}) });
+  await assert.rejects(invalid.requestSessionJson({ url: "https://hermes.example/api/status" }), { code: "relay_result_unavailable" });
+});

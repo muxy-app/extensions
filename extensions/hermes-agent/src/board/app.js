@@ -87,6 +87,7 @@ export class HermesProjectBoard {
 
   release() {
     this.released = true;
+    this.authSession?.release();
     this.client?.release();
     this.client = null;
     if (this.sessionCheckTimer) globalThis.clearInterval(this.sessionCheckTimer);
@@ -100,6 +101,7 @@ export class HermesProjectBoard {
   }
 
   render() {
+    if (this.released) return;
     clear(this.root);
     this.root.appendChild(this.view());
     this.syncForms();
@@ -280,7 +282,7 @@ export class HermesProjectBoard {
           h("strong", null, `${total} ${total === 1 ? "card" : "cards"}`),
           this.projectMappingState(),
         ),
-        h("form", { class: "board-create-form", onsubmit: (event) => void this.openBoard(event) },
+        h("form", { class: "board-selection-form", onsubmit: (event) => void this.openBoard(event) },
           selector,
           h("button", { class: "board-button board-button-secondary", type: "submit", disabled: !this.boardValue }, "View board"),
           h("button", { class: "board-button board-button-primary", type: "button", disabled: !this.viewedBoardValue, onclick: () => void this.mapViewedBoard() }, "Map to this project"),
@@ -349,8 +351,8 @@ export class HermesProjectBoard {
     this.render();
     try {
       const auth = new DashboardAuthSession({ baseUrl: this.urlValue });
-      this.authSnapshot = await auth.discover();
       this.authSession = auth;
+      this.authSnapshot = await auth.discover();
       this.providerValue = this.authSnapshot.providers.find((provider) => provider.supportsPassword)?.name ?? "";
       this.state = this.authSnapshot.state;
       this.message = this.authSnapshot.state === "logged_out" ? "Sign in to continue." : "";
@@ -624,12 +626,13 @@ export class HermesProjectBoard {
 
   async restoreSavedSession() {
     const saved = await this.sessionBroker.readDashboard();
-    if (!saved || this.state === "ready") return;
+    if (this.released || !saved || this.state === "ready") return;
     this.urlValue = saved.baseUrl;
     this.state = "restoring";
     this.message = "";
     this.render();
     try {
+      this.authSession?.release();
       const auth = DashboardAuthSession.fromSession({ baseUrl: saved.baseUrl, session: saved.auth });
       this.authSession = auth;
       this.authSnapshot = await auth.verify();

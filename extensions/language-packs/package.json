@@ -1,11 +1,12 @@
 {
   "name": "language-packs",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "private": true,
   "type": "module",
   "description": "Community app language packs for Muxy",
   "scripts": {
-    "build": "node scripts/copy-manifest.mjs"
+    "build": "node scripts/copy-manifest.mjs",
+    "test": "node --test scripts/catalogs.test.mjs"
   },
   "muxy": {
     "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",

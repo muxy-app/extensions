@@ -108,6 +108,7 @@ export function applyWorkstreamData(state, key, data) {
   const next = shallow(state);
   const ws = { ...existing };
   if (data.isGsd !== undefined) ws.isGsd = data.isGsd;
+  if (data.dataUnavailable !== undefined) ws.dataUnavailable = data.dataUnavailable;
   if (data.gsd !== undefined) ws.gsd = data.gsd;
   if (data.gsdUnavailableReason !== undefined) ws.gsdUnavailableReason = data.gsdUnavailableReason;
   if (data.git !== undefined) ws.git = data.git;
@@ -182,14 +183,13 @@ export function applyAgentHydration(state, listResponse, at = new Date().toISOSt
 
 /** `file.changed` → mark affected workstream live + record event time (FR-030/031). */
 export function applyFileChanged(state, evt, at = new Date().toISOString()) {
-  const path = String(evt.path ?? "");
   const projectPath = evt.projectPath ? String(evt.projectPath) : undefined;
   let touched = false;
   /** @type {ReturnType<typeof shallow>} */ let next = state;
 
   for (const [key, ws] of state.workstreams) {
-    const matchesProject = projectPath ? samePath(ws.projectPath, projectPath) : true;
-    const relevant = matchesProject && isPlanningPath(path);
+    const matchesProject = projectPath ? samePath(ws.worktreePath, projectPath) : ws.isActiveWorktree;
+    const relevant = matchesProject && isPlanningChange(evt);
     if (!relevant) continue;
     next = next === state ? shallow(state) : next;
     const updated = {
@@ -208,6 +208,12 @@ export function applyFileChanged(state, evt, at = new Date().toISOString()) {
 export function isPlanningPath(path) {
   const p = String(path ?? "");
   return p === ".planning" || p.startsWith(".planning/") || p.split("/").includes(".planning");
+}
+
+/** Muxy 2 also emits a project-root path when a watcher needs a full rescan. */
+export function isPlanningChange(evt) {
+  return isPlanningPath(evt?.path)
+    || (!!evt?.path && !!evt?.projectPath && samePath(evt.path, evt.projectPath));
 }
 
 /** `worktree.headChanged` → branch context refresh (FR-033). */
