@@ -45,7 +45,7 @@
       "github" : "mountain1009",
       "repository" : "https://github.com/muxy-app/extensions",
       "categories" : ["git", "productivity"],
-      "icon" : "assets/icon.svg",
+      "icon" : "assets/marketplace-icon.svg",
       "screenshots" : ["screenshots/screenshot-1.png"]
     }
   },
@@ -56,5 +56,5 @@
     "dev" : "vite"
   },
   "type" : "module",
-  "version" : "0.1.1"
+  "version" : "0.1.2"
 }
