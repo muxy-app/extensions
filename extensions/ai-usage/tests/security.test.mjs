@@ -34,6 +34,37 @@ test("regression: background restores the cached status bar text on activation",
   // assert.doesNotMatch(background, /setInterval/);
 });
 
+test("regression: background Claude collector matches the live collector", async () => {
+  const background = await readFile(new URL("../src/background.mjs", import.meta.url), "utf8");
+
+  // The live path was migrated to the OAuth usage endpoint and Bearer auth, but
+  // the background collector kept calling api.claude.ai with a session cookie.
+  // That host no longer resolves, so every background poll failed silently.
+  assert.match(background, /api\.anthropic\.com\/api\/oauth\/usage/);
+  assert.match(background, /platform\.claude\.com\/v1\/oauth\/token/);
+  assert.doesNotMatch(background, /api\.claude\.ai/);
+  assert.doesNotMatch(background, /sessionKey=/);
+
+  // Credentials may live in the keychain rather than a file.
+  assert.match(background, /find-generic-password/);
+  assert.match(background, /Claude Code-credentials/);
+
+  // parseClaudeRows returns { rows, planName }; the caller must not treat it as
+  // an array, or Array.isArray() is always false and the poll returns null.
+  assert.doesNotMatch(background, /Array\.isArray\(parseClaudeRows/);
+  assert.doesNotMatch(background, /const rows = parseClaudeRows/);
+});
+
+test("regression: background credential paths are reachable from the startup poll", async () => {
+  const background = await readFile(new URL("../src/background.mjs", import.meta.url), "utf8");
+
+  // The activation block runs at the top of the module and calls poll()
+  // immediately, so any module-level const it reaches is still in its temporal
+  // dead zone. Credential path tables must be hoisted function declarations.
+  assert.doesNotMatch(background, /const claudeCredPaths =/);
+  assert.match(background, /function claudeCredPaths\(/);
+});
+
 test("regression: background activation survives runtimes without timers", async () => {
   const source = await readFile(new URL("../dist/background.js", import.meta.url), "utf8");
   const calls = [];

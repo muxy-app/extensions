@@ -74,19 +74,20 @@ export function pattern_stdin(variants) {
   return `${variants.join("\n")}\n`;
 }
 
-// rg runs with --null, so it emits "path\0line:content" and the path may itself
-// contain colons. grep has no such option and emits "path:line:content"; there we
-// fall back to splitting on the first colon, since a path containing one is rarer
-// than a matched line that starts with digits and a colon.
+// rg and git grep run with --null, so the path may itself contain colons: rg emits
+// "path\0line:content" and git grep "path\0line\0content". grep has no such option
+// and emits "path:line:content"; there we fall back to splitting on the first
+// colon, since a path containing one is rarer than a matched line that starts with
+// digits and a colon.
 function split_result_line(line) {
   const nul = line.indexOf("\0");
   if (nul > 0) {
     const rest = line.slice(nul + 1);
-    const colon = rest.indexOf(":");
-    if (colon <= 0) return null;
-    const lineNumber = line_number_of(rest.slice(0, colon));
+    const separator = rest.search(/[:\0]/);
+    if (separator <= 0) return null;
+    const lineNumber = line_number_of(rest.slice(0, separator));
     if (!lineNumber) return null;
-    return { filePath: line.slice(0, nul), lineNumber, content: rest.slice(colon + 1) };
+    return { filePath: line.slice(0, nul), lineNumber, content: rest.slice(separator + 1) };
   }
 
   const first = line.indexOf(":");

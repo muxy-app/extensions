@@ -6,12 +6,17 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-27
+
+### Added
+
 - Established `gabeosx/muxy-gsd-control-tower` as the project repository.
 - Rewrote the README around the current-project and All projects workflows.
 - Replaced synthetic listing artwork with genuine, sanitized native Muxy captures.
 - Tightened the marketplace description to the extension's actual read-only scope.
 
 ### Changed
+
 - Simplified the panel and documentation around project progress, agent activity, permissions, and limitations.
 - Shows one alphabetical workstream list without Control Tower-derived priority or status signals.
 - Added a configurable cross-project planning/Git refresh interval (Manual, 1, 5, 15, or 30 minutes; 5 minutes by default). Agent status remains event-driven.
@@ -19,6 +24,12 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Phase rows now show optional workflow artifacts only when present and expanded; missing stages are never treated as incomplete.
 - Phase directories that contain artifacts but are not selected by `STATE.md` now show **Not current** instead of a blank status.
 - Progress display now uses roadmap checkboxes or declared phase counts instead of raw percentages.
+- Agent activity is now a disclosure that follows live activity until the user explicitly expands or collapses it.
+- The panel now hides its pin control so its declared pinned mode remains stable.
+
+### Fixed
+
+- Recognizes plan, verification, and optional workflow artifacts whose filenames use decimal phase prefixes such as `04.1`.
 
 ## [0.1.0] - 2026-08-23
 

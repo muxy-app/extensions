@@ -11,9 +11,11 @@ import {
   resolveTeam, createIssue, fetchIssueById,
   fetchTeamMembers, fetchTeamProjects, fetchTeamLabels,
   fetchProjectMilestones, fetchTeamTemplates, fetchTeamStates,
+  createTeamLabel,
 } from "./linear.js";
 import { setLang, t } from "./i18n.js";
 import { mountMarkdownEditor } from "./mdwysiwyg.js";
+import { mountLabelSelect } from "./labelselect.js";
 
 const muxy = window.muxy;
 const app = document.getElementById("app");
@@ -28,12 +30,6 @@ const asTab = document.body.classList.contains("tab");
 
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-}
-
-function h(html) {
-  const tpl = document.createElement("template");
-  tpl.innerHTML = html.trim();
-  return tpl.content.firstElementChild;
 }
 
 async function main() {
@@ -56,18 +52,18 @@ async function main() {
   }
 
   app.innerHTML = `
-    <h2 class="m-title">${parent ? t("create.subTitle") : t("create.title")}</h2>
+    <header class="m-head">
+      <h2 class="m-title">${parent ? t("create.subTitle") : t("create.title")}</h2>
+      <span class="spacer"></span>
+      <button id="cancel" class="icon-btn" title="${t("common.close")}" aria-label="${t("common.close")}">✕</button>
+    </header>
     ${parent ? `<div class="issue-meta"><span class="chip">${t("create.parentOf", { id: escapeHtml(parent.identifier) })}</span></div>` : ""}
 
-    <div class="props">
-      <div class="field">
-        <span class="label">${t("create.teamKey")}</span>
-        <input type="text" id="team" value="${escapeHtml(defaultTeam)}" placeholder="${t("create.teamKeyPh")}" />
-      </div>
-      <div class="field">
-        <span class="label">${t("create.template")}</span>
-        <select id="template"><option value="">${t("create.noTemplate")}</option></select>
-      </div>
+    <!-- KNK-117: 팀 키는 프로젝트 설정/부모 이슈에서 자동으로 정해지므로 화면·DOM 어디에도 두지 않는다.
+         팀 키 값은 currentTeamKey 변수로만 관리한다. -->
+    <div class="field">
+      <span class="label">${t("create.template")}</span>
+      <select id="template"><option value="">${t("create.noTemplate")}</option></select>
     </div>
 
     <div class="field">
@@ -100,7 +96,7 @@ async function main() {
 
     <div class="field">
       <span class="label">${t("issue.labels")}</span>
-      <div id="labels" class="label-chips muted">${t("common.loading")}</div>
+      <div id="labels"></div>
     </div>
 
     <div class="field">
@@ -110,7 +106,6 @@ async function main() {
 
     <p id="err" class="error" hidden></p>
     <div class="actions">
-      <button id="cancel">${t("common.cancel")}</button>
       <button id="create" class="primary">${t("common.create")}</button>
     </div>
   `;
@@ -139,26 +134,19 @@ async function main() {
     }
   })();
 
-  // ---- 라벨: 팀 라벨을 토글 칩으로. 켜진 집합을 생성 시 함께 등록한다. ----------
+  // ---- 라벨: 팀 라벨을 다중선택 콤보박스로. 목록에 없는 이름은 새 라벨로 만든다.
+  // 선택 집합은 콤보박스가 소유하며, 생성 시 getSelected() 로 읽어 함께 등록한다.
   let teamLabels = [];
-  const selectedLabels = new Set();
-  function renderLabels() {
-    const box = $("labels");
-    box.classList.remove("muted");
-    box.innerHTML = "";
-    if (!teamLabels.length) { box.textContent = t("issue.noLabels"); return; }
-    for (const l of teamLabels) {
-      const chip = h(`<button class="label-chip" type="button"></button>`);
-      chip.classList.toggle("on", selectedLabels.has(l.id));
-      chip.style.setProperty("--label-color", l.color || "#8a8f98");
-      chip.textContent = l.name;
-      chip.addEventListener("click", () => {
-        if (selectedLabels.has(l.id)) selectedLabels.delete(l.id); else selectedLabels.add(l.id);
-        chip.classList.toggle("on", selectedLabels.has(l.id));
-      });
-      box.append(chip);
-    }
-  }
+  const labelSelect = mountLabelSelect($("labels"), {
+    disabled: true,
+    onError: (e) => showErr(e.message),
+    onCreate: async (name) => {
+      if (!teamId) throw new Error(t("link.selectTeamFirst"));
+      const created = await createTeamLabel(token, teamId, { name });
+      teamLabels = [...teamLabels, created].sort((a, b) => a.name.localeCompare(b.name));
+      return created;
+    },
+  });
 
   // 셀렉트 채우기 헬퍼: [{value,label}] + 맨 앞 "없음" 옵션.
   function fillSelect(sel, items, { noneLabel, selected = "" } = {}) {
@@ -201,7 +189,9 @@ async function main() {
     }
   }
 
-  // ---- 팀 종속 데이터 로드(담당자·프로젝트·라벨·템플릿). 팀 키 변경 시 재실행. --
+  // ---- 팀 종속 데이터 로드(담당자·프로젝트·라벨·템플릿). --------------------------
+  // 팀 키는 화면에 노출하지 않으므로 DOM 대신 이 변수로만 관리한다(생성 시 폴백에 사용).
+  let currentTeamKey = defaultTeam;
   let teamId = null;
   let templates = [];
   async function loadTeamData(teamKey) {
@@ -209,12 +199,11 @@ async function main() {
     $("state").innerHTML = `<option>${t("common.loading")}</option>`;
     $("assignee").innerHTML = `<option>${t("common.loading")}</option>`;
     $("project").innerHTML = `<option>${t("common.loading")}</option>`;
-    $("labels").textContent = t("common.loading");
-    $("labels").classList.add("muted");
+    labelSelect.setDisabled(true);
     try {
       const team = await resolveTeam(token, teamKey);
       teamId = team.id;
-      $("team").value = team.key; // 정규화된 키 반영
+      currentTeamKey = team.key; // 정규화된 키 반영
 
       const [members, projects, labels, tpls, states] = await Promise.all([
         fetchTeamMembers(token, teamId).catch(() => []),
@@ -243,10 +232,11 @@ async function main() {
       await loadMilestones($("project").value);
 
       teamLabels = labels;
+      labelSelect.setLabels(teamLabels);
       // 존재하지 않는(이전 팀) 라벨 선택은 정리.
       const valid = new Set(labels.map((l) => l.id));
-      for (const id of [...selectedLabels]) if (!valid.has(id)) selectedLabels.delete(id);
-      renderLabels();
+      labelSelect.setSelected(labelSelect.getSelected().filter((id) => valid.has(id)));
+      labelSelect.setDisabled(false);
 
       templates = tpls;
       fillSelect($("template"), tpls.map((tp) => ({ value: tp.id, label: tp.name })), {
@@ -257,22 +247,13 @@ async function main() {
       $("state").innerHTML = `<option>—</option>`;
       $("assignee").innerHTML = `<option>—</option>`;
       $("project").innerHTML = `<option>—</option>`;
-      $("labels").textContent = t("issue.noLabels");
-      $("labels").classList.remove("muted");
+      labelSelect.setLabels([]);
+      labelSelect.setDisabled(false);
     }
   }
 
   // 프로젝트가 바뀌면 마일스톤을 다시 로드(리스너는 한 번만 등록).
   $("project").addEventListener("change", () => loadMilestones($("project").value));
-
-  // 팀 키를 바꾸면(포커스 아웃) 종속 데이터를 다시 로드한다.
-  let lastTeamKey = defaultTeam;
-  $("team").addEventListener("change", () => {
-    const key = $("team").value.trim();
-    if (key === lastTeamKey) return;
-    lastTeamKey = key;
-    loadTeamData(key);
-  });
 
   // ---- 템플릿 적용: templateData 로 폼을 채운다. -------------------------------
   $("template").addEventListener("change", () => {
@@ -306,8 +287,9 @@ async function main() {
     }
     const tplLabels = data.labelIds || data.labels;
     if (Array.isArray(tplLabels)) {
-      for (const id of tplLabels) if (teamLabels.some((l) => l.id === id)) selectedLabels.add(id);
-      renderLabels();
+      const cur = new Set(labelSelect.getSelected());
+      for (const id of tplLabels) if (teamLabels.some((l) => l.id === id)) cur.add(id);
+      labelSelect.setSelected([...cur]);
     }
   }
 
@@ -325,7 +307,7 @@ async function main() {
     try {
       // teamId 가 아직 준비 안 됐으면(로드 실패/지연) 팀 키로 재확인.
       if (!teamId) {
-        const team = await resolveTeam(token, $("team").value.trim());
+        const team = await resolveTeam(token, currentTeamKey);
         teamId = team.id;
       }
       const created = await createIssue(token, {
@@ -336,7 +318,7 @@ async function main() {
         priority: Number($("priority").value),
         projectId: $("project").value || undefined,
         projectMilestoneId: $("milestone").value || undefined,
-        labelIds: [...selectedLabels],
+        labelIds: labelSelect.getSelected(),
         stateId: $("state").value || undefined,
         parentId: parent?.id || undefined,
       });

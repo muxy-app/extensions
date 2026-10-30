@@ -33,7 +33,8 @@ test("Find in Files runScript reuses the previous result after clearing and rety
 });
 
 function search_command(argv) {
-  return argv.find((arg) => arg === "rg" || arg === "grep");
+  const command = argv.find((arg) => arg === "rg" || arg === "git" || arg === "grep");
+  return command === "git" ? "git grep" : command;
 }
 
 test("Find in Files reports an rg timeout without starting grep", async () => {
@@ -97,7 +98,7 @@ test("Find in Files runScript does not cache an rg execution failure", async () 
   }
 });
 
-test("Find in Files runScript falls back to grep when rg is unavailable", async () => {
+test("Find in Files runScript falls back to git grep when rg is unavailable", async () => {
   let modalOptions = null;
   const calls = [];
   globalThis.muxy = {
@@ -120,21 +121,90 @@ test("Find in Files runScript falls back to grep when rg is unavailable", async 
   };
 
   try {
-    await openRunScript("grep-fallback");
+    await openRunScript("git-grep-fallback");
 
     const result = await runModalQuery(modalOptions, "needle");
 
     assert.equal(result.emittedItems[0].title, "needle fallback");
     assert.deepEqual(
       calls.map((call) => search_command(call.argv)),
-      ["rg", "grep"],
+      ["rg", "git grep"],
     );
   } finally {
     delete globalThis.muxy;
   }
 });
 
-test("Find in Files falls back to grep when the rg launch rejects", async () => {
+test("Find in Files runScript falls back to grep outside a Git work tree", async () => {
+  let modalOptions = null;
+  const calls = [];
+  globalThis.muxy = {
+    modal: {
+      open(options) {
+        modalOptions = options;
+      },
+    },
+    execAsync: execAsyncFromSync((argv) => {
+      const command = search_command(argv);
+      calls.push(command);
+      if (command === "rg") {
+        return { exitCode: 0, stdout: "", stderr: "__MUXY_FIND_IN_FILES_EXIT__=127\n" };
+      }
+      if (command === "git grep") {
+        return {
+          exitCode: 0,
+          stdout: "",
+          stderr: "fatal: not a git repository\n__MUXY_FIND_IN_FILES_EXIT__=128\n",
+        };
+      }
+      return { exitCode: 0, stdout: "src/main.js:7:needle fallback\n" };
+    }),
+  };
+
+  try {
+    await openRunScript("grep-fallback");
+
+    const result = await runModalQuery(modalOptions, "needle");
+
+    assert.equal(result.emittedItems[0].title, "needle fallback");
+    assert.deepEqual(calls, ["rg", "git grep", "grep"]);
+  } finally {
+    delete globalThis.muxy;
+  }
+});
+
+test("Find in Files reports a git grep timeout without starting grep", async () => {
+  let modalOptions = null;
+  const calls = [];
+  globalThis.muxy = {
+    modal: {
+      open(options) {
+        modalOptions = options;
+      },
+    },
+    execAsync: execAsyncFromSync((argv) => {
+      const command = search_command(argv);
+      calls.push(command);
+      if (command === "rg") {
+        return { exitCode: 0, stdout: "", stderr: "__MUXY_FIND_IN_FILES_EXIT__=127\n" };
+      }
+      return { exitCode: -1, stdout: "", stderr: "", timedOut: true };
+    }),
+  };
+
+  try {
+    await openRunScript("git-grep-timeout-no-grep");
+
+    const result = await runModalQuery(modalOptions, "needle");
+
+    assert.equal(result.emittedItems[0].title, "Search timed out");
+    assert.deepEqual(calls, ["rg", "git grep"]);
+  } finally {
+    delete globalThis.muxy;
+  }
+});
+
+test("Find in Files falls back to git grep when the rg launch rejects", async () => {
   let modalOptions = null;
   const calls = [];
   globalThis.muxy = {
@@ -157,12 +227,12 @@ test("Find in Files falls back to grep when the rg launch rejects", async () => 
   };
 
   try {
-    await openRunScript("grep-launch-rejection-fallback");
+    await openRunScript("git-grep-launch-rejection-fallback");
 
     const result = await runModalQuery(modalOptions, "needle");
 
     assert.equal(result.emittedItems[0].title, "needle fallback");
-    assert.deepEqual(calls, ["rg", "grep"]);
+    assert.deepEqual(calls, ["rg", "git grep"]);
   } finally {
     delete globalThis.muxy;
   }

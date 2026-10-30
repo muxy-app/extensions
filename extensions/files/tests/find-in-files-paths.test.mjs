@@ -93,6 +93,37 @@ test("Find in Files runScript keeps colons in ripgrep paths out of the line numb
   }
 });
 
+test("Find in Files runScript reads git grep's NUL-delimited line numbers", async () => {
+  let modalOptions = null;
+  globalThis.muxy = {
+    modal: {
+      open(options) {
+        modalOptions = options;
+      },
+    },
+    execAsync: execAsyncFromSync(() => ({
+      exitCode: 0,
+      stdout: `a:b/f.js${NUL}4${NUL}needle: here\n`,
+    })),
+  };
+
+  try {
+    await openRunScript("git-grep-null");
+
+    const result = await runModalQuery(modalOptions, "needle");
+
+    assert.deepEqual(result.emittedItems, [
+      {
+        id: JSON.stringify({ filePath: "a:b/f.js", lineNumber: 4 }),
+        title: "needle: here",
+        subtitle: "a:b/f.js:4",
+      },
+    ]);
+  } finally {
+    delete globalThis.muxy;
+  }
+});
+
 test("Find in Files runScript keeps a matched line that itself starts with digits and a colon", async () => {
   let modalOptions = null;
   globalThis.muxy = {

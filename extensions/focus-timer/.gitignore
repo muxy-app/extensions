@@ -1,0 +1,26 @@
+# Only what the extension needs to build and run is committed; the publish
+# pipeline builds dist/ itself from this source.
+#
+# Kept deliberately: package.json (the manifest), package-lock.json and
+# README.md (both required by CI), vite.config.js, scripts/, src/, popover/,
+# report/, public/ (the listing icon and screenshots), and test/.
+
+# Build output and dependencies
+node_modules/
+dist/
+
+# Muxy writes the extension log into the build output
+*.log
+
+# macOS
+.DS_Store
+
+# Coding-agent tooling — vendored copies of Muxy's own authoring skill plus the
+# instructions pointing at them. Regenerate with `npm run update-skill`.
+.claude/
+.agents/
+AGENTS.md
+CLAUDE.md
+
+# Design notes, superseded by README.md
+plan.md

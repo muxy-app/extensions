@@ -43,6 +43,7 @@ export class ControlTowerApp {
     this.selectedKey = null;
     this.didAutoFocus = false;
     this.expandedPhases = new Set();
+    this.agentActivityExpanded = new Map();
     this.banner = null;
     this.refreshing = false;
     this.refreshQueued = false;
@@ -841,8 +842,7 @@ export class ControlTowerApp {
 
       const hasAgentData = !!row.agent?.providerId
         || ["working", "waiting", "idle"].includes(row.agent?.runtimeState);
-      body.appendChild(h("div", { class: "ct-block" },
-        h("div", { class: "ct-blocktitle" }, "Agent activity"),
+      body.appendChild(disclosure("Agent activity",
         h("div", { class: "ct-card" },
           row.agent?.providerId ? kv("Agent", formatProvider(row.agent.providerId)) : null,
           kv("Status", formatRuntime(row.agent?.runtimeState)),
@@ -851,7 +851,10 @@ export class ControlTowerApp {
             : null,
           row.agent?.observedAt ? kv("Updated", relativeTime(row.agent.observedAt)) : null,
         ),
-      ));
+        {
+          open: this.isAgentActivityExpanded(row),
+          onToggle: (open) => this.agentActivityExpanded.set(row.key, open),
+        }));
 
       // -- git block
       body.appendChild(disclosure("Repository",
@@ -921,6 +924,15 @@ export class ControlTowerApp {
           : null,
       ) : null,
     );
+  }
+
+  /** Untouched disclosures follow live activity; explicit user choices win. */
+  isAgentActivityExpanded(row) {
+    if (this.agentActivityExpanded.has(row.key)) {
+      return this.agentActivityExpanded.get(row.key);
+    }
+    return !!row.agent?.providerId
+      || ["working", "waiting", "idle"].includes(row.agent?.runtimeState);
   }
 
   // --------------------------------------------------------------- overlays --
@@ -1268,8 +1280,12 @@ function statusIconName(state) {
   }
 }
 
-function disclosure(title, content) {
-  return h("details", { class: "ct-disclosure" },
+function disclosure(title, content, { open = false, onToggle } = {}) {
+  return h("details", {
+    class: "ct-disclosure",
+    open,
+    ontoggle: onToggle ? (event) => onToggle(event.currentTarget.open) : undefined,
+  },
     h("summary", null, h("span", null, title), icon("chevronRight", 12)),
     h("div", { class: "ct-disclosure-body" }, content));
 }

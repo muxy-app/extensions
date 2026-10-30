@@ -32,6 +32,26 @@ test("phase labels stay explicit when artifacts and STATE.md disagree", () => {
   assert.equal(phaseStatusOf({ ...base, verification: "failed", done: true }).label, "Verification failed");
 });
 
+test("agent activity disclosure defaults from activity and preserves user choice", () => {
+  const app = bareApp();
+  const row = { key: "p1::root", agent: { runtimeState: "unavailable" } };
+
+  assert.equal(app.isAgentActivityExpanded(row), false);
+  assert.equal(app.isAgentActivityExpanded({
+    ...row,
+    agent: { runtimeState: "working", providerId: "codex" },
+  }), true);
+
+  app.agentActivityExpanded.set(row.key, false);
+  assert.equal(app.isAgentActivityExpanded({
+    ...row,
+    agent: { runtimeState: "working", providerId: "codex" },
+  }), false);
+
+  app.agentActivityExpanded.set(row.key, true);
+  assert.equal(app.isAgentActivityExpanded(row), true);
+});
+
 test("refresh requests coalesce into one follow-up while a refresh is in flight", async () => {
   const app = bareApp();
   let calls = 0;
