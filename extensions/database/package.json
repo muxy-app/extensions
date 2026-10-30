@@ -1,6 +1,6 @@
 {
   "name": "database",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "scripts": {
     "dev": "vite",
     "test": "node --test tests/*.test.js",
