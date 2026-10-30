@@ -1,6 +1,6 @@
 {
   "name": "ollama",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "description": "Ollama servers and models, with one-click agent launches in Muxy",
@@ -102,7 +102,7 @@
       "github": "phimage",
       "repository": "https://github.com/muxy-app/extensions",
       "categories": ["developer-tools", "ai"],
-      "icon": "ollama.svg",
+      "icon": "marketplace-icon.svg",
       "screenshots": ["screenshot-1.png"]
     }
   }
