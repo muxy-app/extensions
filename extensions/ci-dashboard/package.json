@@ -2,7 +2,7 @@
   "name": "ci-dashboard",
   "private": true,
   "type": "module",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "scripts": {
     "build": "vite build && node -e \"require('fs').copyFileSync('package.json','dist/package.json')\"",
     "dev": "vite",
@@ -92,7 +92,7 @@
         "developer-tools",
         "productivity"
       ],
-      "icon": "assets/icon.svg",
+      "icon": "assets/marketplace-icon.svg",
       "screenshots": [
         "screenshots/screenshot-1.png",
         "screenshots/screenshot-2.png",

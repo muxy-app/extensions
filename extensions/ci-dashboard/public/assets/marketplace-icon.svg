@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="CI Dashboard">
+  <defs>
+    <linearGradient id="ci-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#38BDF8"/>
+      <stop offset="1" stop-color="#4F46E5"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="56" fill="url(#ci-bg)"/>
+  <g transform="translate(48 50) scale(6.667)" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M9.9 6.6 6.6 16.7" fill="none"/>
+    <path d="M14.1 6.6l3.3 10.1" fill="none"/>
+    <path d="M7.4 19h9.2" fill="none"/>
+    <circle cx="12" cy="5" r="2.4" fill="#FFFFFF"/>
+    <circle cx="5" cy="19" r="2.4" fill="#4ADE80"/>
+    <circle cx="19" cy="19" r="2.4" fill="#FACC15"/>
+  </g>
+</svg>
