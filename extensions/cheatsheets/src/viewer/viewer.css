@@ -1,0 +1,100 @@
+@import "@/shared/theme.css";
+
+#root { height: 100%; display: flex; flex-direction: column; }
+
+/* Native-matching topbar (tab presentation only). */
+.topbar {
+  box-sizing: content-box;
+  height: var(--muxy-topbar-height);
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  padding: 0 var(--s6);
+  background: var(--muxy-background);
+  border-bottom: 1px solid var(--muxy-border);
+  flex: 0 0 auto;
+}
+.topbar .title {
+  font-size: var(--font-title);
+  font-weight: 600;
+  font-family: var(--mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.topbar .actions { margin-left: auto; display: flex; gap: var(--s2); align-items: center; }
+
+/* Compact header (modal presentation). */
+.modal-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  padding: var(--s5) var(--s6);
+  border-bottom: 1px solid var(--muxy-border);
+  flex: 0 0 auto;
+}
+.modal-head .title {
+  font-size: var(--font-title);
+  font-weight: 600;
+  font-family: var(--mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.modal-head .actions { margin-left: auto; display: flex; gap: var(--s2); align-items: center; }
+
+.viewer-body { flex: 1; display: flex; min-height: 0; }
+
+.outline {
+  flex: 0 0 168px;
+  border-right: 1px solid var(--muxy-border);
+  overflow-y: auto;
+  padding: var(--s5) 0;
+  display: none;
+}
+.outline a {
+  display: block;
+  padding: var(--s2) var(--s5);
+  color: var(--muxy-foreground-muted);
+  font-size: var(--font-footnote);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.outline a:hover { color: var(--muxy-foreground); background: var(--muxy-hover); text-decoration: none; }
+.presentation-tab .has-outline .outline { display: block; }
+
+.content {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--s6);
+  scroll-behavior: smooth;
+}
+.presentation-tab .content { padding: var(--s7) var(--s9); }
+/* The scroll container spans the full pane so its scrollbar sits at the
+   window edge; the content itself is capped and centered inside it. */
+.presentation-tab .content > .tldr,
+.presentation-tab .content > .man,
+.presentation-tab .content > .man-pre,
+.presentation-tab .content > .state {
+  max-width: 860px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.hint {
+  padding: var(--s3) var(--s6);
+  border-top: 1px solid var(--muxy-border);
+  color: var(--muxy-foreground-muted);
+  font-size: var(--font-caption);
+  flex: 0 0 auto;
+  display: flex;
+  gap: var(--s5);
+}
+.hint kbd {
+  font-family: var(--mono);
+  background: var(--muxy-surface-solid);
+  border: 1px solid var(--muxy-border);
+  border-radius: 4px;
+  padding: 0 var(--s2);
+}

@@ -1,6 +1,6 @@
 {
   "name": "gsd-control-tower",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "Read-only Muxy panel for GSD next steps, roadmap progress, and agent activity.",
@@ -62,6 +62,9 @@
         "entry": "panel/index.html",
         "position": "right",
         "mode": "pinned",
+        "hiddenControls": [
+          "pin"
+        ],
         "headerButtons": [
           {
             "id": "refresh",

@@ -1,5 +1,5 @@
 import { MAX_RESULTS, SEARCH_EXIT_MARKER } from "./constants.js";
-import { grep_request, rg_request } from "./commands.js";
+import { git_grep_request, grep_request, rg_request } from "./commands.js";
 import {
   is_search_too_short,
   parse_result_id,
@@ -9,6 +9,8 @@ import {
 } from "./query.js";
 
 const COMMAND_NOT_FOUND_EXIT_CODE = 127;
+// git grep exits 128 outside a Git work tree and 129 when it is too old for an option.
+const GIT_GREP_UNAVAILABLE_EXIT_CODES = [COMMAND_NOT_FOUND_EXIT_CODE, 128, 129];
 const SEARCH_CACHE_LIMIT = 20;
 
 let searchCache = new Map();
@@ -172,8 +174,11 @@ function resolve_scheduled_search(expectedResolve) {
 
 async function perform_search(variants, options) {
   let response = await run_request(rg_request(variants, options));
-  if (should_fallback_to_grep(response)) {
-    response = await run_request(grep_request(variants, options));
+  if (is_unavailable(response, [COMMAND_NOT_FOUND_EXIT_CODE])) {
+    response = await run_request(git_grep_request(variants, options));
+    if (is_unavailable(response, GIT_GREP_UNAVAILABLE_EXIT_CODES)) {
+      response = await run_request(grep_request(variants, options));
+    }
   }
 
   const result = response.ok ? response.result : null;
@@ -228,9 +233,9 @@ async function run_request(request) {
   }
 }
 
-function should_fallback_to_grep(response) {
+function is_unavailable(response, exitCodes) {
   if (response.ok) {
-    return search_exit_code(response.result) === COMMAND_NOT_FOUND_EXIT_CODE;
+    return !response.result?.timedOut && exitCodes.includes(search_exit_code(response.result));
   }
   return is_command_not_found_error(response.error);
 }

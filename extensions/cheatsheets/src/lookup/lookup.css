@@ -1,0 +1,29 @@
+@import "@/shared/theme.css";
+@import "@/shared/list.css";
+
+/* Webview modals are opaque cards, unlike popovers. */
+body { background: var(--muxy-background); }
+
+#root { height: 100%; display: flex; flex-direction: column; }
+
+.read-body .tldr-desc { font-size: var(--font-body); }
+
+.hintbar {
+  border-top: 1px solid var(--muxy-border);
+  padding: var(--s3) var(--s5);
+  color: var(--muxy-foreground-muted);
+  font-size: var(--font-caption);
+  flex: 0 0 auto;
+  display: flex;
+  gap: var(--s5);
+}
+/* s3 vertical would make the bar 40px tall around the 28px ⚙ button. */
+.hintbar { align-items: center; padding-top: var(--s2); padding-bottom: var(--s2); }
+.hintbar .grow { flex: 1; }
+.hintbar kbd {
+  font-family: var(--mono);
+  background: var(--muxy-surface-solid);
+  border: 1px solid var(--muxy-border);
+  border-radius: 4px;
+  padding: 0 var(--s2);
+}

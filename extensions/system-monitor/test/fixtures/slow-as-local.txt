@@ -1,0 +1,5 @@
+Now drawing from 'AC Power'
+ -InternalBattery-0 (id=24707171)	75%; charging; 1:56 remaining present: true
+@@
+Filesystem     1024-blocks      Used Available Capacity  Mounted on
+/dev/disk3s3s1   971350180  13334800 140680632     9%    /

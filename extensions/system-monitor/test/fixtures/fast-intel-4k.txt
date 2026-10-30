@@ -1,0 +1,53 @@
+Darwin
+@@
+Processes: 512 total, 3 running, 509 sleeping, 2400 threads
+2026/09/13 10:00:00
+Load Avg: 2.44, 2.58, 2.81
+CPU usage: 7.35% user, 11.76% sys, 80.88% idle
+SharedLibs: 300M resident, 60M data, 200M linkedit.
+MemRegions: 90000 total, 4G resident, 500M private, 2G shared.
+PhysMem: 12G used (2300M wired, 1367M compressor), 3800M unused.
+VM: 200T vsize, 4G framework vsize, 120(0) swapins, 340(0) swapouts.
+Networks: packets: 1000000/1G in, 500000/300M out.
+Disks: 800000/20G read, 700000/12G written.
+@@
+Mach Virtual Memory Statistics: (page size of 4096 bytes)
+Pages free:                                   100000.
+Pages active:                                1500000.
+Pages inactive:                               800000.
+Pages speculative:                             50000.
+Pages throttled:                                   0.
+Pages wired down:                             600000.
+Pages purgeable:                               40000.
+"Translation faults":                      100000000.
+Pages copy-on-write:                         9000000.
+Pages zero filled:                          80000000.
+Pages reactivated:                            400000.
+Pages purged:                                 300000.
+File-backed pages:                            550000.
+Anonymous pages:                             1800000.
+Pages stored in compressor:                   900000.
+Pages occupied by compressor:                 350000.
+Decompressions:                               500000.
+Compressions:                                 700000.
+Pageins:                                     2000000.
+Pageouts:                                       5000.
+Swapins:                                         120.
+Swapouts:                                        340.
+@@
+4096
+17179869184
+{ 2.44 2.58 2.81 }
+total = 2048.00M  used = 812.50M  free = 1235.50M  (encrypted)
+@@
+Name       Mtu   Network       Address            Ipkts Ierrs     Ibytes    Opkts Oerrs     Obytes  Coll
+lo0        16384 <Link#1>                        165952     0   59144060   165952     0   59144060     0
+en0        1500  <Link#4>    a4:83:e7:aa:bb:cc  4000000     0    5000000  2000000     0    2500000     0
+en0        1500  fe80::%en0/64 fe80:4::a483:e7ff 4000000     -    5000000  2000000     -    2500000     -
+utun0      1380  <Link#17>                         1225     0     336914      748     0     287734     0
+@@
++-o IntelAccelerator  <class IntelAccelerator, id 0x100000456, registered, matched, active, busy 0 (0 ms), retain 12>
+    {
+      "PerformanceStatistics" = {"Device Utilization %"=37,"Renderer Utilization %"=35,"Tiler Utilization %"=12}
+      "IOClass" = "IntelAccelerator"
+    }

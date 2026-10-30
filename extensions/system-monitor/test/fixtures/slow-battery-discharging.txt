@@ -1,0 +1,5 @@
+Now drawing from 'Battery Power'
+ -InternalBattery-0 (id=24707171)	87%; discharging; 4:12 remaining present: true
+@@
+Filesystem     1024-blocks      Used Available Capacity  Mounted on
+/dev/disk3s1s1   994662584  11021012 328731640     4%    /

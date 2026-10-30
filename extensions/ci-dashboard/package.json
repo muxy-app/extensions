@@ -1,0 +1,107 @@
+{
+  "name": "ci-dashboard",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "scripts": {
+    "build": "vite build && node -e \"require('fs').copyFileSync('package.json','dist/package.json')\"",
+    "dev": "vite",
+    "test": "node --test test/*.test.mjs"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  },
+  "muxy": {
+    "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
+    "description": "A unified CI/CD dashboard for the current project — pipelines, jobs, failure excerpts, environments, from GitHub Actions, GitLab CI, or any CCTray build server.",
+    "panels": [
+      {
+        "id": "ci",
+        "title": "CI/CD",
+        "icon": {
+          "svg": "assets/icon.svg"
+        },
+        "entry": "index.html",
+        "position": "right",
+        "mode": "pinned",
+        "headerButtons": [
+          {
+            "id": "refresh",
+            "icon": {
+              "symbol": "arrow.clockwise"
+            },
+            "tooltip": "Refresh",
+            "command": "refresh-ci"
+          },
+          {
+            "id": "sources",
+            "icon": {
+              "symbol": "slider.horizontal.3"
+            },
+            "tooltip": "Sources",
+            "command": "open-ci-sources"
+          }
+        ]
+      }
+    ],
+    "commands": [
+      {
+        "id": "toggle-ci-panel",
+        "title": "CI/CD: Toggle Dashboard",
+        "action": {
+          "kind": "togglePanel",
+          "panel": "ci"
+        }
+      },
+      {
+        "id": "refresh-ci",
+        "title": "CI/CD: Refresh"
+      },
+      {
+        "id": "open-ci-sources",
+        "title": "CI/CD: Configure Sources"
+      }
+    ],
+    "topbarItems": [
+      {
+        "id": "ci-panel",
+        "icon": {
+          "svg": "assets/icon.svg"
+        },
+        "tooltip": "Toggle CI/CD dashboard",
+        "command": "toggle-ci-panel"
+      }
+    ],
+    "events": [
+      "project.switched"
+    ],
+    "permissions": [
+      "commands:exec",
+      "projects:read",
+      "panels:write",
+      "git:read",
+      "files:read",
+      "storage:read",
+      "storage:write"
+    ],
+    "marketplace": {
+      "author": "Eric Marchand",
+      "github": "phimage",
+      "repository": "https://github.com/muxy-app/extensions",
+      "categories": [
+        "developer-tools",
+        "productivity"
+      ],
+      "icon": "assets/icon.svg",
+      "screenshots": [
+        "screenshots/screenshot-1.png",
+        "screenshots/screenshot-2.png",
+        "screenshots/screenshot-3.png"
+      ]
+    }
+  },
+  "allowScripts": {
+    "esbuild@0.21.5": true,
+    "fsevents@2.3.3": true
+  }
+}

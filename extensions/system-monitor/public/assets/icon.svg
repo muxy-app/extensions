@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img"
+     aria-label="System Monitor: a gauge">
+  <defs>
+    <linearGradient id="dial" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#22C55E"/>
+      <stop offset="1" stop-color="#0D9488"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="112" fill="url(#dial)"/>
+
+  <!-- The same gauge as the status bar symbol, drawn heavy enough to hold
+       together at 48px, on an opaque tile so it reads on any store theme. -->
+  <g fill="none" stroke="#fff" stroke-linecap="round">
+    <path d="M126 285 A130 130 0 0 1 386 285" stroke-width="34"/>
+    <path d="M256 285 L326 202" stroke-width="28"/>
+    <path d="M170 357 H342" stroke-width="28"/>
+  </g>
+  <circle cx="256" cy="285" r="21" fill="#fff"/>
+</svg>

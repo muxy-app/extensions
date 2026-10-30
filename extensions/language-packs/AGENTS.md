@@ -4,24 +4,38 @@ These instructions apply to every change under `extensions/language-packs/`.
 
 ## Source Of Truth
 
-- Always translate from the latest English catalog in
-  [`muxy-app/muxy`](https://github.com/muxy-app/muxy/blob/main/Muxy/Resources/Localization/en.lproj/Localizable.strings).
-- Fetch a fresh copy before starting. Never use another translation as the source and never assume an existing catalog has every current key.
-- Record the Muxy source commit used in the pull request so reviewers can reproduce the catalog.
-- A new catalog should contain every English source key exactly once and in the same order. Translate only the value on the right side of `=`.
+Each catalog serves both Muxy 1.x and Muxy 2.x, so it translates two English
+sources in [`muxy-app/muxy`](https://github.com/muxy-app/muxy):
 
-Fetch and pin the current source instead of copying it from a local checkout:
+| App | Branch | English catalog |
+| --- | --- | --- |
+| Muxy 1.x | `main` | `Muxy/Resources/Localization/en.lproj/Localizable.strings` |
+| Muxy 2.x | `2.x` | `crates/muxy-app/localization/en.lproj/Localizable.strings` |
+
+- Always translate from the latest copy of both catalogs. Fetch fresh copies before starting. Never use another translation as the source and never assume an existing catalog has every current key.
+- Record both Muxy source commits used in the pull request so reviewers can reproduce the catalog.
+- A catalog has three sections, each a comment followed by entries:
+  1. Muxy 1.x: every key of the `main` catalog, in its order.
+  2. Muxy 2.x: every key of the `2.x` catalog that the `main` catalog lacks, in its order.
+  3. Earlier Muxy 1.x releases (optional): keys older releases still use.
+
+  Every key appears exactly once. Translate only the value on the right side of `=`.
+
+Fetch and pin the current sources instead of copying them from a local checkout:
 
 ```bash
-SOURCE_COMMIT="$(git ls-remote https://github.com/muxy-app/muxy.git refs/heads/main | cut -f1)"
-curl -fsSL "https://raw.githubusercontent.com/muxy-app/muxy/${SOURCE_COMMIT}/Muxy/Resources/Localization/en.lproj/Localizable.strings" \
-  -o "/tmp/Muxy-Localizable.strings"
+V1="$(git ls-remote https://github.com/muxy-app/muxy.git refs/heads/main | cut -f1)"
+V2="$(git ls-remote https://github.com/muxy-app/muxy.git refs/heads/2.x | cut -f1)"
+curl -fsSL "https://raw.githubusercontent.com/muxy-app/muxy/${V1}/Muxy/Resources/Localization/en.lproj/Localizable.strings" \
+  -o "/tmp/Muxy-1-Localizable.strings"
+curl -fsSL "https://raw.githubusercontent.com/muxy-app/muxy/${V2}/crates/muxy-app/localization/en.lproj/Localizable.strings" \
+  -o "/tmp/Muxy-2-Localizable.strings"
 ```
 
 ## Adding A Language
 
 1. Choose the canonical BCP 47 language tag, such as `de`, `fr`, or `pt-BR`, and the language's native display name.
-2. Create `localization/<EnglishLanguageName>.bundle/<tag>.lproj/Localizable.strings` from the current English catalog.
+2. Create `localization/<EnglishLanguageName>.bundle/<tag>.lproj/Localizable.strings` from both current English catalogs, in the sections described above.
 3. Add `localization/<EnglishLanguageName>.bundle/Info.plist` with:
    - A unique, lowercase `CFBundleIdentifier` following `app.muxy.language-packs.<tag>`.
    - `CFBundleDevelopmentRegion` set to the exact BCP 47 tag.
@@ -42,7 +56,7 @@ Follow the existing naming pattern: English PascalCase bundle directory names, c
 - Use natural terminology consistently across the whole catalog. Do not submit raw machine translation as finished work; AI-assisted catalogs require fluent-speaker review.
 - For right-to-left languages, review punctuation, placeholders, paths, and mixed-direction technical text in the running interface.
 
-Muxy rejects a localization bundle when a translated format string could read arguments with incompatible types. The complete rules are documented in
+Both Muxy 1.x and 2.x reject a localization bundle when a translated format string could read arguments with incompatible types. The complete rules are documented in
 [`docs/extensions/localizations.md`](https://github.com/muxy-app/muxy/blob/main/docs/extensions/localizations.md).
 
 ## Validation
@@ -68,7 +82,7 @@ Inspect `extensions/language-packs/dist/` only to verify the built package. Do n
 
 Before finishing, verify all of the following:
 
-- The translated catalog parses and has the same complete key set as the pinned English source.
+- The translated catalog parses and has the same complete key set as the two pinned English sources.
 - Every manifest path and language tag matches the bundle on disk exactly.
 - `Info.plist` has no executable declaration.
 - The extension still has no permissions or executable localization code.

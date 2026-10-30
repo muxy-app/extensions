@@ -8,7 +8,7 @@ import { run } from "./fatal.js";
 import { loadConfig, saveConfig } from "./config.js";
 import { fetchTeams, fetchTeamProjects, fetchProjectByName, createProject } from "./linear.js";
 import { readProjectConfig, writeProjectConfig, clearProjectConfig } from "./project.js";
-import { setLang, t } from "./i18n.js";
+import { setLang, t, LANGS } from "./i18n.js";
 
 const muxy = window.muxy;
 const app = document.getElementById("app");
@@ -24,7 +24,11 @@ async function main() {
   const tokenEntries = Array.isArray(config.api_tokens) ? config.api_tokens : [];
 
   app.innerHTML = `
-    <h2 class="m-title">${t("set.title")}</h2>
+    <header class="m-head">
+      <h2 class="m-title">${t("set.title")}</h2>
+      <span class="spacer"></span>
+      <button id="close" class="icon-btn" title="${t("common.close")}" aria-label="${t("common.close")}">✕</button>
+    </header>
     <div class="seg" id="scope" style="margin:6px 0 6px">
       <button class="seg-btn" data-scope="global">${t("scope.global")}</button>
       <button class="seg-btn" data-scope="project">${t("scope.project")}</button>
@@ -33,7 +37,10 @@ async function main() {
     <div id="scope-body"></div>
     <p id="err" class="error" hidden></p>
     <div class="actions">
-      <button id="close" class="primary">${t("common.close")}</button>
+      <span class="spacer"></span>
+      <!-- 자동 저장이지만, 눌러서 즉시 저장하고 저장 피드백을 받고 싶을 때를 위한 수동 저장 버튼(가운데 배치). -->
+      <button id="save" class="primary">${t("common.save")}</button>
+      <span class="spacer"></span>
     </div>
   `;
 
@@ -89,8 +96,15 @@ async function main() {
     const tokenOptions = tokenEntries.length
       ? tokenEntries.map((e) => `<option value="${escapeHtml(e.id)}">${e.label ? escapeHtml(e.label) : "—"}</option>`).join("")
       : `<option value="">${t("set.noKeysRegistered")}</option>`;
+    // 언어 select 옵션
+    const langOptions = LANGS.map((l) => `<option value="${l.v}" ${config.language === l.v ? "selected" : ""}>${l.t}</option>`).join("");
 
     body.innerHTML = `
+      <div class="field">
+        <span class="label">${t("set.language")}</span>
+        <select id="language">${langOptions}</select>
+      </div>
+
       <div class="field">
         <span class="label">${t("set.apiKey")}</span>
         <div class="row" style="gap:6px">
@@ -135,6 +149,13 @@ async function main() {
     }
     const globalToken = () => tokenEntries.find((t) => t.id === tokenSel.value)?.token || "";
     tokenSel.addEventListener("change", () => loadTeams("team_key", "team_hint", globalToken(), document.getElementById("team_key").value));
+
+    // 언어 변경: config.language 를 즉시 갱신·적용하고 전체를 재렌더한다(값 저장은 위임 autoSave 가 처리).
+    document.getElementById("language").addEventListener("change", (e) => {
+      config.language = e.target.value;
+      setLang(config.language);
+      applyScope();
+    });
 
     // 관리 모달
     document.getElementById("manage-keys").addEventListener("click", async () => {
@@ -388,6 +409,7 @@ async function main() {
     const activeId = tokenSel?.value || "";
     const activeToken = tokenEntries.find((e) => e.id === activeId)?.token || "";
     const next = {
+      language: val("language") || config.language,
       api_token_active: activeId,
       api_token: activeToken, // 하위 호환: 활성 키를 단일 값에도 반영
       team_key: val("team_key"),
@@ -453,6 +475,21 @@ async function main() {
   // 값 변경(select/checkbox)은 change, 텍스트 입력은 input 으로 감지. 버튼(click)은 대상 아님.
   body.addEventListener("change", autoSave);
   body.addEventListener("input", autoSave);
+
+  // 수동 저장: 자동 저장과 동일한 경로(persistScope)로 현재 스코프를 즉시 저장하고 피드백을 준다.
+  document.getElementById("save").addEventListener("click", async () => {
+    const btn = document.getElementById("save");
+    btn.disabled = true;
+    try {
+      await persistScope();
+      muxy.toast?.({ title: t("set.saved") });
+    } catch (e) {
+      errEl.textContent = e.message;
+      errEl.hidden = false;
+    } finally {
+      btn.disabled = false;
+    }
+  });
 
   // 닫기: 디바운스 대기분을 즉시 반영한 뒤 닫는다.
   document.getElementById("close").addEventListener("click", async () => {

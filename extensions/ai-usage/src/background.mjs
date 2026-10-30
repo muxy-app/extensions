@@ -357,37 +357,78 @@ function refreshKimiCredsSync(home, cred) {
 
 // ── claude ──
 
-const claudeCredPaths = [
-  (home) => `${home}/.claude/.credentials.json`,
-  (home) => `${home}/.config/claude/.credentials.json`,
-];
+// Declared as a hoisted function, not a const array: the startup block at the
+// top of this module calls poll() before module-level bindings initialize, so a
+// const here is still in its temporal dead zone on the first poll.
+function claudeCredPaths(home) {
+  const configDir = readEnv("CLAUDE_CONFIG_DIR");
+  return [
+    `${configDir || `${home}/.claude`}/.credentials.json`,
+    `${home}/.config/claude/.credentials.json`,
+  ];
+}
 
 function fetchClaudeSync(home, provider) {
   let cred = readClaudeCreds(home);
   if (!cred) return null;
 
-  // Refresh expired token in background (expiresAt is in ms)
-  if (cred.expiresAt && Date.now() > cred.expiresAt) {
-    if (!cred.refreshToken) return null;
+  // Refresh expired token in background (expiresAt is in ms). Keychain-sourced
+  // credentials have no credentialPath to write the rotated token back to, so
+  // they are used as-is and left for Claude Code itself to refresh — matching
+  // the popover, which guards on credentialPath for the same reason.
+  if (cred.credentialPath && cred.refreshToken && cred.expiresAt && Date.now() > cred.expiresAt) {
     const refreshed = refreshClaudeCredsSync(home, cred);
-    if (!refreshed) return null;
-    cred = refreshed;
+    if (refreshed) cred = refreshed;
   }
 
-  const payload = syncCurl("https://api.claude.ai/api/organization/usage", "GET", {
-    Cookie: `sessionKey=${cred.token}`,
+  const payload = syncCurl("https://api.anthropic.com/api/oauth/usage", "GET", {
+    Authorization: `Bearer ${cred.token}`,
     Accept: "application/json",
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Claude",
+    "Content-Type": "application/json",
+    "anthropic-beta": "oauth-2025-04-20",
+    "User-Agent": "claude-code/2.1.69",
   });
   if (!payload) return null;
-  const rows = parseClaudeRows(payload);
-  if (!Array.isArray(rows) || rows.length === 0) return null;
-  return makeSnapshot(provider, rows);
+  const parsed = parseClaudeRows(payload);
+  const rows = parsed && Array.isArray(parsed.rows) ? parsed.rows : [];
+  if (rows.length === 0) return null;
+  return makeSnapshot(provider, rows, (parsed && parsed.planName) || "");
+}
+
+function readClaudeKeychainCreds() {
+  const user = readEnv("USER");
+  for (const account of [user, ""]) {
+    const argv = ["/usr/bin/security", "find-generic-password", "-s", "Claude Code-credentials", "-w"];
+    if (account) argv.splice(2, 0, "-a", account);
+    const result = muxy.exec(argv, { timeoutMs: 3000 });
+    if (!result || result.exitCode !== 0) continue;
+    const raw = String(result.stdout || "").trim();
+    if (!raw) continue;
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      continue;
+    }
+    const oauth = data && data.claudeAiOauth;
+    if (oauth && oauth.accessToken) {
+      return {
+        token: oauth.accessToken,
+        refreshToken: oauth.refreshToken || null,
+        expiresAt: Number(oauth.expiresAt) || null,
+        credentialPath: null,
+        raw: data,
+      };
+    }
+  }
+  return null;
 }
 
 function readClaudeCreds(home) {
-  for (const path of claudeCredPaths) {
-    const data = readJSON(path(home));
+  const keychain = readClaudeKeychainCreds();
+  if (keychain) return keychain;
+  for (const path of claudeCredPaths(home)) {
+    const data = readJSON(path);
     if (data && data.claudeAiOauth) {
       const oauth = data.claudeAiOauth;
       if (oauth.accessToken) {
@@ -395,7 +436,7 @@ function readClaudeCreds(home) {
           token: oauth.accessToken,
           refreshToken: oauth.refreshToken || null,
           expiresAt: Number(oauth.expiresAt) || null,
-          credentialPath: path(home),
+          credentialPath: path,
           raw: data,
         };
       }
@@ -405,11 +446,16 @@ function readClaudeCreds(home) {
 }
 
 function refreshClaudeCredsSync(home, cred) {
-  const body = `grant_type=refresh_token&refresh_token=${escapeCurl(cred.refreshToken)}`;
+  const body = JSON.stringify({
+    grant_type: "refresh_token",
+    refresh_token: cred.refreshToken,
+    client_id: "9d1c250a-e61b-44d9-88ed-5944d1962f5e",
+    scope: "user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload",
+  });
   const config =
-    `url = "https://api.claude.ai/api/oauth/token"\n` +
+    `url = "https://platform.claude.com/v1/oauth/token"\n` +
     `request = "POST"\n` +
-    `header = "Content-Type: application/x-www-form-urlencoded"\n` +
+    `header = "Content-Type: application/json"\n` +
     `header = "Accept: application/json"\n` +
     `data = "${escapeCurl(body)}"\n`;
 

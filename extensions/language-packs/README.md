@@ -1,6 +1,6 @@
 # Language Packs
 
-A [Muxy](https://muxy.app) localization extension that adds community-contributed app languages via **Settings → Interface → Language**.
+A [Muxy](https://muxy.app) localization extension that adds community-contributed app languages via **Settings → Interface → Language** in Muxy 1.x, or **Settings → Appearance → App language** in Muxy 2.x.
 
 One extension, one `localizations` entry per language — anyone can add a new language by adding a bundle folder and one manifest entry, no code required.
 
@@ -19,12 +19,19 @@ None. This extension only ships resource-only localization bundles — no code r
 
 ## How it works
 
-Each language is a resource-only Apple `.bundle` under `localization/`, containing `<language>.lproj/Localizable.strings` translated from Muxy's English source (`Muxy/Resources/Localization/en.lproj/Localizable.strings`). Missing keys fall back to English automatically. Format placeholders (`%@`, `%lld`, etc.) are kept in the same position and type as the English source — see [`docs/extensions/localizations.md`](https://github.com/muxy-app/muxy/blob/main/docs/extensions/localizations.md) in the Muxy app repo for the exact rules.
+Each language is a resource-only Apple `.bundle` under `localization/`, containing `<language>.lproj/Localizable.strings`. One catalog serves both Muxy 1.x and Muxy 2.x: it holds the translations of both apps' English sources, and each app uses the keys it knows.
+
+| App | English source |
+| --- | --- |
+| Muxy 1.x (`main`) | `Muxy/Resources/Localization/en.lproj/Localizable.strings` |
+| Muxy 2.x (`2.x`) | `crates/muxy-app/localization/en.lproj/Localizable.strings` |
+
+Missing keys fall back to English automatically. Format placeholders (`%@`, `%lld`, etc.) are kept in the same position and type as the English source — see [`docs/extensions/localizations.md`](https://github.com/muxy-app/muxy/blob/main/docs/extensions/localizations.md) in the Muxy app repo for the exact rules.
 
 ## Adding a new language
 
 1. Add `localization/<Language>.bundle/<lang>.lproj/Localizable.strings` (and optionally `Localizable.stringsdict`), plus a minimal `Info.plist` with no `CFBundleExecutable`.
-2. Translate every key from the English source, keeping format placeholders identical in position and type.
+2. Translate every key from both English sources, keeping format placeholders identical in position and type.
 3. Add one entry to `muxy.localizations` in `package.json`:
    ```json
    {

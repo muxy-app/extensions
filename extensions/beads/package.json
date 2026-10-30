@@ -33,7 +33,8 @@
     ],
     "events": [
       "project.switched",
-      "worktree.switched"
+      "worktree.switched",
+      "worktree.headChanged"
     ],
     "panels": [
       {
@@ -107,8 +108,9 @@
   "private": true,
   "scripts": {
     "build": "vite build && node scripts/copy-manifest.mjs",
-    "dev": "vite"
+    "dev": "vite",
+    "test": "node --test test/*.test.mjs"
   },
   "type": "module",
-  "version": "0.2.1"
+  "version": "0.2.2"
 }

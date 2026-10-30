@@ -7,7 +7,7 @@
 import { parseVerificationMd } from "./parse-support.js";
 import { BOUNDS } from "../types.js";
 
-const PLAN_RE = /^(\d{2,})-(\d{2,})-PLAN\.md$/i;
+const PLAN_RE = /^(\d+(?:\.\d+)*)-(\d{2,})-PLAN\.md$/i;
 const DIR_NUM_RE = /^(\d+(?:\.\d+)?)(?:[-_]|$)/;
 
 /**
@@ -54,7 +54,7 @@ export async function collectPhases(source, opts = {}) {
 
     let verification = /** @type {PhasePipelineEntry["verification"]} */ ("unknown");
     let verificationDetail;
-    const verifyName = names.find((n) => /^\d{2,}-VERIFICATION\.md$/i.test(n))
+    const verifyName = names.find((n) => /^\d+(?:\.\d+)*-VERIFICATION\.md$/i.test(n))
       ?? (names.includes("VERIFICATION.md") ? "VERIFICATION.md" : undefined);
     if (verifyName) {
       const text = await safeRead(source, `.planning/phases/${dir.name}/${verifyName}`, errors, warnings);
@@ -73,14 +73,14 @@ export async function collectPhases(source, opts = {}) {
         normalizeNumber(opts.currentPhaseNumber) === normalizeNumber(numberRaw),
       pausedMarker: names.some((n) => n === ".continue-here.md" || n === "HANDOFF.json"),
       stages: {
-        discuss: has(/^(\d+-)?(DISCUSSION-LOG|CONTEXT)\.md$/i),
-        research: has(/^(\d+-)?RESEARCH\.md$/i),
-        ui: has(/^(\d+-)?UI-SPEC\.md$/i),
-        spec: has(/^(\d+-)?SPEC\.md$/i),
-        patterns: has(/^(\d+-)?PATTERNS\.md$/i),
-        review: has(/^(\d+-)?REVIEW(-FIX)?\.md$/i),
-        security: has(/^(\d+-)?SECURITY\.md$/i),
-        validation: has(/^(\d+-)?VALIDATION\.md$/i),
+        discuss: has(/^(\d+(?:\.\d+)*-)?(DISCUSSION-LOG|CONTEXT)\.md$/i),
+        research: has(/^(\d+(?:\.\d+)*-)?RESEARCH\.md$/i),
+        ui: has(/^(\d+(?:\.\d+)*-)?UI-SPEC\.md$/i),
+        spec: has(/^(\d+(?:\.\d+)*-)?SPEC\.md$/i),
+        patterns: has(/^(\d+(?:\.\d+)*-)?PATTERNS\.md$/i),
+        review: has(/^(\d+(?:\.\d+)*-)?REVIEW(-FIX)?\.md$/i),
+        security: has(/^(\d+(?:\.\d+)*-)?SECURITY\.md$/i),
+        validation: has(/^(\d+(?:\.\d+)*-)?VALIDATION\.md$/i),
       },
       plansTotal: plans.length,
       plansDone,

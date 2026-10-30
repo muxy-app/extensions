@@ -80,6 +80,9 @@ const ISSUE_FIELDS = `
   assignee { id name displayName avatarUrl }
   parent { id identifier title }`;
 
+// 목록에서 하위 이슈 완료 정도를 계산하기 위한 경량 요약(상태 type 만).
+const CHILD_SUMMARY = `children(first: 100) { nodes { state { type } } }`;
+
 // 활성 상태 타입 필터(완료/취소 제외).
 function activeStateFilter() {
   return { type: { in: ["triage", "backlog", "unstarted", "started"] } };
@@ -99,7 +102,7 @@ export async function fetchMyIssues(token, { teamKey = "", projectId = "", activ
         name
         displayName
         assignedIssues(first: $first, filter: $filter, orderBy: updatedAt) {
-          nodes { ${ISSUE_FIELDS} }
+          nodes { ${ISSUE_FIELDS} ${CHILD_SUMMARY} }
         }
       }
     }`;
@@ -119,7 +122,7 @@ export async function fetchProjectIssues(token, { projectId, activeOnly = true, 
         id
         name
         issues(first: $first, filter: $filter, orderBy: updatedAt) {
-          nodes { ${ISSUE_FIELDS} }
+          nodes { ${ISSUE_FIELDS} ${CHILD_SUMMARY} }
         }
       }
     }`;
@@ -357,7 +360,8 @@ export async function fetchProjectMilestones(token, projectId) {
 
 // 팀에서 사용 가능한 이슈 템플릿 목록(워크스페이스 공용 템플릿 포함).
 // templateData 에는 제목/본문/중요도/라벨/담당자/프로젝트 등 기본값이 들어 있어
-// 생성 폼을 채우는 데 쓴다. Linear 는 JSON 스칼라로 객체를 그대로 돌려준다.
+// 생성 폼을 채우는 데 쓴다. Linear 는 templateData 를 "JSON 문자열"로 돌려주므로
+// (객체가 아니다) 여기서 JSON.parse 로 객체화해 넘긴다. 파싱 실패 시 빈 객체로 둔다.
 export async function fetchTeamTemplates(token, teamId) {
   const query = `
     query TeamTemplates($id: String!) {
@@ -368,6 +372,12 @@ export async function fetchTeamTemplates(token, teamId) {
     }`;
   const data = await gql(token, query, { id: teamId });
   const nodes = (data.team?.templates?.nodes ?? []).filter((t) => t.type === "issue" || !t.type);
+  for (const n of nodes) {
+    if (typeof n.templateData === "string") {
+      try { n.templateData = JSON.parse(n.templateData); }
+      catch { n.templateData = {}; }
+    }
+  }
   return nodes.sort((a, b) => a.name.localeCompare(b.name));
 }
 
@@ -417,6 +427,24 @@ export async function updateIssuePriority(token, issueId, priority) {
     }`;
   const data = await gql(token, query, { id: issueId, priority });
   return data.issueUpdate?.success === true;
+}
+
+// 팀에 새 라벨을 생성한다. color 를 안 주면 Linear 가 자동 배정한다.
+// 생성된 라벨({id,name,color})을 돌려줘 곧바로 선택 목록에 넣을 수 있게 한다.
+export async function createTeamLabel(token, teamId, { name, color } = {}) {
+  const query = `
+    mutation CreateLabel($input: IssueLabelCreateInput!) {
+      issueLabelCreate(input: $input) {
+        success
+        issueLabel { id name color isGroup }
+      }
+    }`;
+  const input = { teamId, name };
+  if (color) input.color = color;
+  const data = await gql(token, query, { input });
+  const res = data.issueLabelCreate;
+  if (!res?.success || !res.issueLabel) throw new Error("라벨 생성에 실패했습니다.");
+  return res.issueLabel;
 }
 
 // 이슈 라벨 전체 교체(labelIds 배열로 지정한 집합으로 설정).

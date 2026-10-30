@@ -1,0 +1,95 @@
+{
+  "name": "run-deck",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "description": "Discover running services, open their pages, and stop them from a focused Muxy panel.",
+  "author": "DarinRowe",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DarinRowe/run-deck.git"
+  },
+  "homepage": "https://github.com/DarinRowe/run-deck#readme",
+  "bugs": {
+    "url": "https://github.com/DarinRowe/run-deck/issues"
+  },
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build && node scripts/copy-manifest.mjs"
+  },
+  "devDependencies": {
+    "vite": "7.3.6"
+  },
+  "muxy": {
+    "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
+    "description": "Monitor service trees and resources, jump to terminals, and safely stop or restart tracked launches. Live checks only while visible.",
+    "permissions": [
+      "panels:write",
+      "projects:read",
+      "worktrees:read",
+      "tabs:read",
+      "tabs:write",
+      "storage:read",
+      "storage:write",
+      "commands:exec",
+      "files:read",
+      "browser:write"
+    ],
+    "events": [
+      "project.switched",
+      "worktree.switched",
+      "tab.created",
+      "tab.updated",
+      "tab.closed"
+    ],
+    "panels": [
+      {
+        "id": "services",
+        "title": "Run Deck",
+        "icon": {
+          "symbol": "play.rectangle.on.rectangle"
+        },
+        "entry": "panel/index.html",
+        "position": "right",
+        "mode": "pinned"
+      }
+    ],
+    "commands": [
+      {
+        "id": "toggle-services",
+        "title": "Run Deck: Toggle Services",
+        "action": {
+          "kind": "togglePanel",
+          "panel": "services"
+        }
+      }
+    ],
+    "topbarItems": [
+      {
+        "id": "services",
+        "icon": {
+          "symbol": "play.rectangle.on.rectangle"
+        },
+        "tooltip": "Run Deck",
+        "command": "toggle-services"
+      }
+    ],
+    "marketplace": {
+      "author": "DarinRowe",
+      "github": "DarinRowe",
+      "categories": [
+        "developer-tools",
+        "productivity"
+      ],
+      "icon": "assets/icon.svg",
+      "screenshots": [
+        "assets/screenshot-dark.png",
+        "assets/screenshot-light.png"
+      ]
+    }
+  }
+}
