@@ -1,23 +1,21 @@
 {
   "name": "git",
   "private": true,
+  "type": "module",
+  "version": "2.0.0",
   "scripts": {
-    "build": "vite build && node -e \"require('fs').copyFileSync('package.json','dist/package.json')\"",
-    "build:surfaces": "vite build",
     "dev": "vite",
-    "test": "node --test tests/*.test.mjs",
+    "build": "vite build && node scripts/build-scripts.mjs",
+    "test": "node --import ./tests/support/alias.mjs --test \"tests/*.test.mjs\"",
     "update-skill": "node scripts/update-skill.mjs"
   },
-  "type": "module",
-  "version": "1.16.0",
   "dependencies": {
     "@pierre/diffs": "^1.2.12",
     "dompurify": "^3.4.13",
     "marked": "^18.0.9"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.3.0",
-    "tailwindcss": "^4.3.0",
+    "esbuild": "^0.27.7",
     "vite": "^7.3.5"
   },
   "muxy": {
@@ -25,13 +23,12 @@
     "description": "Official Git extension for Muxy — GitHub, Forgejo, and Gitea",
     "permissions": [
       "commands:exec",
+      "commands:run-script",
       "panels:write",
       "tabs:write",
       "worktrees:read",
       "worktrees:write",
       "notifications:write",
-      "storage:read",
-      "storage:write",
       "files:read",
       "git:read",
       "git:write"
@@ -39,7 +36,9 @@
     "events": [
       "project.switched",
       "worktree.switched",
-      "file.changed"
+      "worktree.headChanged",
+      "file.changed",
+      "panel.opened"
     ],
     "panels": [
       {
@@ -74,7 +73,7 @@
     "tabTypes": [
       {
         "id": "diff-viewer",
-        "title": "Diff Viewer",
+        "title": "Changes",
         "entry": "panel/diff-viewer.html"
       }
     ],
@@ -90,55 +89,57 @@
       },
       {
         "id": "refresh-scm",
-        "title": "Refresh"
+        "title": "Git: Refresh"
       },
       {
         "id": "open-repository",
-        "title": "Open Repository in Browser"
+        "title": "Git: Open Repository in Browser"
       },
       {
         "id": "open-diff",
-        "title": "Open Diff",
+        "title": "Git: Open Changes",
+        "subtitle": "Diff of the working tree",
         "action": {
           "kind": "openTab",
-          "tabType": "diff-viewer"
-        }
-      },
-      {
-        "id": "commit",
-        "title": "Commit",
-        "subtitle": "Stage all changes and commit",
-        "action": {
-          "kind": "openModal",
-          "entry": "modal/commit.html",
-          "width": 520,
-          "height": 310,
-          "dismissOnOutsideClick": true
+          "tabType": "diff-viewer",
+          "data": {
+            "source": "working",
+            "handoff": true
+          }
         }
       },
       {
         "id": "create-pr",
-        "title": "Create PR",
+        "title": "Git: Create Pull Request…",
         "subtitle": "Commit, push, and open a pull request",
         "action": {
           "kind": "openModal",
           "entry": "modal/create-pr.html",
           "width": 520,
-          "height": 450,
-          "dismissOnOutsideClick": true
+          "height": 440,
+          "dismissOnOutsideClick": false
         }
       },
       {
         "id": "checkout-pr",
-        "title": "Checkout Pull Request…",
-        "subtitle": "Search open pull requests",
+        "title": "Git: Pull Requests…",
+        "subtitle": "Browse, check out, and review pull requests",
         "defaultShortcut": "cmd+shift+y",
         "action": {
           "kind": "openModal",
-          "entry": "modal/pr-checkout.html",
-          "width": 800,
-          "height": 680,
+          "entry": "modal/pr-browser.html",
+          "width": 860,
+          "height": 620,
           "dismissOnOutsideClick": true
+        }
+      },
+      {
+        "id": "switch-branch",
+        "title": "Git: Switch Branch…",
+        "subtitle": "Switch to or create a branch",
+        "action": {
+          "kind": "runScript",
+          "script": "scripts/switch-branch.js"
         }
       }
     ],
