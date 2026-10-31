@@ -36,9 +36,10 @@ export class FileRail {
     this.list = new VirtualList(this.listEl, this.canvas, {
       rowHeight: ROW_HEIGHT,
       key: (row) => row.key,
-      signature: (row) => (row.entry?.id === this.active ? "1" : "0"),
+      signature: (row) => this.signature(row),
       create: () => h("div", { class: "row" }),
       update: (el, row) => this.paint(el, row),
+      decorate: (el, row) => el.classList.toggle("row-selected", !!row.entry && row.entry.id === this.active),
     });
     this.listEl.addEventListener("click", (event) => this.onClick(event));
     this.listEl.addEventListener("keydown", (event) => this.onKey(event));
@@ -71,10 +72,17 @@ export class FileRail {
     this.list.setItems(this.rows);
   }
 
+  signature(row) {
+    if (row.type === "file") {
+      const item = row.entry;
+      return `${row.key}|${item.code}|${item.additions}|${item.deletions}|${item.oldPath}|${row.depth}|${this.tree}|${this.actionsFor(item).length}`;
+    }
+    return `${row.key}|${row.open}|${row.count ?? row.entries.length}|${row.depth}`;
+  }
+
   setActive(id) {
     this.active = id;
-    this.list.invalidate();
-    this.list.render();
+    this.list.decorate();
     const index = this.rows.findIndex((row) => row.entry?.id === id);
     if (index !== -1) this.list.scrollToIndex(index);
   }
@@ -101,7 +109,7 @@ export class FileRail {
       return;
     }
     const item = row.entry;
-    el.className = cls("row", "row-file", item.id === this.active && "row-selected");
+    el.className = cls("row", "row-file");
     el.title = item.oldPath ? `${item.oldPath} → ${item.path}` : item.path;
     const actions = this.actionsFor(item);
     fill(

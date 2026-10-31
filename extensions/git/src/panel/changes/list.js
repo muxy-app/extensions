@@ -33,9 +33,10 @@ export class ChangeList {
     this.list = new VirtualList(this.el, this.canvas, {
       rowHeight: ROW_HEIGHT,
       key: (row) => row.key,
-      signature: (row) => `${this.selected.has(row.key) ? 1 : 0}${this.cursor === row.key ? 1 : 0}`,
+      signature: (row) => this.signature(row),
       create: () => h("div", { class: "row", role: "treeitem" }),
       update: (el, row) => this.paint(el, row),
+      decorate: (el, row) => this.decorate(el, row),
     });
     this.el.addEventListener("click", (event) => this.onClick(event));
     this.el.addEventListener("dblclick", (event) => this.onDoubleClick(event));
@@ -53,11 +54,23 @@ export class ChangeList {
     this.list.setItems(rows);
   }
 
-  paint(el, row) {
+  signature(row) {
+    if (row.type === "section") return `${row.key}|${row.open}|${row.count}`;
+    if (row.type === "folder") return `${row.key}|${row.open}|${row.entries.length}|${row.depth}`;
+    const { entry } = row;
+    return `${row.key}|${entry.code}|${entry.additions}|${entry.deletions}|${entry.binary}|${entry.oldPath}|${row.depth}|${this.tree}`;
+  }
+
+  decorate(el, row) {
     const selected = this.selected.has(row.key);
-    el.className = cls("row", `row-${row.type}`, selected && "row-selected", this.cursor === row.key && "row-cursor");
-    el.style.setProperty("--depth", String(row.depth ?? 0));
+    el.classList.toggle("row-selected", selected);
+    el.classList.toggle("row-cursor", this.cursor === row.key);
     el.setAttribute("aria-selected", String(selected));
+  }
+
+  paint(el, row) {
+    el.className = cls("row", `row-${row.type}`);
+    el.style.setProperty("--depth", String(row.depth ?? 0));
     const actions = h("span", { class: "row-actions" }, rowActions(row).map(([action, title, name]) => iconButton(name, title, { action, small: true })));
     if (row.type === "section") {
       el.setAttribute("aria-expanded", String(row.open));
@@ -95,8 +108,7 @@ export class ChangeList {
 
   refreshSelection() {
     this.el.classList.toggle("list-focused", document.activeElement === this.el);
-    this.list.invalidate();
-    this.list.render();
+    this.list.decorate();
   }
 
   rowFromEvent(event) {

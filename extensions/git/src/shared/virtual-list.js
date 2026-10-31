@@ -34,6 +34,11 @@ export class VirtualList {
     for (const el of this.active.values()) el._sig = null;
   }
 
+  decorate() {
+    if (!this.opts.decorate) return;
+    for (const el of this.active.values()) this.opts.decorate(el, el._item, el._index);
+  }
+
   schedule() {
     if (this.frame) return;
     this.frame = requestAnimationFrame(() => {
@@ -87,11 +92,12 @@ export class VirtualList {
         el.style.transform = `translateY(${i * rowHeight}px)`;
       }
       const sig = opts.signature(item, i);
-      if (el._sig !== sig || el._item !== item) {
+      el._item = item;
+      if (el._sig !== sig) {
         el._sig = sig;
-        el._item = item;
         opts.update(el, item, i);
       }
+      opts.decorate?.(el, item, i);
     }
     this.active = next;
   }

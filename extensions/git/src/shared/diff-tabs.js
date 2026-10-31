@@ -40,13 +40,34 @@ export async function sendToTab(tab, data) {
   }
 }
 
+const PENDING_PREFIX = "muxy.git.diff-pending:";
+const PENDING_MS = 8000;
+const opening = new Map();
+
+export function takePending(root, kind) {
+  const key = `${PENDING_PREFIX}${root}\n${kind}`;
+  const entry = readJson(key);
+  removeKey(key);
+  return entry && Date.now() - (entry.at ?? 0) < PENDING_MS ? entry.data : null;
+}
+
 export async function openDiffTab(root, data) {
   const kind = diffKind(data);
   for (const { tab } of registeredTabs(root, kind)) {
     if (await sendToTab(tab, data)) return;
   }
-  await muxy.tabs.open({
-    kind: "extensionWebView",
-    extension: { id: muxy.extensionID, tabType: "diff-viewer", data },
-  });
+  const slot = `${root}\n${kind}`;
+  if (opening.has(slot)) {
+    writeJson(`${PENDING_PREFIX}${slot}`, { data, at: Date.now() });
+    return;
+  }
+  opening.set(slot, true);
+  try {
+    await muxy.tabs.open({
+      kind: "extensionWebView",
+      extension: { id: muxy.extensionID, tabType: "diff-viewer", data },
+    });
+  } finally {
+    setTimeout(() => opening.delete(slot), 3000);
+  }
 }

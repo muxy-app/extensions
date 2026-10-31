@@ -3,7 +3,7 @@ import { icon } from "@/shared/icons";
 import { alertError, confirmAction, errorMessage, openInEditor, setDialogAnchor } from "@/shared/actions";
 import { readJson, readString, removeKey, writeJson, writeString } from "@/shared/prefs";
 import { isInside } from "@/shared/paths";
-import { REQUEST_KEY, STATE_PREFIX, TAB_PREFIX, diffKind, forgetTab, registeredTabs, sendToTab } from "@/shared/diff-tabs";
+import { REQUEST_KEY, STATE_PREFIX, TAB_PREFIX, diffKind, forgetTab, registeredTabs, sendToTab, takePending } from "@/shared/diff-tabs";
 import * as git from "@/core/git";
 import { PrDetail } from "@/panel/prs/detail";
 import { splitCombined } from "@/diff/patch";
@@ -114,6 +114,8 @@ export class DiffApp {
     if (await this.handoff()) return;
     this.register();
     await this.load();
+    const pending = takePending(this.repoRoot, diffKind(this.data));
+    if (pending) this.apply(pending, true);
   }
 
   async handoff() {

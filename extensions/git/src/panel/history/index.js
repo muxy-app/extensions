@@ -56,13 +56,20 @@ export class HistoryView {
     this.list = new VirtualList(this.listEl, this.canvas, {
       rowHeight: ROW_HEIGHT,
       key: (row) => row.key,
-      signature: (row) => row.key,
+      signature: (row) => this.signature(row),
       create: () => h("div", { class: "row commit-row" }),
       update: (el, row) => this.paint(el, row),
       onScroll: () => this.maybeLoadMore(),
     });
     this.listEl.addEventListener("click", (event) => this.onClick(event));
     this.listEl.addEventListener("contextmenu", (event) => this.onContextMenu(event));
+  }
+
+  signature(row) {
+    if (row.type === "header") return `header|${this.incomingOpen}|${this.incoming.length}`;
+    if (row.type !== "commit") return row.key;
+    const g = row.graph;
+    return `${row.key}|${g.col}|${g.hasChild}|${g.pass}|${g.joins}|${g.edges}|${g.width}|${this.outgoing.has(g.commit.hash)}|${g.commit.refs.map((ref) => ref.name)}`;
   }
 
   paint(el, row) {
@@ -173,7 +180,6 @@ export class HistoryView {
       if (event.target.closest?.("[data-action=pull]")) void pull(this.ctl);
       else {
         this.incomingOpen = !this.incomingOpen;
-        this.list.invalidate();
         this.renderRows();
       }
       return;
