@@ -239,14 +239,9 @@ export function openConfirm({ anchor, title, message = "", buttons, critical = f
     );
     const state = mount(anchor, content, () => done(null));
     content.addEventListener("keydown", (event) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        state.close();
-      } else if (event.key === "Enter" && buttons.length && !critical) {
-        event.preventDefault();
-        done(buttons[0]);
-        state.close();
-      }
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      state.close();
     });
     (critical || !nodes.length ? cancel : nodes[nodes.length - 1]).focus();
   });

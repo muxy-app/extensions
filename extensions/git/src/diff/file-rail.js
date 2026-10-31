@@ -3,7 +3,7 @@ import { icon } from "@/shared/icons";
 import { baseName, dirName } from "@/shared/paths";
 import { readJson, readString, writeJson, writeString } from "@/shared/prefs";
 import { VirtualList } from "@/shared/virtual-list";
-import { buildRows } from "@/panel/changes/model";
+import { buildRows, visibleCollapsed } from "@/panel/changes/model";
 
 const ROW_HEIGHT = 24;
 const VIEW_KEY = "muxy.git.diff.view";
@@ -68,7 +68,8 @@ export class FileRail {
     const sections = this.groups.map((group) => ({ id: group.id, label: group.label }));
     const source = Object.fromEntries(this.groups.map((group) => [group.id, group.items]));
     const showHeaders = this.groups.filter((group) => group.items.length).length > 1;
-    this.rows = buildRows(source, { tree: this.tree, collapsed: this.collapsed, sections }).filter((row) => showHeaders || row.type !== "section");
+    const collapsed = visibleCollapsed(this.collapsed, showHeaders);
+    this.rows = buildRows(source, { tree: this.tree, collapsed, sections }).filter((row) => showHeaders || row.type !== "section");
     this.list.setItems(this.rows);
   }
 

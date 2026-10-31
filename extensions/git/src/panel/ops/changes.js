@@ -91,12 +91,18 @@ export function resolveWith(ctl, entry, side) {
   });
 }
 
+export function stashEntries(ctl, entries, label) {
+  const paths = entries.map((entry) => entry.path);
+  if (!paths.length) return;
+  return ctl.run("Could not stash changes", () => git.stashPush(`Stash ${label}`, paths));
+}
+
 export function ignore(ctl, entry) {
   return ctl.run("Could not update .gitignore", () => git.ignorePath(entry.path));
 }
 
-export function reveal(entry) {
-  revealInFinder(entry.path);
+export function reveal(path) {
+  revealInFinder(path);
 }
 
 export function copyPath(entries) {

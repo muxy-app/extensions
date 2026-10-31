@@ -77,3 +77,7 @@ export function selectedEntries(rows, keys) {
   for (const row of rows) if (row.type === "file" && keys.has(row.key)) out.push(row);
   return out;
 }
+
+export function visibleCollapsed(collapsed, showSectionHeaders) {
+  return showSectionHeaders ? collapsed : new Set([...collapsed].filter((key) => !key.startsWith("s:")));
+}

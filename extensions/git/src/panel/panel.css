@@ -416,6 +416,7 @@
   flex: 0 0 auto;
   align-items: center;
   gap: var(--s1);
+  margin-left: auto;
 }
 
 .row:hover .row-actions,

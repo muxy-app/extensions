@@ -4,6 +4,7 @@ import * as git from "@/core/git";
 import { forgeFor } from "@/core/forge";
 import { branchSlug, existingPrUrl } from "@/core/forge/normalize";
 import { changeCount } from "@/core/status";
+import { baseOptions } from "@/create-pr/bases";
 
 function field(label, control, hint = null) {
   return h("label", { class: "form-field" }, h("span", { class: "form-label" }, label, hint ? h("span", { class: "muted" }, ` ${hint}`) : null), control);
@@ -78,8 +79,7 @@ export class CreatePrForm {
   }
 
   fillBases(branches) {
-    const current = this.status.branch;
-    const names = [...new Set([this.defaultBranch, ...branches].filter((name) => name && name !== current))];
+    const names = baseOptions(branches, this.status.branch, this.defaultBranch);
     fill(this.base, ...names.map((name) => h("option", { value: name, selected: name === this.defaultBranch }, name)));
     if (!names.length) this.base.appendChild(h("option", { value: "" }, "Repository default"));
   }

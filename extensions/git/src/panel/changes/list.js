@@ -9,13 +9,17 @@ import * as ops from "@/panel/ops/changes";
 const ROW_HEIGHT = 24;
 const CODE_TITLE = { M: "Modified", A: "Added", D: "Deleted", R: "Renamed", C: "Copied", T: "Type changed", U: "Untracked", "!": "Conflict" };
 
+const NOUN = { file: "", folder: " Folder", section: " All" };
+
 function rowActions(row) {
   const { type, section } = row;
+  const noun = NOUN[type];
   const out = [];
   if (type === "file") out.push(["openFile", "Open File", "openFile"]);
-  if (section === "unstaged") out.push(["discard", type === "section" ? "Discard All Changes" : "Discard Changes", "undo"]);
-  if (section === "staged") out.push(["unstage", type === "section" ? "Unstage All" : "Unstage", "minus"]);
-  else if (section === "unstaged") out.push(["stage", type === "section" ? "Stage All" : "Stage", "plus"]);
+  if (type === "folder" && section !== "conflicts") out.push(["stash", "Stash Folder", "stash"]);
+  if (section === "unstaged") out.push(["discard", type === "file" ? "Discard Changes" : `Discard${noun}`, "undo"]);
+  if (section === "staged") out.push(["unstage", `Unstage${noun}`, "minus"]);
+  else if (section === "unstaged") out.push(["stage", `Stage${noun}`, "plus"]);
   else if (type === "file") out.push(["stage", "Mark as Resolved", "check"]);
   return out;
 }
@@ -178,6 +182,7 @@ export class ChangeList {
     if (action === "stage") return ops.stagePaths(this.ctl, paths);
     if (action === "unstage") return ops.unstagePaths(this.ctl, paths);
     if (action === "discard") return ops.discardEntries(this.ctl, entries.filter((entry) => entry.code !== "!"));
+    if (action === "stash") return ops.stashEntries(this.ctl, entries, row.type === "folder" ? row.path : `${entries.length} files`);
   }
 
   onContextMenu(event) {
@@ -190,7 +195,14 @@ export class ChangeList {
   }
 
   groupMenu(row) {
-    return rowActions(row).map(([action, title]) => ({ label: title, danger: action === "discard", run: () => this.runAction(action, row, false) }));
+    const label = row.type === "folder" ? row.path : row.label.toLowerCase();
+    return [
+      ...rowActions(row).filter(([action]) => action !== "stash").map(([action, title]) => ({ label: action === "discard" ? `${title}…` : title, danger: action === "discard", run: () => this.runAction(action, row, false) })),
+      row.section !== "conflicts" ? { label: "Stash Changes", run: () => ops.stashEntries(this.ctl, row.entries, label) } : null,
+      row.type === "folder" ? "-" : null,
+      row.type === "folder" ? { label: "Reveal in Finder", run: () => ops.reveal(row.path) } : null,
+      row.type === "folder" ? { label: "Copy Path", run: () => void navigator.clipboard?.writeText(row.path) } : null,
+    ];
   }
 
   fileMenu(row) {
@@ -202,11 +214,12 @@ export class ChangeList {
     return [
       { label: "Open Changes", run: () => rows.forEach((r) => ops.openDiff(this.ctl, r.entry, r.section)) },
       { label: "Open File", disabled: entries.every((entry) => entry.code === "D"), run: () => this.runAction("openFile", row, true) },
-      single ? { label: "Reveal in Finder", run: () => ops.reveal(single) } : null,
+      single ? { label: "Reveal in Finder", run: () => ops.reveal(single.path) } : null,
       { label: entries.length > 1 ? "Copy Paths" : "Copy Path", run: () => ops.copyPath(entries) },
       "-",
       section === "staged" ? { label: `Unstage${plural}`, run: () => this.runAction("unstage", row, true) } : { label: section === "conflicts" ? `Mark as Resolved${plural}` : `Stage${plural}`, run: () => this.runAction("stage", row, true) },
       section === "unstaged" ? { label: `Discard Changes${plural}…`, danger: true, run: () => this.runAction("discard", row, true) } : null,
+      section !== "conflicts" ? { label: `Stash Changes${plural}`, run: () => ops.stashEntries(this.ctl, entries, single ? single.path : `${entries.length} files`) } : null,
       section === "conflicts" && single ? "-" : null,
       section === "conflicts" && single ? { label: "Accept Current (Ours)", run: () => ops.resolveWith(this.ctl, single, "ours") } : null,
       section === "conflicts" && single ? { label: "Accept Incoming (Theirs)", run: () => ops.resolveWith(this.ctl, single, "theirs") } : null,

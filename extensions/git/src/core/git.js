@@ -111,7 +111,8 @@ export const trackRemote = (ref) => git("switch", "--track", ref);
 export const deleteBranch = (name, force) => muxy.git.branch.delete({ name, force: !!force });
 export const deleteRemoteBranch = (branch) => muxy.git.branch.deleteRemote({ branch });
 
-export const stashPush = (message) => git("stash", "push", "--include-untracked", ...(message ? ["-m", message] : []));
+export const stashPush = (message, paths = []) =>
+  git("stash", "push", "--include-untracked", ...(message ? ["-m", message] : []), ...(paths.length ? ["--", ...paths] : []));
 export const stashApply = (ref, pop) => git("stash", pop ? "pop" : "apply", ref);
 export const stashDrop = (ref) => git("stash", "drop", ref);
 

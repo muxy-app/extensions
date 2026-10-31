@@ -446,6 +446,7 @@ body.resizing {
   display: none;
   flex: 0 0 auto;
   gap: var(--s1);
+  margin-left: auto;
 }
 
 .row:hover .row-actions {
