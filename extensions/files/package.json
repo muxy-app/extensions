@@ -1,11 +1,13 @@
 {
   "name": "files",
-  "version": "1.21.6",
+  "version": "2.0.0",
   "scripts": {
     "dev": "vite",
     "build": "vite build && node scripts/copy-build-assets.mjs",
+    "test": "node --import ./tests/support/alias.mjs --test \"tests/*.test.mjs\"",
     "gen-icons": "node scripts/gen-material-icons.mjs",
-    "update-skill": "node scripts/update-skill.mjs"
+    "update-skill": "node scripts/update-skill.mjs",
+    "bench:build": "vite build -c dev/vite.bench.config.js && cp dev/mock-muxy.js dev/bench.js bench-dist/dev/"
   },
   "private": true,
   "type": "module",
@@ -41,13 +43,11 @@
     "yaml": "^2.9.0"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.3.0",
     "@tree-sitter-grammars/tree-sitter-lua": "^0.4.1",
     "@tree-sitter-grammars/tree-sitter-toml": "^0.7.0",
     "@tree-sitter-grammars/tree-sitter-zig": "^1.1.2",
     "esbuild": "^0.27.7",
     "material-icon-theme": "^5.35.0",
-    "tailwindcss": "^4.3.0",
     "tree-sitter-bash": "^0.25.1",
     "tree-sitter-c": "^0.24.1",
     "tree-sitter-cpp": "^0.23.4",
@@ -77,10 +77,6 @@
       "file.changed",
       "worktree.switched",
       "project.switched",
-      "tab.created",
-      "tab.updated",
-      "tab.closed",
-      "tab.focused",
       "panel.opened"
     ],
     "panels": [
@@ -112,6 +108,14 @@
             },
             "tooltip": "Toggle file icon theme",
             "command": "files-toggle-icon-theme"
+          },
+          {
+            "id": "files-collapse-all",
+            "icon": {
+              "symbol": "rectangle.compress.vertical"
+            },
+            "tooltip": "Collapse all folders",
+            "command": "files-collapse-all"
           }
         ]
       }
@@ -163,6 +167,11 @@
         "id": "files-toggle-icon-theme",
         "title": "Files: Toggle Icon Theme",
         "subtitle": "Switch the file tree between stroke and colored icons"
+      },
+      {
+        "id": "files-collapse-all",
+        "title": "Files: Collapse All Folders",
+        "subtitle": "Collapse every folder in the file tree"
       },
       {
         "id": "files-find-in-files",

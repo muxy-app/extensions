@@ -88,7 +88,7 @@ export const BY_EXTENSION = ${JSON.stringify(byExt, null, 2)};
 export const BY_FILENAME = ${JSON.stringify(byName, null, 2)};
 `;
 
-const target = resolve(here, "..", "src", "lib", "material-icons.generated.js");
+const target = resolve(here, "..", "src", "shared", "material-icons.generated.js");
 writeFileSync(target, out);
 console.log(
   `Wrote ${target}\n  ${Object.keys(icons).length} icons, ` +

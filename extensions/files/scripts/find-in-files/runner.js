@@ -1,4 +1,5 @@
 import { MAX_RESULTS, SEARCH_EXIT_MARKER } from "./constants.js";
+import { open_editor } from "../lib/open-editor.js";
 import { git_grep_request, grep_request, rg_request } from "./commands.js";
 import {
   is_search_too_short,
@@ -357,19 +358,5 @@ function open_result(choice) {
   if (!choice) return;
   const result = parse_result_id(choice.id);
   if (!result) return;
-
-  const extId = (typeof muxy !== "undefined" && muxy.extensionID) || "files";
-  muxy.tabs.open({
-    kind: "extensionWebView",
-    extension: {
-      id: extId,
-      tabType: "code-editor",
-      singleton: false,
-      data: {
-        filePath: result.filePath,
-        line: result.lineNumber,
-        replaceable: false,
-      },
-    },
-  });
+  open_editor(result.filePath, { line: result.lineNumber });
 }
