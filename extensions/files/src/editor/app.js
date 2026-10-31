@@ -20,7 +20,7 @@ import {
   project_root,
   request_replace,
 } from "@/shared/editors";
-import { read_json, read_string, remove_key, watch_key, write_json, write_string } from "@/shared/prefs";
+import { keys_with_prefix, read_json, read_string, remove_key, watch_key, write_json, write_string } from "@/shared/prefs";
 import { tab_symbol } from "@/shared/file-types";
 import { is_binary_kind, is_html, is_svg, kind_of } from "./kinds";
 import { AUTO_SAVE_DELAY_MS, load_editor_config, update_editor_config, watch_editor_config } from "./config";
@@ -42,6 +42,18 @@ const load_image = () => import("./viewers/image-viewer");
 const load_pdf = () => import("./viewers/pdf-viewer");
 const load_html = () => import("./viewers/html-viewer");
 const load_settings = () => import("./settings-sheet");
+
+const TAB_STATE_TTL_MS = 90 * 24 * 60 * 60 * 1000;
+
+/** Forgets the saved state of tabs that haven't loaded in months (long closed). */
+function prune_tab_states() {
+  const now = Date.now();
+  for (const key of keys_with_prefix(TAB_STATE_PREFIX)) {
+    if (key === TAB_STATE_PREFIX + muxy.tabInstanceID) continue;
+    const at = read_json(key)?.at;
+    if (typeof at !== "number" || now - at > TAB_STATE_TTL_MS) remove_key(key);
+  }
+}
 
 function position_from(data) {
   const line = Number(data?.line);
@@ -94,11 +106,13 @@ export class EditorApp {
     // A tab that replaced its file shows the replacement after a restart. The
     // host keeps the data the tab was opened with, so it is overridden here
     // only while that data is unchanged.
-    const state = read_json(TAB_STATE_PREFIX + muxy.tabInstanceID);
-    if (state && typeof state.path === "string" && state.base === (this.data.filePath ?? null)) {
-      this.data = { filePath: state.path };
-    }
+    const saved = read_json(TAB_STATE_PREFIX + muxy.tabInstanceID);
+    const state = saved && saved.base === (this.data.filePath ?? null) ? saved : null;
+    if (typeof state?.path === "string") this.data = { filePath: state.path };
     this.preview = !state?.kept;
+    // A terminal-opened tab decides once, when it is created, whether to hand
+    // its file to another tab. Restored after a restart, it must stay put.
+    this.settled = Boolean(state?.settled);
     this.config = load_editor_config();
     this.isDark = muxy.theme?.colorScheme === "dark";
     this.showToc = read_string(TOC_PREF_KEY, "0") === "1";
@@ -162,6 +176,7 @@ export class EditorApp {
     });
 
     setTimeout(prune_drafts, 2000);
+    setTimeout(prune_tab_states, 2500);
     void this.loadTarget();
   }
 
@@ -235,7 +250,9 @@ export class EditorApp {
       this.registration.activate();
       void this.consumeGoto();
     }
-    if (this.data.source !== "terminal") return;
+    if (this.data.source !== "terminal" || this.settled) return;
+    this.settled = true;
+    this.saveTabState();
     // Cmd-clicking a path in a terminal always opens a new tab. If the file is
     // already open in an older tab, go there; otherwise, with tab reuse on,
     // hand it to the preview tab that was in use. Either way close this one.
@@ -255,6 +272,7 @@ export class EditorApp {
       return;
     }
     this.closing = true;
+    remove_key(TAB_STATE_PREFIX + muxy.tabInstanceID);
     void muxy.lifecycle.close();
   }
 
@@ -288,8 +306,8 @@ export class EditorApp {
   saveTabState() {
     const key = TAB_STATE_PREFIX + muxy.tabInstanceID;
     const base = muxy.data?.filePath ?? null;
-    if (this.path === base && this.preview) remove_key(key);
-    else write_json(key, { base, path: this.path, kept: !this.preview });
+    if (this.path === base && this.preview && !this.settled) remove_key(key);
+    else write_json(key, { base, path: this.path, kept: !this.preview, settled: this.settled, at: Date.now() });
   }
 
   async consumeGoto() {
