@@ -8,8 +8,15 @@ Muxy extension scaffolded from a starter kit. This is an npm + Vite project.
   top level; all Muxy fields live under the `muxy` key. A `build` script
   (Vite) is required.
 - `vite.config.js` — builds to `dist/`, the directory Muxy installs.
-- `panel/` + `src/` — vanilla JavaScript source for the files panel and
-  editor tab.
+- `panel/index.html` → `src/panel/` — the Files panel (virtualized tree).
+- `panel/editor.html` → `src/editor/` — the code editor tab.
+- `src/shared/` — modules both pages use; `editors.js` is the
+  panel/editor/script handshake that keeps one tab per file.
+- `scripts/` — palette `runScript` commands, bundled by
+  `scripts/copy-build-assets.mjs`.
+- `dev/` — mock `window.muxy` + benchmarks (`dev/README.md`). Check
+  performance-sensitive changes against them.
+- `tests/` — `npm test` (Node's test runner; `@/` resolves to `src/`).
 
 Add a `"background"` script (e.g. `background.js`) under the `muxy` key
 only if the extension needs to receive pushed workspace events or run

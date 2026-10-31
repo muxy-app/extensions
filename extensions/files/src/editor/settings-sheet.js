@@ -1,5 +1,5 @@
-import { FONT_SIZE_MAX, FONT_SIZE_MIN } from "@/lib/editor-config";
-import { cls, h } from "@/lib/dom";
+import { FONT_SIZE_MAX, FONT_SIZE_MIN } from "./config";
+import { cls, h } from "@/shared/dom";
 
 const TAB_SIZES = [2, 4, 8];
 
@@ -68,6 +68,11 @@ export class SettingsSheet {
       id: "cfg-auto-save",
       type: "checkbox",
       onChange: (event) => this.update({ autoSave: event.target.checked }),
+    });
+    this.reuseTab = h("input", {
+      id: "cfg-reuse-tab",
+      type: "checkbox",
+      onChange: (event) => this.update({ reuseTab: event.target.checked }),
     });
 
     this.overlay = h(
@@ -139,6 +144,16 @@ export class SettingsSheet {
         h(
           "div",
           { class: "sheet-row" },
+          h(
+            "label",
+            { class: "sheet-label", for: "cfg-reuse-tab", title: "Off: every file opens in a new tab" },
+            "Open files in the current tab until edited",
+          ),
+          this.reuseTab,
+        ),
+        h(
+          "div",
+          { class: "sheet-row" },
           h("label", { class: "sheet-label" }, "Tab size"),
           h(
             "div",
@@ -182,6 +197,7 @@ export class SettingsSheet {
     this.colorPreview.checked = config.colorPreview !== false;
     this.treeSitter.checked = config.treeSitter !== false;
     this.autoSave.checked = config.autoSave !== false;
+    this.reuseTab.checked = config.reuseTab !== false;
 
     for (const [size, button] of this.tabButtons) {
       button.className = cls("segment", config.tabSize === size && "segment-active");

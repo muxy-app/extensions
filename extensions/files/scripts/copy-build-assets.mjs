@@ -6,18 +6,19 @@ const dist = resolve("dist");
 const scripts = resolve(dist, "scripts");
 mkdirSync(scripts, { recursive: true });
 copyFileSync("package.json", resolve(dist, "package.json"));
-copyFileSync("scripts/quick-open.js", resolve(scripts, "quick-open.js"));
 
-// find-in-files is split across scripts/find-in-files/, and runScript entries are
-// loaded as a single plain script, so this one is bundled rather than copied.
-buildSync({
-  entryPoints: ["scripts/find-in-files.js"],
-  outfile: resolve(scripts, "find-in-files.js"),
-  bundle: true,
-  format: "iife",
-  platform: "browser",
-  target: "es2020",
-});
+// runScript entries are loaded as a single plain script, so each palette
+// script is bundled with the modules it imports.
+for (const name of ["quick-open", "find-in-files"]) {
+  buildSync({
+    entryPoints: [`scripts/${name}.js`],
+    outfile: resolve(scripts, `${name}.js`),
+    bundle: true,
+    format: "iife",
+    platform: "browser",
+    target: "es2020",
+  });
+}
 
 const pdfAssets = resolve(dist, "assets", "pdfjs");
 for (const directory of ["cmaps", "iccs", "standard_fonts", "wasm"]) {

@@ -41,6 +41,8 @@ test("Find in Files runScript opens selected result in the code editor", async (
   let openedTab = null;
   globalThis.muxy = {
     extensionID: "files",
+    exec: () => ({ exitCode: 0, stdout: "/p\n" }),
+    storage: { keys: () => [], get: () => null, set: () => {}, delete: () => {} },
     modal: {
       open(options) {
         modalOptions = options;
@@ -60,11 +62,52 @@ test("Find in Files runScript opens selected result in the code editor", async (
       id: JSON.stringify({ filePath: "src/main.js", lineNumber: 12 }),
     });
 
-    assert.deepEqual(openedTab.extension.data, {
-      filePath: "src/main.js",
-      line: 12,
-      replaceable: false,
+    assert.deepEqual(openedTab.extension, {
+      id: "files",
+      tabType: "code-editor",
+      data: { filePath: "src/main.js", line: 12 },
     });
+  } finally {
+    delete globalThis.muxy;
+  }
+});
+
+test("Find in Files hands the line to an editor tab that already shows the file", async () => {
+  let modalOptions = null;
+  let openedTab = null;
+  const switched = [];
+  const storage = new Map([["editor:pane-1", { root: "/p", path: "src/main.js", at: Date.now() }]]);
+  globalThis.muxy = {
+    extensionID: "files",
+    exec: () => ({ exitCode: 0, stdout: "/p\n" }),
+    storage: {
+      keys: () => [...storage.keys()],
+      get: (key) => storage.get(key) ?? null,
+      set: (key, value) => void storage.set(key, value),
+      delete: (key) => void storage.delete(key),
+    },
+    modal: {
+      open(options) {
+        modalOptions = options;
+      },
+    },
+    tabs: {
+      open(tab) {
+        openedTab = tab;
+      },
+      switchTo(pane) {
+        switched.push(pane);
+      },
+    },
+  };
+
+  try {
+    await openRunScript("select-open");
+    modalOptions.onSelect({ id: JSON.stringify({ filePath: "src/main.js", lineNumber: 7 }) });
+    assert.deepEqual(switched, ["pane-1"]);
+    assert.equal(openedTab, null);
+    assert.equal(storage.get("goto").pane, "pane-1");
+    assert.equal(storage.get("goto").line, 7);
   } finally {
     delete globalThis.muxy;
   }
