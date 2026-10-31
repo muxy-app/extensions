@@ -31,6 +31,8 @@ import { OpenIcon, RevealIcon, SaveIcon, SettingsIcon, TocIcon } from "./icons";
 import * as code_module from "./code/code-editor";
 
 const TOC_PREF_KEY = "files:md-toc";
+// The Preview / Edit mode last chosen for a markdown file; new files open in it.
+const MD_MODE_KEY = "muxy.files.markdown-mode";
 const RELOAD_DEBOUNCE_MS = 100;
 const CLEAN_CHECK_MS = 300;
 const DRAFT_DELAY_MS = 1000;
@@ -140,7 +142,7 @@ export class EditorApp {
     this.savedText = null; // what we believe is on disk
     this.savedSnap = null; // the same, as the view's cheap-to-compare snapshot
     this.baseline = null; // content to restore on "Discard" (open time or last deliberate save)
-    this.mdMode = "preview";
+    this.mdMode = read_string(MD_MODE_KEY) === "edit" ? "edit" : "preview";
     this.svgView = false;
     this.htmlView = false;
   }
@@ -406,7 +408,13 @@ export class EditorApp {
     this.focusRaf = requestAnimationFrame(() => this.child?.focus?.());
   }
 
-  async setMarkdownMode(mode, position = null) {
+  /**
+   * `remember` marks a choice the user made (the Preview / Edit toggle, the
+   * `e` key), which new markdown files then open in. Switching to edit to
+   * search or jump to a line doesn't change it.
+   */
+  async setMarkdownMode(mode, position = null, { remember = false } = {}) {
+    if (remember) write_string(MD_MODE_KEY, mode);
     if (this.mdMode === mode && !position) return;
     if (this.mdMode === mode) return this.child?.gotoPosition?.(position);
     const value = this.child?.getValue?.() ?? this.savedText ?? "";
@@ -732,7 +740,7 @@ export class EditorApp {
       if (find || replace || edit) {
         event.preventDefault();
         event.stopPropagation();
-        void this.setMarkdownMode("edit").then(() => {
+        void this.setMarkdownMode("edit", null, { remember: edit }).then(() => {
           if (find) this.child?.openSearch?.();
           if (replace) this.child?.openReplace?.();
         });
@@ -792,8 +800,8 @@ export class EditorApp {
     }
     if (this.kind === "markdown") {
       const control = segmented("mdMode", [
-        ["Preview", "preview", () => void this.setMarkdownMode("preview")],
-        ["Edit", "edit", () => void this.setMarkdownMode("edit")],
+        ["Preview", "preview", () => void this.setMarkdownMode("preview", null, { remember: true })],
+        ["Edit", "edit", () => void this.setMarkdownMode("edit", null, { remember: true })],
       ]);
       updaters.push(control.update);
       toc = toolButton("Table of contents", TocIcon, () => {

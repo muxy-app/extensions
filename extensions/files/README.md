@@ -47,6 +47,11 @@ from terminal links. A file that is already open just focuses its tab.
 To always open a new tab instead, turn off **Open files in the current tab
 until edited** in the editor's settings (the gear in the editor toolbar).
 
+Markdown files open in the mode you last picked with the **Preview / Edit**
+toggle (or the `e` key), so working through several files in Edit mode doesn't
+need a toggle per file. Switching to Edit to search or jump to a line doesn't
+change it.
+
 ## Keyboard (file tree)
 
 Focus lands in the tree when the panel opens (or click any row), then:
