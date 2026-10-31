@@ -1,15 +1,17 @@
 import { defineConfig } from "vite";
-import tailwindcss from "@tailwindcss/vite";
 import { resolve } from "node:path";
+
+const ENTRIES = {
+  scm: resolve(__dirname, "panel/index.html"),
+  "diff-viewer": resolve(__dirname, "panel/diff-viewer.html"),
+  "create-pr": resolve(__dirname, "modal/create-pr.html"),
+  "pr-browser": resolve(__dirname, "modal/pr-browser.html"),
+};
 
 export default defineConfig({
   base: "./",
-  plugins: [tailwindcss()],
   resolve: {
-    alias: {
-      "@": resolve(__dirname, "src"),
-      "@muxy/ui": resolve(__dirname, "../../shared/ui"),
-    },
+    alias: { "@": resolve(__dirname, "src") },
   },
   define: {
     "process.env.NODE_ENV": JSON.stringify("production"),
@@ -20,14 +22,10 @@ export default defineConfig({
   build: {
     outDir: "dist",
     emptyOutDir: true,
+    target: "safari16",
+    chunkSizeWarningLimit: 1600,
     rollupOptions: {
-      input: {
-        scm: resolve(__dirname, "panel/index.html"),
-        "diff-viewer": resolve(__dirname, "panel/diff-viewer.html"),
-        commit: resolve(__dirname, "modal/commit.html"),
-        "create-pr": resolve(__dirname, "modal/create-pr.html"),
-        "pr-checkout": resolve(__dirname, "modal/pr-checkout.html"),
-      },
+      input: process.env.ENTRY ? { [process.env.ENTRY]: ENTRIES[process.env.ENTRY] } : ENTRIES,
     },
   },
 });
