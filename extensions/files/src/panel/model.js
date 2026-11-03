@@ -4,15 +4,18 @@
 //
 // Paths are project-relative; folders end in "/" and the root is "".
 
-import { basename, depth_of, dir_path, is_within, parent_of, strip_slash } from "@/shared/paths";
+import { basename, depth_of, dir_path, is_within, parent_of } from "@/shared/paths";
 
 /** @typedef {{ path: string, name: string, dir: boolean, ignored: boolean, depth: number, draft?: "file" | "folder" }} Entry */
 
-export function entry_from_host(item) {
-  const raw = strip_slash(String(item.path ?? ""));
+export function entry_from_host(item, parent) {
+  const name = item.name ? String(item.name) : basename(String(item.path ?? ""));
+  // The host resolves symlinked folders. Keep children under the listed path
+  // so an alias and its target never share row keys or nesting depth.
+  const raw = dir_path(parent) + name;
   const dir = Boolean(item.isDirectory);
   const path = dir ? dir_path(raw) : raw;
-  return { path, name: item.name ? String(item.name) : basename(raw), dir, ignored: Boolean(item.isIgnored), depth: depth_of(path) - 1 };
+  return { path, name, dir, ignored: Boolean(item.isIgnored), depth: depth_of(path) - 1 };
 }
 
 function same_listing(a, b) {

@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { TreeModel, compare_entries, entry_from_host } from "@/panel/model";
+import { parent_of } from "@/shared/paths";
 
 const host = (path, isDirectory = false, isIgnored = false) =>
-  entry_from_host({ name: path.split("/").at(-1), path, isDirectory, isIgnored });
+  entry_from_host({ name: path.split("/").at(-1), path, isDirectory, isIgnored }, parent_of(path));
 
 function project() {
   const model = new TreeModel();
@@ -21,6 +22,28 @@ test("host entries become folder paths with depth", () => {
   assert.equal(entry.dir, true);
   assert.equal(entry.depth, 1);
   assert.equal(host("README.md").depth, 0);
+});
+
+test("host entries use the listed parent instead of a resolved symlink target", () => {
+  const entry = entry_from_host({ name: "index.js", path: "cache/pkg/index.js", isDirectory: false, isIgnored: true }, "cache/links/pkg/");
+  assert.deepEqual(entry, { path: "cache/links/pkg/index.js", name: "index.js", dir: false, ignored: true, depth: 3 });
+});
+
+test("host folder entries preserve their displayed names and normalize slashes", () => {
+  const item = { name: "alias", path: "target/", isDirectory: true };
+  assert.equal(entry_from_host(item, "").path, "alias/");
+  for (const parent of ["links", "links/", "links//"]) {
+    const entry = entry_from_host(item, parent);
+    assert.equal(entry.path, "links/alias/");
+    assert.equal(entry.depth, 1);
+  }
+});
+
+test("a missing host name falls back to the returned basename under the listed parent", () => {
+  const entry = entry_from_host({ path: "target/lib/", isDirectory: true }, "alias/");
+  assert.equal(entry.name, "lib");
+  assert.equal(entry.path, "alias/lib/");
+  assert.equal(entry.depth, 1);
 });
 
 test("flatten shows children of expanded folders only", () => {
