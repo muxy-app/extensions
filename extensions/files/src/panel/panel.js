@@ -274,7 +274,7 @@ export class FilesPanel {
     let pending = this.loads.get(dir);
     if (!pending) {
       pending = this.limit(() => muxy.files.list(strip_slash(dir)))
-        .then((items) => items.map(entry_from_host))
+        .then((items) => items.map((item) => entry_from_host(item, dir)))
         .finally(() => this.loads.delete(dir));
       this.loads.set(dir, pending);
     }
