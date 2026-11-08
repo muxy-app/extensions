@@ -1,0 +1,211 @@
+/* Shared page chrome for the panel. Spacing, type and radius
+   tokens (--s*, --font-*, --radius*) come from @muxy/ui; colors are the
+   --muxy-* theme variables Muxy injects. Extension-specific classes use the
+   `sn-` prefix so they never collide with the `mx-` primitives. */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--muxy-background);
+  color: var(--muxy-foreground);
+  font-family: var(--font-ui);
+  font-size: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.sn-mono {
+  font-family: var(--font-mono);
+}
+
+/* {{variables}} inside a command */
+.sn-var {
+  color: var(--muxy-accent);
+}
+
+/* Inputs that fill their row */
+.mx-input.sn-grow,
+.mx-select.sn-grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.mx-textarea.sn-code,
+.mx-input.sn-code {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: var(--font-body);
+}
+
+.mx-textarea.sn-code {
+  line-height: 1.6;
+  min-height: 112px;
+}
+
+/* Readable keyboard shortcut hint, e.g. inside a primary button. */
+.sn-keys {
+  display: inline-flex;
+  gap: var(--s1);
+  margin-left: var(--s2);
+}
+
+.sn-keys span {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 var(--s2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-badge);
+  font-size: var(--font-body);
+  font-weight: 600;
+  line-height: 1;
+  border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+/* Command preview */
+.sn-preview {
+  padding: var(--s4) var(--s5);
+  border-radius: var(--radius);
+  border: 1px solid var(--muxy-border);
+  background: var(--muxy-surface);
+  font-family: var(--font-mono);
+  font-size: var(--font-body);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* Form layout */
+.sn-form {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s7);
+  padding: var(--s4) var(--s5) var(--s7);
+}
+
+.sn-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+}
+
+.sn-field > label,
+.sn-label {
+  font-size: var(--font-footnote);
+  font-weight: 600;
+  color: var(--muxy-foreground-muted);
+}
+
+.sn-field .mx-input,
+.sn-field .mx-select {
+  width: 100%;
+}
+
+.sn-hint {
+  font-size: var(--font-footnote);
+  line-height: 1.4;
+  color: var(--muxy-foreground-muted);
+}
+
+.sn-error {
+  font-size: var(--font-footnote);
+  color: var(--muxy-diff-remove);
+}
+
+.sn-error:empty {
+  display: none;
+}
+
+.sn-row-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s5);
+}
+
+.sn-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+}
+
+/* Warning about secrets */
+.sn-warn {
+  display: flex;
+  gap: var(--s4);
+  padding: var(--s4) var(--s5);
+  border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, var(--muxy-diff-remove) 45%, transparent);
+  background: color-mix(in srgb, var(--muxy-diff-remove) 10%, transparent);
+  font-size: var(--font-body);
+  line-height: 1.4;
+}
+
+.sn-warn svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--muxy-diff-remove);
+}
+
+/* Bars */
+.sn-bar-top {
+  border-bottom: 1px solid var(--muxy-border);
+}
+
+.sn-bar-bottom {
+  border-top: 1px solid var(--muxy-border);
+}
+
+.sn-title {
+  font-size: var(--font-title);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Group color dot */
+.sn-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 2px;
+}
