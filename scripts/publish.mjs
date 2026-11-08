@@ -13,8 +13,8 @@ const SECRET_KEY = process.env.MINISIGN_SECRET_KEY;
 const DRY_RUN = process.argv.includes("--dry-run");
 
 // Optional release announcement. When DISCORD_WEBHOOK_URL is set, each
-// successful upload posts a one-line "<name> <version> is published." to the
-// channel, with the name linking to the store page. Unset = silently skipped.
+// successful upload posts "<name> <version> is published." plus the store page
+// URL, which Discord unfurls into a preview card. Unset = silently skipped.
 const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL;
 // Store base; an extension's page is `${STORE_BASE_URL}/<name>`.
 const STORE_BASE_URL = (process.env.MUXY_STORE_URL || "https://muxy.app/store").replace(/\/+$/, "");
@@ -26,16 +26,17 @@ function fail(message) {
 
 // Announce a publish to Discord. Best-effort: publishing has already succeeded
 // and the artifact is live, so a webhook failure must never fail the run — it
-// only warns. SUPPRESS_EMBEDS (flag 1<<2) keeps it to a single clean line with
-// no link-preview card.
+// only warns. The store URL is posted bare (not masked, embeds not suppressed)
+// so Discord unfurls the store page's Open Graph tags into a preview card.
 async function postDiscordRelease(name, version) {
   if (!DISCORD_WEBHOOK_URL) return;
-  const content = `[${name}](${STORE_BASE_URL}/${encodeURIComponent(name)}) ${version} is published.`;
+  const storeUrl = `${STORE_BASE_URL}/${encodeURIComponent(name)}`;
+  const content = `**${name}** ${version} is published.\n${storeUrl}`;
   try {
     const response = await fetch(DISCORD_WEBHOOK_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content, flags: 4, allowed_mentions: { parse: [] } }),
+      body: JSON.stringify({ content, allowed_mentions: { parse: [] } }),
     });
     if (!response.ok) {
       const body = await response.text().catch(() => "");
