@@ -17,6 +17,7 @@ export class MarkdownEditor {
         fontSize: config.fontSize,
         isDark,
         filePath,
+        width: config.previewWidth,
         showToc: showToc === true,
         onToggleTask: (next) => {
           this.source = next;
@@ -88,8 +89,12 @@ export class MarkdownEditor {
     const restyle = config.fontSize !== this.config.fontSize || isDark !== this.isDark;
     this.config = config;
     this.isDark = isDark;
-    if (this.code) this.code.updateConfig(config, isDark);
-    else if (restyle) this.preview.update(this.source, config.fontSize, isDark);
+    if (this.code) {
+      this.code.updateConfig(config, isDark);
+      return;
+    }
+    this.preview.setWidth(config.previewWidth);
+    if (restyle) this.preview.update(this.source, config.fontSize, isDark);
   }
 
   destroy() {
