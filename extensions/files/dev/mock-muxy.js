@@ -60,6 +60,11 @@
   }
   for (let f = 0; f < 30; f++) addFile(`docs/guide-${f}.md`, `# Guide ${f}\n\n- [ ] task\n\n\`\`\`js\nconst a = 1;\n\`\`\`\n`);
   addFile("src/big.js", jsSource(3000, "big"));
+  addFile("docs/img/banner.png", atob("iVBORw0KGgoAAAANSUhEUgAAAPAAAABaCAIAAAAJsExNAAABDUlEQVR4nO3SUQkAIBTAwJfTTEY0jCUEYRxcgH1s1j6QMd8L4CFDk2JoUgxNiqFJMTQphibF0KQYmhRDk2JoUgxNiqFJMTQphibF0KQYmhRDk2JoUgxNiqFJMTQphibF0KQYmhRDk2JoUgxNiqFJMTQphibF0KQYmhRDk2JoUgxNiqFJMTQphibF0KQYmhRDk2JoUgxNiqFJMTQphibF0KQYmhRDk2JoUgxNiqFJMTQphibF0KQYmhRDk2JoUgxNiqFJMTQphibF0KQYmhRDk2JoUgxNiqFJMTQphibF0KQYmhRDk2JoUgxNiqFJMTQphibF0KQYmhRDk2JoUgxNiqFJMTQphibF0KQYmpQL5ylZbatOPNQAAAAASUVORK5CYII="));
+  addFile(
+    "docs/img/logo.svg",
+    '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="#e0a030"/></svg>',
+  );
   addFile(
     "docs/sample.md",
     [
@@ -69,17 +74,34 @@
       "",
       "## Section two",
       "",
+      "Markdown preview is meant for reading: long paragraphs like this one should wrap at a comfortable measure, with enough line height that the eye can find the start of the next line without effort. A second sentence keeps it going so the wrap is visible at every width.",
+      "",
       "- First item",
-      "- Second item with `code`",
+      "- Second item with `code` that wraps",
+      "  onto a continuation line",
       "  - Nested item",
+      "    - Deeper item",
+      "  - Another nested item",
+      "- Third item",
       "",
       "1. One",
-      "2. Two",
+      "",
+      "2. Two, after a blank line",
+      "   1. Sub-step a",
+      "   2. Sub-step b",
+      "3. Three",
       "",
       "- [ ] Open task",
       "- [x] Done task",
+      "  - [ ] Nested task",
       "",
-      "> A blockquote line.",
+      "> A blockquote line that runs long enough to show how quoted text wraps inside the rule.",
+      "",
+      "#### Fourth-level heading",
+      "",
+      "##### Fifth-level heading",
+      "",
+      "###### Sixth-level heading",
       "",
       "```js",
       "const answer = 42;",
@@ -88,10 +110,17 @@
       "",
       "### Table",
       "",
-      "| Name | Value |",
-      "| --- | --- |",
-      "| alpha | 1 |",
-      "| beta | 2 |",
+      "| Name | Description | Value |",
+      "| --- | --- | ---: |",
+      "| alpha | First entry | 1 |",
+      "| beta | Second entry | 2,048 |",
+      "| gamma | Third entry | 31 |",
+      "",
+      "### Images",
+      "",
+      "![Banner](img/banner.png \"A local PNG\")",
+      "",
+      "Inline SVG ![logo](img/logo.svg) and a raw tag <img src=\"/docs/img/logo.svg\" width=\"24\" alt=\"small logo\">, then a missing one ![missing image](img/nope.png).",
       "",
       "---",
       "",
@@ -99,7 +128,47 @@
       "",
     ].join("\n"),
   );
-  addFile("README.md", "# Project\n\nHello **world**.\n");
+  addFile(
+    "README.md",
+    [
+      '<p align="center">',
+      '  <picture>',
+      '    <source media="(prefers-color-scheme: dark)" srcset="docs/img/logo.svg">',
+      '    <img src="docs/img/banner.png" width="96" alt="Project logo">',
+      '  </picture>',
+      "</p>",
+      "",
+      '<h1 align="center">Project</h1>',
+      "",
+      '<p align="center">A <b>tiny</b> project with an HTML header, like many READMEs.</p>',
+      '<p align="center"><a href="#install">Mac</a> | <a href="docs/sample.md">Docs</a> | <a href="https://example.com" onclick="alert(1)">Site</a></p>',
+      "",
+      '<div align="center">',
+      "",
+      "[![CI](https://img.shields.io/badge/ci-passing-green)](https://example.com) ![License](https://img.shields.io/badge/license-MIT-blue)",
+      "",
+      "</div>",
+      "",
+      "<!-- a hidden maintainer note -->",
+      "",
+      "## Install",
+      "",
+      "Press <kbd>Cmd</kbd>+<kbd>P</kbd>, or see <https://example.com/docs>.",
+      "",
+      "<details>",
+      "<summary>Build from source</summary>",
+      "",
+      "1. Clone it",
+      "2. Run `make`",
+      "",
+      "</details>",
+      "",
+      "<script>alert('never runs')</script>",
+      "",
+      "Hello **world**.",
+      "",
+    ].join("\n"),
+  );
   addFile("package.json", '{\n  "name": "project",\n  "version": "1.0.0"\n}\n');
   addFile(".gitignore", "node_modules\ndist\n");
   addFile("dist/bundle.js", "/* built */\n");
@@ -292,6 +361,12 @@
       call(() => {
         const args = Array.isArray(argv) ? argv : [];
         if (args[0] === "pwd") return { stdout: `${ROOT}\n`, stderr: "", exitCode: 0 };
+        // Binary files are stored as byte strings; see read_binary_base64.
+        if (args[0] === "base64") {
+          const rel = String(args[args.length - 1]);
+          if (!files.has(rel)) return { stdout: "", stderr: `${rel}: No such file`, exitCode: 1 };
+          return { stdout: btoa(files.get(rel)), stderr: "", exitCode: 0 };
+        }
         if (args[0] === "git" && args[1] === "show") {
           const rel = String(args[2]).replace(/^HEAD:(\.\/)?/, "");
           if (!headFiles.has(rel)) return { stdout: "", stderr: "not in HEAD", exitCode: 128 };
