@@ -1,4 +1,4 @@
-import { FONT_SIZE_MAX, FONT_SIZE_MIN } from "./config";
+import { FONT_SIZE_MAX, FONT_SIZE_MIN, PREVIEW_WIDTHS } from "./config";
 import { cls, h } from "@/shared/dom";
 
 const TAB_SIZES = [2, 4, 8];
@@ -10,6 +10,7 @@ export class SettingsSheet {
     this.update = update;
     this.onClose = onClose;
     this.tabButtons = new Map();
+    this.widthButtons = new Map();
 
     this.keyHandler = (event) => {
       if (event.key !== "Escape") return;
@@ -168,6 +169,23 @@ export class SettingsSheet {
             }),
           ),
         ),
+        h(
+          "div",
+          { class: "sheet-row" },
+          h("label", { class: "sheet-label", title: "How wide the text runs in the markdown preview" }, "Markdown width"),
+          h(
+            "div",
+            { class: "segmented" },
+            PREVIEW_WIDTHS.map(([value, label]) => {
+              const button = h("button", {
+                type: "button",
+                onClick: () => this.update({ previewWidth: value }),
+              }, label);
+              this.widthButtons.set(value, button);
+              return button;
+            }),
+          ),
+        ),
       ),
     );
 
@@ -202,6 +220,10 @@ export class SettingsSheet {
     for (const [size, button] of this.tabButtons) {
       button.className = cls("segment", config.tabSize === size && "segment-active");
       button.setAttribute("aria-pressed", String(config.tabSize === size));
+    }
+    for (const [value, button] of this.widthButtons) {
+      button.className = cls("segment", config.previewWidth === value && "segment-active");
+      button.setAttribute("aria-pressed", String(config.previewWidth === value));
     }
   }
 

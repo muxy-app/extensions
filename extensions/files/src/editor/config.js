@@ -13,7 +13,15 @@ export const DEFAULT_CONFIG = {
   autoSave: true,
   // Open files in the current tab when it hasn't been edited (IDE "preview").
   reuseTab: true,
+  // How wide the markdown preview's text column runs: "narrow", "wide", or "full".
+  previewWidth: "wide",
 };
+
+export const PREVIEW_WIDTHS = [
+  ["narrow", "Narrow"],
+  ["wide", "Wide"],
+  ["full", "Full"],
+];
 
 export const FONT_SIZE_MIN = 10;
 export const FONT_SIZE_MAX = 24;

@@ -1,0 +1,153 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Sticky Note</title>
+  <style>
+    :root {
+      --ink: #2b2a26;
+      --ink-soft: rgba(43, 42, 38, 0.55);
+      --paper: #fff1a8;
+      --bar: #f5dd72;
+    }
+    .note[data-color="yellow"] { --paper: #fff1a8; --bar: #f5dd72; }
+    .note[data-color="pink"]   { --paper: #ffd6e0; --bar: #f7b3c5; }
+    .note[data-color="blue"]   { --paper: #d3e9ff; --bar: #a9d3fa; }
+    .note[data-color="green"]  { --paper: #d7f5cc; --bar: #b0e49f; }
+    .note[data-color="purple"] { --paper: #e7dcff; --bar: #cbb8f7; }
+    .note[data-color="orange"] { --paper: #ffdfbd; --bar: #f8c48c; }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: transparent;
+      overflow: hidden;
+      font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      color: var(--ink);
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    .note {
+      position: absolute;
+      inset: 4px;
+      display: flex;
+      flex-direction: column;
+      background: var(--paper);
+      border-radius: 10px;
+      box-shadow: 0 1px 2px rgba(0,0,0,.18), 0 3px 8px rgba(0,0,0,.14);
+      overflow: hidden;
+      transition: background-color .15s;
+    }
+    header {
+      flex: none;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      background: var(--bar);
+      transition: background-color .15s;
+    }
+    .grip {
+      flex: 1;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: grab;
+    }
+    .grip::before {
+      content: "";
+      width: 28px;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--ink-soft);
+      opacity: .35;
+    }
+    .tools { display: flex; gap: 2px; padding-right: 4px; }
+    .tools button {
+      width: 22px;
+      height: 22px;
+      padding: 0;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--ink-soft);
+      display: grid;
+      place-items: center;
+      cursor: default;
+    }
+    .tools button:hover { background: rgba(0,0,0,.08); color: var(--ink); }
+    .tools button svg { width: 14px; height: 14px; }
+    .swatch-dot {
+      width: 12px; height: 12px; border-radius: 50%;
+      background: var(--paper);
+      box-shadow: inset 0 0 0 1.5px rgba(0,0,0,.35);
+    }
+    #delete.confirm {
+      width: auto;
+      padding: 0 7px;
+      background: #d64545;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .palette {
+      position: absolute;
+      top: 28px; left: 0; right: 0;
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      padding: 8px;
+      background: var(--bar);
+      box-shadow: 0 2px 4px rgba(0,0,0,.08);
+      transform: translateY(-110%);
+      opacity: 0;
+      pointer-events: none;
+      transition: transform .15s, opacity .15s;
+      z-index: 2;
+    }
+    .palette.open { transform: none; opacity: 1; pointer-events: auto; }
+    .palette button {
+      width: 20px; height: 20px; padding: 0;
+      border: 0; border-radius: 50%;
+      box-shadow: inset 0 0 0 1.5px rgba(0,0,0,.25);
+    }
+    .palette button[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--ink); }
+    .palette button:hover { transform: scale(1.12); }
+    textarea {
+      flex: 1;
+      width: 100%;
+      margin: 0;
+      padding: 8px 12px 12px;
+      border: 0;
+      outline: none;
+      resize: none;
+      background: transparent;
+      color: var(--ink);
+      font: inherit;
+      -webkit-user-select: text;
+      user-select: text;
+    }
+    textarea::placeholder { color: var(--ink-soft); }
+  </style>
+</head>
+<body>
+  <div class="note" id="note" data-color="yellow">
+    <header id="header">
+      <div class="grip" title="Drag to move"></div>
+      <div class="tools" id="tools">
+        <button id="color" title="Color"><span class="swatch-dot"></span></button>
+        <button id="add" title="New note">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg>
+        </button>
+        <button id="delete" title="Delete note">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+        </button>
+      </div>
+    </header>
+    <div class="palette" id="palette"></div>
+    <textarea id="text" placeholder="Write something…" spellcheck="true"></textarea>
+  </div>
+  <script src="note.js"></script>
+</body>
+</html>

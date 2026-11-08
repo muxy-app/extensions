@@ -1,0 +1,89 @@
+{
+  "name": "snippets",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Save, group and run terminal command snippets in Muxy — inspired by Termius.",
+  "license": "MIT",
+  "author": "cibofdevs",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && vite build --config vite.quick-run.config.js && node scripts/copy-manifest.mjs",
+    "setup:ui": "node scripts/setup-ui.mjs",
+    "test": "node --test test/core.test.js",
+    "test:ui": "node --import ./test/support/register.mjs --test test/ui.test.js test/quick-run.test.js"
+  },
+  "devDependencies": {
+    "jsdom": "^24.1.0",
+    "vite": "^7.3.5"
+  },
+  "muxy": {
+    "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
+    "description": "Save, group and run terminal command snippets — inspired by Termius.",
+    "permissions": [
+      "panels:write",
+      "commands:run-script",
+      "storage:read",
+      "storage:write",
+      "panes:read",
+      "panes:write",
+      "tabs:write",
+      "notifications:write"
+    ],
+    "panels": [
+      {
+        "id": "snippets",
+        "title": "Snippets",
+        "icon": "curlybraces",
+        "entry": "panel/index.html",
+        "position": "right",
+        "mode": "pinned"
+      }
+    ],
+    "commands": [
+      {
+        "id": "toggle",
+        "title": "Snippets: Toggle Panel",
+        "subtitle": "saved commands snippets",
+        "action": {
+          "kind": "togglePanel",
+          "panel": "snippets"
+        },
+        "defaultShortcut": "cmd+shift+s"
+      },
+      {
+        "id": "quick-run",
+        "title": "Snippets: Run Snippet…",
+        "subtitle": "search run saved command snippet",
+        "action": {
+          "kind": "runScript",
+          "script": "quick-run.js"
+        },
+        "defaultShortcut": "cmd+opt+s"
+      }
+    ],
+    "topbarItems": [
+      {
+        "id": "snippets",
+        "icon": "curlybraces",
+        "command": "toggle",
+        "tooltip": "Snippets"
+      }
+    ],
+    "marketplace": {
+      "author": "Ahmad Wijaya",
+      "github": "cibofdevs",
+      "repository": "https://github.com/cibofdevs/snippets",
+      "categories": [
+        "productivity",
+        "terminal"
+      ],
+      "icon": "assets/icon.svg",
+      "screenshots": [
+        "assets/screenshots/screenshot-1.png",
+        "assets/screenshots/screenshot-2.png",
+        "assets/screenshots/screenshot-3.png"
+      ]
+    }
+  }
+}

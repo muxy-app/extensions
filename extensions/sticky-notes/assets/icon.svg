@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <defs>
+    <filter id="s" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000" flood-opacity=".22"/>
+    </filter>
+  </defs>
+  <g filter="url(#s)">
+    <rect x="70" y="40" width="150" height="150" rx="16" fill="#d3e9ff" transform="rotate(8 145 115)"/>
+    <rect x="70" y="40" width="150" height="26" rx="13" fill="#a9d3fa" transform="rotate(8 145 115)"/>
+  </g>
+  <g filter="url(#s)">
+    <rect x="36" y="66" width="160" height="160" rx="18" fill="#fff1a8" transform="rotate(-6 116 146)"/>
+    <path d="M54 66h124a18 18 0 0 1 18 18v12H36V84a18 18 0 0 1 18-18z" fill="#f5dd72" transform="rotate(-6 116 146)"/>
+    <g stroke="#2b2a26" stroke-opacity=".45" stroke-width="9" stroke-linecap="round" transform="rotate(-6 116 146)">
+      <path d="M62 130h108M62 158h108M62 186h68"/>
+    </g>
+  </g>
+</svg>
