@@ -77,11 +77,12 @@ export class PanelApp {
     if (ready) return;
     if (state.phase === "loading") fill(this.status, h("div", { class: "placeholder" }, spinner(16)));
     else if (state.phase === "no_repo")
-      fill(this.status, 
+      fill(
+        this.status,
         placeholder(
           "Not a Git repository",
           "Initialize a repository to start tracking changes in this folder.",
-          button("Initialize Repository", { primary: true, onClick: () => void this.ctl.run("Could not initialize the repository", () => git.initRepo()).then(() => this.ctl.load()) }),
+          button("Initialize Repository", { primary: true, onClick: () => void this.ctl.run("Could not initialize the repository", () => git.initRepo()) }),
         ),
       );
     else fill(this.status, placeholder("Couldn't read this repository", state.error, button("Try Again", { onClick: () => void this.ctl.load() })));

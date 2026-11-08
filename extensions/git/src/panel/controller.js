@@ -1,5 +1,5 @@
 import * as git from "@/core/git";
-import { statusKey } from "@/core/status";
+import { isMissingRepo, statusKey } from "@/core/status";
 import { forgeFor } from "@/core/forge";
 import { alertError, errorMessage } from "@/shared/actions";
 import { isInside } from "@/shared/paths";
@@ -19,10 +19,6 @@ const INITIAL = {
   busy: 0,
   headVersion: 0,
 };
-
-function isRepoError(message) {
-  return /not a git repo/i.test(message);
-}
 
 export class Controller {
   constructor() {
@@ -72,7 +68,7 @@ export class Controller {
       if (generation !== this.generation) return;
       const message = errorMessage(err);
       this.key = "";
-      this.store.set({ ...INITIAL, phase: isRepoError(message) ? "no_repo" : "error", error: message });
+      this.store.set({ ...INITIAL, phase: isMissingRepo(message) ? "no_repo" : "error", error: message });
       return;
     }
     if (generation !== this.generation) return;
@@ -119,7 +115,7 @@ export class Controller {
     if (status) this.applyStatus(status);
     else if (!this.state.status) {
       const message = errorMessage(error);
-      this.store.set({ phase: isRepoError(message) ? "no_repo" : "error", error: message });
+      this.store.set({ phase: isMissingRepo(message) ? "no_repo" : "error", error: message });
     }
     if (this.again) {
       this.again = false;
@@ -235,8 +231,10 @@ export class Controller {
       return { ok: false, error };
     } finally {
       this.store.set({ busy: Math.max(0, this.state.busy - 1) });
-      await this.refreshStatus();
-      void this.refreshHead();
+      if (this.root) {
+        await this.refreshStatus();
+        void this.refreshHead();
+      } else await this.load();
     }
   }
 

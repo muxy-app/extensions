@@ -145,3 +145,7 @@ export function statusKey(status) {
     listKey(status.unstaged),
   ].join("\u0002");
 }
+
+export function isMissingRepo(message) {
+  return /not a git repo|git worktree is missing/i.test(String(message ?? ""));
+}

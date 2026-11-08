@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { changeCount, fileCode, normalizeStatus, parsePorcelain, statusKey } from "@/core/status";
+import { changeCount, fileCode, isMissingRepo, normalizeStatus, parsePorcelain, statusKey } from "@/core/status";
 
 test("fileCode maps porcelain codes", () => {
   assert.equal(fileCode("?", false), "U");
@@ -52,4 +52,11 @@ test("statusKey changes only when visible state changes", () => {
   assert.equal(a, statusKey(normalizeStatus(structuredClone(base))));
   base.unstagedFiles[0].additions = 2;
   assert.notEqual(a, statusKey(normalizeStatus(base)));
+});
+
+test("isMissingRepo recognizes folders without a repository", () => {
+  assert.equal(isMissingRepo("BadRequest: Git worktree is missing"), true);
+  assert.equal(isMissingRepo("fatal: not a git repository (or any of the parent directories): .git"), true);
+  assert.equal(isMissingRepo("BadRequest: Project directory is missing"), false);
+  assert.equal(isMissingRepo(undefined), false);
 });
