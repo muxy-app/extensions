@@ -1,0 +1,87 @@
+{
+  "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
+  "name": "sticky-notes",
+  "version": "0.1.0",
+  "license": "MIT",
+  "scripts": {
+    "build": "node scripts/build.mjs"
+  },
+  "muxy": {
+    "description": "Colorful sticky notes that float over every project",
+    "permissions": [
+      "panels:write",
+      "storage:read",
+      "storage:write"
+    ],
+    "background": "background.js",
+    "panels": [
+      {
+        "id": "note",
+        "title": "Sticky Note",
+        "entry": "note/index.html",
+        "mode": "detached",
+        "chrome": "none",
+        "transparent": true,
+        "scope": "global",
+        "movable": true,
+        "resizable": true,
+        "frame": {
+          "x": 140,
+          "y": 120,
+          "width": 240,
+          "height": 220
+        },
+        "minSize": {
+          "width": 160,
+          "height": 120
+        },
+        "maxSize": {
+          "width": 900,
+          "height": 900
+        }
+      }
+    ],
+    "commands": [
+      {
+        "id": "new-note",
+        "title": "Sticky Notes: New Note",
+        "subtitle": "add create sticky note",
+        "defaultShortcut": "ctrl+opt+n"
+      },
+      {
+        "id": "toggle-notes",
+        "title": "Sticky Notes: Show/Hide Notes",
+        "subtitle": "toggle sticky notes",
+        "defaultShortcut": "ctrl+opt+shift+n"
+      },
+      {
+        "id": "show-notes",
+        "title": "Sticky Notes: Show All Notes"
+      },
+      {
+        "id": "hide-notes",
+        "title": "Sticky Notes: Hide All Notes"
+      }
+    ],
+    "topbarItems": [
+      {
+        "id": "new-note",
+        "icon": "note.text.badge.plus",
+        "command": "new-note",
+        "tooltip": "New Sticky Note"
+      }
+    ],
+    "marketplace": {
+      "author": "Saeed Vaziry",
+      "github": "saeedvaziry",
+      "categories": [
+        "productivity"
+      ],
+      "icon": "assets/icon.svg",
+      "screenshots": [
+        "assets/screenshot-1.png",
+        "assets/screenshot-2.png"
+      ]
+    }
+  }
+}
