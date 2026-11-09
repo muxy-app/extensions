@@ -1,0 +1,507 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Sticky Notes</title>
+  <style>
+    :root {
+      --ink: #29282d;
+      --ink-2: rgba(41, 40, 45, .62);
+      --ink-3: rgba(41, 40, 45, .38);
+      --rule: rgba(41, 40, 45, .08);
+      --paper: #fbe490;
+      --tab: #f0cb45;
+      --glass: rgba(30, 30, 34, .9);
+      --sheet: rgba(250, 250, 252, .97);
+      --gmax: 26px;
+      --snap: cubic-bezier(.2, .9, .25, 1);
+      --ui: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      --round: ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: transparent;
+      overflow: hidden;
+      font: 12px/1.4 var(--ui);
+      color: var(--ink);
+      -webkit-user-select: none;
+      user-select: none;
+      cursor: default;
+      -webkit-font-smoothing: antialiased;
+    }
+    button { font: inherit; color: inherit; }
+
+    /* ---- Ribbons: one per note, plus +, along a window edge ---- */
+
+    #ribbons { position: absolute; inset: 0; pointer-events: none; }
+    .tab {
+      position: absolute;
+      background: var(--tab);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, .35),
+        0 0 0 .5px rgba(0, 0, 0, .14),
+        0 1px 4px rgba(0, 0, 0, .2);
+      transition:
+        transform .14s var(--snap),
+        left .24s var(--snap),
+        top .24s var(--snap),
+        width .24s var(--snap),
+        height .24s var(--snap),
+        background-color .18s ease;
+    }
+    .instant, .instant * { transition: none !important; }
+    body[data-side="right"]  .tab { border-radius: 8px 0 0 8px; }
+    body[data-side="left"]   .tab { border-radius: 0 8px 8px 0; }
+    body[data-side="top"]    .tab { border-radius: 0 0 8px 8px; }
+    body[data-side="bottom"] .tab { border-radius: 8px 8px 0 0; }
+
+    .tab .glyph {
+      position: absolute;
+      display: grid;
+      place-items: center;
+      font: 700 10.5px/1 var(--round);
+      color: rgba(0, 0, 0, .55);
+      opacity: 0;
+      transition: opacity .12s ease;
+    }
+    body[data-side="right"]  .glyph { left: 0;   top: 0; bottom: 0; width: var(--gmax); }
+    body[data-side="left"]   .glyph { right: 0;  top: 0; bottom: 0; width: var(--gmax); }
+    body[data-side="top"]    .glyph { bottom: 0; left: 0; right: 0; height: var(--gmax); }
+    body[data-side="bottom"] .glyph { top: 0;    left: 0; right: 0; height: var(--gmax); }
+    .tab.add { --tab: rgba(246, 246, 248, .95); }
+    .tab.add .glyph { font-size: 15px; font-weight: 500; color: #444; }
+
+    /* The invisible strip over the ribbons that takes the pointer. It is wider
+       than the ribbons, so they're easy to hit, and has a margin around it
+       that notices the pointer leaving. */
+    #spine { position: absolute; z-index: 5; }
+
+    /* ---- The label that follows the pointer ---- */
+
+    #tip {
+      position: absolute;
+      z-index: 30;
+      left: 0;
+      top: 0;
+      max-width: 230px;
+      padding: 6px 10px 7px;
+      border-radius: 9px;
+      background: var(--glass);
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, .25);
+      -webkit-backdrop-filter: blur(12px);
+      backdrop-filter: blur(12px);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity .12s ease, left .12s var(--snap), top .12s var(--snap);
+      white-space: nowrap;
+    }
+    #tip.show { opacity: 1; }
+    #tip b { display: block; font: 600 12px/1.3 var(--ui); overflow: hidden; text-overflow: ellipsis; }
+    #tip span { display: block; font-size: 11px; color: rgba(255, 255, 255, .62); overflow: hidden; text-overflow: ellipsis; }
+    #tip span:empty { display: none; }
+    #tip kbd { font: 500 10.5px var(--ui); color: rgba(255, 255, 255, .55); margin-left: 6px; }
+
+    /* ---- The open note ---- */
+
+    #card {
+      position: absolute;
+      z-index: 10;
+      top: 0;
+      left: 0;
+      width: 300px;
+      height: 200px;
+      display: none;
+      flex-direction: column;
+      border-radius: 16px;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, .38), rgba(255, 255, 255, 0) 120px),
+        var(--paper);
+      color: var(--ink);
+      box-shadow:
+        0 0 0 .5px rgba(0, 0, 0, .1),
+        0 1px 2px rgba(0, 0, 0, .06),
+        0 12px 32px -8px rgba(0, 0, 0, .35);
+      transition: top .22s var(--snap), left .22s var(--snap), height .18s var(--snap), background-color .2s ease;
+    }
+    #card.show { display: flex; }
+    #content { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+    header {
+      flex: none;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 12px 8px 2px 16px;
+    }
+    #title {
+      flex: 1;
+      min-width: 0;
+      margin: 0;
+      padding: 2px 0;
+      border: 0;
+      outline: none;
+      background: transparent;
+      color: var(--ink);
+      font: 650 15px/1.25 var(--round);
+      -webkit-user-select: text;
+      user-select: text;
+    }
+    #title::placeholder { color: var(--ink-3); }
+
+    #text {
+      flex: 1;
+      min-height: 0;
+      width: 100%;
+      margin: 0;
+      padding: 6px 16px 10px;
+      border: 0;
+      outline: none;
+      resize: none;
+      background: transparent;
+      color: var(--ink);
+      font: 13.5px/1.55 var(--round);
+      tab-size: 2;
+      -webkit-user-select: text;
+      user-select: text;
+    }
+    #text::placeholder { color: var(--ink-3); }
+    #text::-webkit-scrollbar { width: 6px; }
+    #text::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, .15); border-radius: 3px; }
+
+    footer {
+      flex: none;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      height: 40px;
+      padding: 0 8px 0 10px;
+      border-top: 1px solid var(--rule);
+    }
+    .icon {
+      flex: none;
+      width: 26px;
+      height: 26px;
+      padding: 0;
+      border: 0;
+      border-radius: 7px;
+      background: transparent;
+      color: var(--ink-2);
+      display: grid;
+      place-items: center;
+      transition: background-color .12s, color .12s, transform .12s var(--snap);
+    }
+    .icon:hover { background: rgba(0, 0, 0, .07); color: var(--ink); }
+    .icon:active { transform: scale(.92); }
+    .icon svg { width: 15px; height: 15px; }
+    /* The put-away arrow points at the edge the ribbons are on. */
+    #tuck svg { transition: transform .2s var(--snap); }
+    body[data-side="left"]   #tuck svg { transform: rotate(180deg); }
+    body[data-side="top"]    #tuck svg { transform: rotate(-90deg); }
+    body[data-side="bottom"] #tuck svg { transform: rotate(90deg); }
+    .dot {
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: var(--tab);
+      box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .15);
+    }
+
+    #swatches {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      max-width: 0;
+      overflow: hidden;
+      opacity: 0;
+      transition: max-width .2s var(--snap), opacity .14s ease;
+    }
+    footer.picking #swatches { max-width: 140px; opacity: 1; }
+    footer.picking #scope, footer.picking #when { opacity: 0; pointer-events: none; }
+    .swatch {
+      flex: none;
+      width: 16px; height: 16px;
+      padding: 0;
+      border: 0;
+      border-radius: 50%;
+      box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .15);
+      transition: transform .14s var(--snap);
+    }
+    .swatch:hover { transform: scale(1.18); }
+    .swatch[aria-pressed="true"] { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .2), 0 0 0 2px var(--paper), 0 0 0 3.5px var(--ink-2); }
+
+    #scope {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      max-width: 120px;
+      height: 22px;
+      padding: 0 8px 0 6px;
+      border: 0;
+      border-radius: 11px;
+      background: rgba(0, 0, 0, .06);
+      color: var(--ink-2);
+      font-size: 11px;
+      font-weight: 500;
+      white-space: nowrap;
+      transition: background-color .12s, color .12s, opacity .12s;
+    }
+    #scope:hover { background: rgba(0, 0, 0, .1); color: var(--ink); }
+    #scope[hidden] { display: none; }
+    #scope svg { flex: none; width: 12px; height: 12px; }
+    #scope span { overflow: hidden; text-overflow: ellipsis; }
+
+    .grow { flex: 1; }
+    #when { font-size: 10.5px; color: var(--ink-3); white-space: nowrap; transition: opacity .12s; }
+
+    /* ---- Settings ---- */
+
+    #prefs {
+      position: absolute;
+      z-index: 20;
+      left: 0;
+      top: 0;
+      width: 236px;
+      display: none;
+      padding: 14px 14px 14px;
+      border-radius: 16px;
+      background: var(--sheet);
+      color: var(--ink);
+      box-shadow:
+        0 0 0 .5px rgba(0, 0, 0, .1),
+        0 1px 2px rgba(0, 0, 0, .06),
+        0 14px 36px -8px rgba(0, 0, 0, .35);
+      transition: left .26s var(--snap), top .26s var(--snap);
+    }
+    #prefs.show { display: block; }
+    #prefs:focus, .spot:focus, .seg button:focus { outline: none; }
+    .spot:focus-visible i, .seg button:focus-visible { box-shadow: 0 0 0 2px rgba(120, 150, 240, .6); }
+    .prefs-head { display: flex; align-items: center; margin-bottom: 10px; }
+    .prefs-head b { flex: 1; font: 650 13px/1.2 var(--round); }
+    .section { margin: 12px 0 6px; font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); }
+    .section:first-of-type { margin-top: 0; }
+
+    #screen {
+      position: relative;
+      height: 132px;
+      border-radius: 11px;
+      background:
+        linear-gradient(rgba(0, 0, 0, .05) 0 14px, transparent 14px),
+        linear-gradient(160deg, #eef0f6, #e4e2ef);
+      box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .1);
+    }
+    #screen::before {
+      /* window buttons */
+      content: "";
+      position: absolute;
+      left: 8px;
+      top: 5px;
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, .18);
+      box-shadow: 7px 0 rgba(0, 0, 0, .18), 14px 0 rgba(0, 0, 0, .18);
+    }
+    .spot {
+      position: absolute;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      display: grid;
+      place-items: center;
+    }
+    .spot i {
+      display: block;
+      border-radius: 3px;
+      background: rgba(41, 40, 45, .2);
+      transition: background-color .14s, transform .2s var(--snap), box-shadow .14s;
+    }
+    .spot.v i { width: 6px; height: 22px; }
+    .spot.h i { width: 22px; height: 6px; }
+    .spot:hover i { background: rgba(41, 40, 45, .45); transform: scale(1.15); }
+    .spot[aria-pressed="true"] i {
+      background: linear-gradient(var(--grad-dir, 180deg), #f0cb45, #ec88ad 35%, #a690f0 65%, #74c98f);
+      box-shadow: 0 1px 5px rgba(0, 0, 0, .25);
+      transform: scale(1.15);
+    }
+    .spot.h[aria-pressed="true"] i { --grad-dir: 90deg; }
+
+    .seg {
+      display: flex;
+      padding: 2px;
+      border-radius: 9px;
+      background: rgba(0, 0, 0, .06);
+    }
+    .seg button {
+      flex: 1;
+      height: 24px;
+      padding: 0;
+      border: 0;
+      border-radius: 7px;
+      background: transparent;
+      color: var(--ink-2);
+      font-size: 11.5px;
+      font-weight: 500;
+      transition: background-color .15s, color .15s, box-shadow .15s;
+    }
+    .seg button:hover { color: var(--ink); }
+    .seg button[aria-pressed="true"] {
+      background: #fff;
+      color: var(--ink);
+      box-shadow: 0 0 0 .5px rgba(0, 0, 0, .08), 0 1px 3px rgba(0, 0, 0, .12);
+    }
+    .hint { margin-top: 10px; font-size: 10.5px; color: var(--ink-3); line-height: 1.4; }
+
+    /* ---- The ribbon menu ---- */
+
+    #menu {
+      position: absolute;
+      z-index: 22;
+      left: 0;
+      top: 0;
+      width: 196px;
+      display: none;
+      padding: 6px;
+      border-radius: 13px;
+      background: var(--sheet);
+      color: var(--ink);
+      box-shadow:
+        0 0 0 .5px rgba(0, 0, 0, .1),
+        0 1px 2px rgba(0, 0, 0, .06),
+        0 12px 30px -8px rgba(0, 0, 0, .35);
+    }
+    #menu.show { display: block; }
+    #menu:focus { outline: none; }
+    #menu-title {
+      padding: 5px 8px 3px;
+      font: 650 12.5px/1.3 var(--round);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #menu-colors { display: flex; gap: 6px; padding: 5px 8px 8px; }
+    #menu-colors .swatch { width: 15px; height: 15px; }
+    #menu-colors .swatch[aria-pressed="true"] { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .2), 0 0 0 2px var(--sheet), 0 0 0 3.5px var(--ink-2); }
+    .item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      height: 28px;
+      padding: 0 8px;
+      border: 0;
+      border-radius: 7px;
+      background: transparent;
+      color: var(--ink);
+      font-size: 12.5px;
+      text-align: left;
+      transition: background-color .1s;
+    }
+    .item:hover { background: rgba(0, 0, 0, .06); }
+    .item svg { flex: none; width: 14px; height: 14px; color: var(--ink-2); }
+    .item kbd { margin-left: auto; font: 11px var(--ui); color: var(--ink-3); }
+    .item.danger, .item.danger svg { color: #c4362d; }
+    .item.danger:hover { background: rgba(214, 69, 69, .1); }
+    .sep { height: 1px; margin: 4px 6px; background: var(--rule); }
+
+    /* ---- Undo after delete ---- */
+
+    #toast {
+      position: absolute;
+      z-index: 25;
+      left: 0;
+      top: 0;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      height: 32px;
+      padding: 0 6px 0 12px;
+      border-radius: 10px;
+      background: var(--glass);
+      color: #fff;
+      font-size: 12px;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, .28);
+      -webkit-backdrop-filter: blur(12px);
+      backdrop-filter: blur(12px);
+      white-space: nowrap;
+    }
+    #toast.show { display: flex; }
+    #toast button {
+      height: 22px;
+      padding: 0 9px;
+      border: 0;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, .14);
+      color: #fff;
+      font-weight: 600;
+    }
+    #toast button:hover { background: rgba(255, 255, 255, .24); }
+  </style>
+</head>
+<body data-side="right">
+  <div id="ribbons"></div>
+  <div id="spine"></div>
+  <div id="tip"><b></b><span></span></div>
+
+  <div id="card">
+    <div id="content">
+      <header>
+        <input id="title" placeholder="Title" spellcheck="false" maxlength="100" autocomplete="off">
+        <button class="icon" id="tuck" title="Put away (Esc)">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5 10.5 8 6 12.5"/></svg>
+        </button>
+      </header>
+      <textarea id="text" spellcheck="true" placeholder="Write something…  Type [] for a checklist."></textarea>
+    </div>
+    <footer id="footer">
+      <button class="icon" id="color" title="Color"><span class="dot"></span></button>
+      <div id="swatches"></div>
+      <button id="scope" hidden></button>
+      <div class="grow"></div>
+      <span id="when"></span>
+      <button class="icon" id="trash" title="Delete note">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.6 4.5l.6 8.5h5.6l.6-8.5"/></svg>
+      </button>
+    </footer>
+  </div>
+
+  <div id="prefs" tabindex="-1">
+    <div class="prefs-head">
+      <b>Sticky Notes</b>
+      <button class="icon" id="prefs-close" title="Close (Esc)">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg>
+      </button>
+    </div>
+    <div class="section">Position</div>
+    <div id="screen"></div>
+    <div class="section">Ribbon size</div>
+    <div class="seg" id="sizes">
+      <button data-size="slim">Slim</button>
+      <button data-size="regular">Regular</button>
+      <button data-size="large">Large</button>
+    </div>
+    <div class="hint">Right-click + to come back here.</div>
+  </div>
+
+  <div id="menu" tabindex="-1">
+    <div id="menu-title"></div>
+    <div id="menu-colors"></div>
+    <button class="item" id="menu-open">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 12.5 10 6M6 3.5h6.5V10"/></svg>Open<kbd>↩</kbd>
+    </button>
+    <button class="item" id="menu-settings">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 4.5h7M12.5 4.5h1M2.5 11.5h1M6.5 11.5h7"/><circle cx="11" cy="4.5" r="1.5"/><circle cx="5" cy="11.5" r="1.5"/></svg>Settings…
+    </button>
+    <div class="sep"></div>
+    <button class="item danger" id="menu-delete">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.6 4.5l.6 8.5h5.6l.6-8.5"/></svg>Delete<kbd>⌫</kbd>
+    </button>
+  </div>
+
+  <div id="toast"><span id="toast-text">Note deleted</span><button id="undo">Undo</button></div>
+
+  <script src="dock.js"></script>
+</body>
+</html>

@@ -1,43 +1,40 @@
 {
   "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
   "name": "sticky-notes",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "license": "MIT",
   "scripts": {
     "build": "node scripts/build.mjs"
   },
   "muxy": {
-    "description": "Colorful sticky notes that float over every project",
+    "description": "Sticky notes on any edge of the window, with checklists and per-project notes",
     "permissions": [
       "panels:write",
+      "projects:read",
       "storage:read",
       "storage:write"
     ],
     "background": "background.js",
     "panels": [
       {
-        "id": "note",
-        "title": "Sticky Note",
-        "entry": "note/index.html",
+        "id": "dock",
+        "title": "Sticky Notes",
+        "entry": "dock/index.html",
         "mode": "detached",
         "chrome": "none",
         "transparent": true,
+        "clickThrough": true,
         "scope": "global",
-        "movable": true,
-        "resizable": true,
+        "movable": false,
+        "resizable": false,
+        "hiddenControls": [
+          "detach"
+        ],
         "frame": {
-          "x": 140,
-          "y": 120,
-          "width": 240,
-          "height": 220
-        },
-        "minSize": {
-          "width": 160,
-          "height": 120
-        },
-        "maxSize": {
-          "width": 900,
-          "height": 900
+          "x": 0,
+          "y": 0,
+          "width": 1200,
+          "height": 800
         }
       }
     ],
@@ -61,6 +58,11 @@
       {
         "id": "hide-notes",
         "title": "Sticky Notes: Hide All Notes"
+      },
+      {
+        "id": "settings",
+        "title": "Sticky Notes: Settings",
+        "subtitle": "position edge corner side size move"
       }
     ],
     "topbarItems": [
@@ -80,8 +82,14 @@
       "icon": "assets/icon.svg",
       "screenshots": [
         "assets/screenshot-1.png",
-        "assets/screenshot-2.png"
+        "assets/screenshot-2.png",
+        "assets/screenshot-3.png"
       ]
-    }
+    },
+    "events": [
+      "pane.focused",
+      "tab.focused",
+      "project.switched"
+    ]
   }
 }
