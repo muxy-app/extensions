@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const dist = join(root, "dist");
-const files = ["package.json", "background.js", "note", "assets", "README.md"];
+const files = ["package.json", "background.js", "dock", "assets", "README.md"];
 
 rmSync(dist, { recursive: true, force: true });
 for (const f of files) {
