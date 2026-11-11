@@ -78,7 +78,10 @@ let cardToken = 0;
 let prefsAnim = null;
 let prefsToken = 0;
 let moveToken = 0;
-let W = window.innerWidth;
+const stage = $("stage");
+let bounds = { width: window.innerWidth, height: window.innerHeight }; // the window, once known
+let origin = { x: 0, y: 0 }; // where the panel's top left corner sits in the window
+let W = window.innerWidth;  // the window's size, not the panel's
 let H = window.innerHeight;
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -312,8 +315,10 @@ function syncTabs() {
 }
 
 function layout() {
-  W = window.innerWidth;
-  H = window.innerHeight;
+  W = bounds.width;
+  H = bounds.height;
+  stage.style.width = `${W}px`;
+  stage.style.height = `${H}px`;
   document.body.dataset.side = settings.side;
   document.body.style.setProperty("--gmax", `${S.max}px`);
 
@@ -344,6 +349,7 @@ function layout() {
   if (prefs.classList.contains("show")) placePrefs();
   if (menuFor && tabs.has(menuFor)) placeBeside(menu, tabs.get(menuFor).center, CARD_GAP);
   if (toast.classList.contains("show") && addTab) placeBeside(toast, addTab.center, CARD_GAP);
+  fitFrame();
 }
 
 // Sizes each ribbon: the open note's sticks out a little, and ribbons near the
@@ -406,16 +412,19 @@ function itemAt(a) {
   return best && bestD <= strip.len / 2 + GAP ? best : null;
 }
 
+// Where a mouse event happened, in the window rather than the panel.
+const at = (e) => [e.clientX + origin.x, e.clientY + origin.y];
+
 spine.addEventListener("mousemove", (e) => {
   // The strip over the ribbons counts; the margin around it means leaving.
-  const onStrip = depthOf(e.clientX, e.clientY) <= S.touch;
-  setPointer(onStrip ? alongOf(e.clientX, e.clientY) : null);
+  const onStrip = depthOf(...at(e)) <= S.touch;
+  setPointer(onStrip ? alongOf(...at(e)) : null);
 });
 spine.addEventListener("mouseleave", () => setPointer(null));
 spine.addEventListener("mousedown", (e) => {
   e.preventDefault(); // keep focus where it is; we move it ourselves
   if (e.button !== 0) return;
-  const t = depthOf(e.clientX, e.clientY) <= S.touch ? itemAt(alongOf(e.clientX, e.clientY)) : null;
+  const t = depthOf(...at(e)) <= S.touch ? itemAt(alongOf(...at(e))) : null;
   if (!t) {
     closeAll();
     return;
@@ -430,7 +439,7 @@ spine.addEventListener("mousedown", (e) => {
 // around the ribbons open the settings.
 spine.addEventListener("contextmenu", (e) => {
   e.preventDefault();
-  const t = depthOf(e.clientX, e.clientY) <= S.touch ? itemAt(alongOf(e.clientX, e.clientY)) : null;
+  const t = depthOf(...at(e)) <= S.touch ? itemAt(alongOf(...at(e))) : null;
   if (t && t.id) {
     if (menuFor === t.id) closeMenu();
     else openMenu(t);
@@ -1044,25 +1053,79 @@ async function applySettings(change) {
 
 // ---- Putting things away ----
 
-// After opening from a command, Muxy hands focus back to the terminal a
-// moment later. For a short while, take it back instead of closing.
-let holdUntil = 0;
+// After a command opens something (often from a shortcut pressed in a
+// terminal), the keyboard still belongs to the terminal, and Muxy hands it back
+// there when the keys come up. For a short while, keep asking for it until it
+// sticks, and don't treat losing it as a click elsewhere.
+//
+// muxy.focused says where Muxy sends the keys; document.hasFocus() can be true
+// while they still go to the terminal. raise() only reorders panels; opening
+// the panel again is what moves the keyboard into it.
+const CLAIM_MS = 2500;
+let claimUntil = 0;
+let claimTimer = null;
 
-function hold(ms = 900) {
-  holdUntil = Date.now() + ms;
+function claimTarget() {
+  if (openId) return card.contains(document.activeElement) ? document.activeElement : (titleEl.value || textEl.value ? textEl : titleEl);
+  if (menuFor) return menu;
+  if (prefs.classList.contains("show")) return prefs;
+  return null;
 }
 
-function reclaimFocus() {
-  if (Date.now() > holdUntil) return false;
-  const el = openId ? (titleEl.value || textEl.value ? textEl : titleEl) : prefs.classList.contains("show") ? prefs : null;
-  if (!el) return false;
-  if (muxy.panel) Promise.resolve(muxy.panel.raise()).catch(() => {});
-  setTimeout(() => el.focus({ preventScroll: true }), 0);
-  return true;
+function claiming() {
+  return Date.now() < claimUntil;
 }
+
+function claimFocus() {
+  claimUntil = Date.now() + CLAIM_MS;
+  clearTimeout(claimTimer);
+  pulse();
+}
+
+function stopClaim() {
+  claimUntil = 0;
+  clearTimeout(claimTimer);
+}
+
+let lastRequest = 0;
+function requestFocus() {
+  if (Date.now() - lastRequest < 120) return;
+  lastRequest = Date.now();
+  Promise.resolve(muxy.panels.open("dock", {}, {}))
+    .catch((e) => console.warn("Couldn't take the keyboard:", e && e.message));
+}
+
+function pulse() {
+  if (!claiming()) return;
+  const el = claimTarget();
+  if (!el) {
+    stopClaim();
+    return;
+  }
+  if (!muxy.focused) requestFocus();
+  if (document.activeElement !== el) el.focus({ preventScroll: true });
+  claimTimer = setTimeout(pulse, 150);
+}
+
+if (muxy.onFocus) {
+  muxy.onFocus((focused) => {
+    if (!focused && claiming()) {
+      clearTimeout(claimTimer);
+      claimTimer = setTimeout(pulse, 30);
+    }
+  });
+}
+
+// Typing or clicking here means focus has arrived.
+document.addEventListener("keydown", (e) => {
+  if (e.ctrlKey || e.altKey || e.metaKey || e.repeat) return; // still the shortcut
+  if (claiming() && muxy.focused) stopClaim();
+}, true);
+document.addEventListener("mousedown", () => stopClaim(), true);
 
 function closeAll(fromFocusLoss = false) {
-  if (fromFocusLoss && reclaimFocus()) return;
+  if (fromFocusLoss && claiming()) return;
+  stopClaim();
   closeCard();
   closePrefs();
   closeMenu();
@@ -1111,18 +1174,87 @@ muxy.events.subscribe("project.switched", async (event) => {
   layout();
 });
 
-// ---- Covering the window ----
+// ---- How much of the window the panel covers ----
+// Even with clicks passing through, a panel over the whole window catches
+// files dragged onto it, so they never reach the terminal or tab underneath.
+// At rest the panel covers only the ribbons, and it spreads over the window
+// only while the pointer is on them or a note, menu, or settings is open.
 
-function anchor(state) {
-  const b = state && state.bounds;
-  if (!b || !b.width || !b.height) return;
-  const want = { x: 0, y: 0, width: b.width, height: b.height };
-  const f = state.frame || {};
-  const off = (a, c) => Math.abs((a || 0) - c) > 0.5;
-  if (off(f.x, want.x) || off(f.y, want.y) || off(f.width, want.width) || off(f.height, want.height)) {
-    Promise.resolve(muxy.panel.setFrame(want)).catch((e) => console.warn("Couldn't place the notes:", e && e.message));
+const COLLAPSE_MS = 180; // lets closing animations finish first
+let wanted = null;       // the frame last asked for
+let collapseTimer = null;
+let framing = false;     // on once the panel's real frame is known
+
+function setOrigin(x, y) {
+  x = Math.round(x || 0);
+  y = Math.round(y || 0);
+  if (x === origin.x && y === origin.y) return;
+  origin = { x, y };
+  stage.style.transform = x || y ? `translate(${-x}px, ${-y}px)` : "";
+}
+
+function needsWindow() {
+  return pointerA != null || [card, prefs, menu, toast, tip].some((el) => el.classList.contains("show"));
+}
+
+// The ribbons, the strip that takes the pointer, and a little room for shadows.
+function restFrame() {
+  const pad = 8;
+  const a0 = Math.max(0, strip.start - HALO - pad);
+  const a1 = Math.min(edgeLength(), strip.start + strip.total + HALO + pad);
+  const r = rectAt(a0, a1 - a0, 0, Math.max(S.touch, S.max) + HALO + pad);
+  const x = Math.floor(r.x);
+  const y = Math.floor(r.y);
+  return { x, y, width: Math.ceil(r.x + r.w) - x, height: Math.ceil(r.y + r.h) - y };
+}
+
+function request(f) {
+  const w = wanted;
+  if (w && w.x === f.x && w.y === f.y && w.width === f.width && w.height === f.height) return;
+  wanted = f;
+  Promise.resolve(muxy.panel.setFrame(f)).catch((e) => console.warn("Couldn't place the notes:", e && e.message));
+}
+
+function fitFrame(now = false) {
+  if (!muxy.panel || !framing) return;
+  if (needsWindow()) {
+    clearTimeout(collapseTimer);
+    collapseTimer = null;
+    request({ x: 0, y: 0, width: W, height: H });
+    return;
+  }
+  if (now) {
+    clearTimeout(collapseTimer);
+    collapseTimer = null;
+    request(restFrame());
+  } else if (!collapseTimer) {
+    collapseTimer = setTimeout(() => {
+      collapseTimer = null;
+      if (!needsWindow()) request(restFrame());
+    }, COLLAPSE_MS);
   }
 }
+
+// The page usually hears it was resized before Muxy reports the new frame, so
+// line the stage up then, if the new size is the one asked for.
+window.addEventListener("resize", () => {
+  const f = wanted;
+  if (f && Math.abs(window.innerWidth - f.width) < 1 && Math.abs(window.innerHeight - f.height) < 1) setOrigin(f.x, f.y);
+});
+
+function panelChanged(state) {
+  if (!state) return;
+  if (state.frame) setOrigin(state.frame.x, state.frame.y);
+  const b = state.bounds;
+  if (b && b.width && b.height && (b.width !== bounds.width || b.height !== bounds.height)) {
+    bounds = { width: b.width, height: b.height };
+    wanted = null; // the window changed size; place the panel again
+    layout();
+    fitFrame(!needsWindow());
+  }
+}
+
+new MutationObserver(() => fitFrame()).observe(stage, { subtree: true, attributes: true, attributeFilter: ["class"] });
 
 // ---- Startup ----
 
@@ -1153,6 +1285,14 @@ async function init() {
     }
   }
 
+  if (muxy.panel) {
+    const state = await muxy.panel.get();
+    if (state && state.bounds && state.bounds.width && state.bounds.height) {
+      bounds = { width: state.bounds.width, height: state.bounds.height };
+    }
+    if (state && state.frame) setOrigin(state.frame.x, state.frame.y);
+  }
+
   syncTabs();
   for (const t of tabs.values()) t.el.getAnimations().forEach((a) => a.finish());
   ribbons.classList.add("instant");
@@ -1160,12 +1300,11 @@ async function init() {
   void ribbons.offsetWidth;
   ribbons.classList.remove("instant");
 
-  window.addEventListener("resize", layout);
-
   if (muxy.panel) {
-    anchor(await muxy.panel.get());
+    framing = true;
+    fitFrame(true);
     muxy.panel.onChange((s) => {
-      anchor(s);
+      panelChanged(s);
       if (s && s.focused === false && !document.hasFocus()) closeAll(true);
     });
     // Clicks land on these; everywhere else reaches Muxy.
@@ -1176,8 +1315,8 @@ async function init() {
   }
 
   // These come from commands, often a shortcut pressed in a terminal.
-  muxy.events.subscribe("extension.new-note", () => { hold(); newNote(); });
-  muxy.events.subscribe("extension.open-settings", () => { hold(); openPrefs(); });
+  muxy.events.subscribe("extension.new-note", () => { newNote(); claimFocus(); });
+  muxy.events.subscribe("extension.open-settings", () => { openPrefs(); claimFocus(); });
 
   muxy.lifecycle.onBeforeClose(async () => {
     if (openId) leaveNote(openId);
@@ -1186,8 +1325,8 @@ async function init() {
   });
 
   const action = muxy.data && muxy.data.action;
-  if (action === "new") { hold(); newNote(); }
-  else if (action === "settings") { hold(); openPrefs(); }
+  if (action === "new") { newNote(); claimFocus(); }
+  else if (action === "settings") { openPrefs(); claimFocus(); }
 
   setInterval(() => {
     const note = byId(openId);
