@@ -1,0 +1,43 @@
+{
+  "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
+  "name": "simulator-extension",
+  "version": "0.1.0",
+  "description": "An iOS Simulator you can see and touch, in a Muxy side panel.",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build.mjs"
+  },
+  "muxy": {
+    "description": "Run and drive an iOS Simulator in a side panel",
+    "permissions": ["commands:exec", "panels:write", "storage:read", "storage:write"],
+    "panels": [
+      {
+        "id": "simulator",
+        "title": "Simulator",
+        "icon": "iphone",
+        "entry": "panel/index.html",
+        "position": "right",
+        "mode": "pinned"
+      }
+    ],
+    "commands": [
+      {
+        "id": "toggle",
+        "title": "Simulator: Toggle Panel",
+        "subtitle": "iOS iPhone iPad Xcode",
+        "action": { "kind": "togglePanel", "panel": "simulator" },
+        "defaultShortcut": "ctrl+opt+i"
+      }
+    ],
+    "topbarItems": [
+      { "id": "simulator", "icon": "iphone", "command": "toggle", "tooltip": "iOS Simulator" }
+    ],
+    "marketplace": {
+      "author": "metecan",
+      "github": "metecan",
+      "categories": ["ios", "simulator", "xcode"],
+      "icon": "icon.svg",
+      "screenshots": ["screenshots/screenshot-1.png"]
+    }
+  }
+}
