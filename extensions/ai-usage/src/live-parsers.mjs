@@ -16,6 +16,17 @@ export function parseClaudeRows(payload) {
     if (value === null && resetAt === null) return [];
     return [row(label, value, resetAt, value === null ? null : `${formatNumber(value)}% used`, periodDuration)];
   });
+  for (const limit of Array.isArray(payload?.limits) ? payload.limits : []) {
+    if (limit?.kind !== "weekly_scoped") continue;
+    const model = nonEmptyString(limit?.scope?.model?.display_name);
+    if (!model) continue;
+    const label = `7d ${model}`;
+    if (rows.some((existing) => existing.label === label)) continue;
+    const value = firstNumber(limit, ["percent", "utilization"]);
+    const resetAt = firstDate(limit, ["resets_at", "reset_at"]);
+    if (value === null && resetAt === null) continue;
+    rows.push(row(label, value, resetAt, value === null ? null : `${formatNumber(value)}% used`, 604800));
+  }
   return { rows, planName };
 }
 
