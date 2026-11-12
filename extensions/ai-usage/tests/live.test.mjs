@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { fetchLiveSnapshots } from "../src/live.mjs";
-import { parseOpenCodeGoRows } from "../src/live-parsers.mjs";
+import { parseClaudeRows, parseOpenCodeGoRows } from "../src/live-parsers.mjs";
 
 test("regression: live provider fetch reads Codex auth from disk and parses WHAM usage rows", async () => {
   const calls = [];
@@ -823,6 +823,28 @@ test("regression: Claude 429 backs off for retry-after instead of re-calling the
     assert.match(claude.state.message, /^Rate limited until /);
     assert.ok(claude.rateLimitedUntil.getTime() >= before + 238000);
   }
+});
+
+test("regression: parseClaudeRows adds model-scoped weekly limits from the limits array", () => {
+  const { rows } = parseClaudeRows({
+    five_hour: { utilization: 48, resets_at: "2026-11-12T15:50:00.000Z" },
+    seven_day: { utilization: 16, resets_at: "2026-11-14T23:00:00.000Z" },
+    seven_day_sonnet: { utilization: 3, resets_at: "2026-11-14T23:00:00.000Z" },
+    limits: [
+      { kind: "session", percent: 48, resets_at: "2026-11-12T15:50:00.000Z", scope: null },
+      { kind: "weekly_all", percent: 16, resets_at: "2026-11-14T23:00:00.000Z", scope: null },
+      { kind: "weekly_scoped", percent: 12, resets_at: "2026-11-14T23:00:00.000Z", scope: { model: { id: null, display_name: "Fable" } } },
+      { kind: "weekly_scoped", percent: 9, resets_at: "2026-11-14T23:00:00.000Z", scope: { model: { display_name: "Sonnet" } } },
+      { kind: "weekly_scoped", percent: 5, scope: { model: null } },
+    ],
+  });
+
+  assert.deepEqual(rows.map((row) => row.label), ["5h", "7d", "7d Sonnet", "7d Fable"]);
+  const fable = rows.find((row) => row.label === "7d Fable");
+  assert.equal(fable.percent, 12);
+  assert.equal(fable.detail, "12.0% used");
+  assert.equal(fable.resetAt.toISOString(), "2026-11-14T23:00:00.000Z");
+  assert.equal(fable.periodDuration, 604800);
 });
 
 function ok(stdout) {
