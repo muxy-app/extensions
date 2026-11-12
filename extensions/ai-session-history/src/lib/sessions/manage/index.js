@@ -7,6 +7,7 @@ import {
   hexToUtf8,
   encodeCursorStoreMeta,
 } from "../scan/helpers.js";
+import { resolveDevinCliDir, resolveDevinDbPath } from "../scan/devin.js";
 
 /**
  * @param {*} fs
@@ -416,6 +417,81 @@ async function deleteOpenCode(fs, home, sessionId) {
 }
 
 /**
+ * Resolve Devin sessions.db path (mirrors scan/devin.js).
+ * @param {*} fs
+ * @param {string} home
+ */
+async function resolveDevinDb(fs, home) {
+  const cliDir = await toPromise(resolveDevinCliDir(fs, { home }));
+  return resolveDevinDbPath(fs, cliDir);
+}
+
+async function renameDevin(fs, home, sessionId, newTitle) {
+  const dbPath = await resolveDevinDb(fs, home);
+  if (!(await toPromise(fs.isFile(dbPath)))) {
+    throw new Error("No Devin session database found");
+  }
+  const existing = await toPromise(
+    fs.sqliteQuery(
+      dbPath,
+      `SELECT id FROM sessions WHERE id = ${sqlQuote(sessionId)} LIMIT 1`,
+    ),
+  );
+  if (!existing.length) throw new Error(`Devin session not found: ${sessionId}`);
+  await toPromise(
+    fs.sqliteExec(
+      dbPath,
+      `UPDATE sessions SET title = ${sqlQuote(newTitle)} WHERE id = ${sqlQuote(sessionId)}`,
+    ),
+  );
+}
+
+async function deleteDevin(fs, home, sessionId) {
+  const cliDir = await toPromise(resolveDevinCliDir(fs, { home }));
+  const dbPath = resolveDevinDbPath(fs, cliDir);
+  if (!(await toPromise(fs.isFile(dbPath)))) {
+    throw new Error("No Devin session database found");
+  }
+  const existing = await toPromise(
+    fs.sqliteQuery(
+      dbPath,
+      `SELECT id FROM sessions WHERE id = ${sqlQuote(sessionId)} LIMIT 1`,
+    ),
+  );
+  if (!existing.length) throw new Error(`Devin session not found: ${sessionId}`);
+  const q = sqlQuote(sessionId);
+  // Only delete from tables that actually exist in this DB revision.
+  const tables = await toPromise(fs.sqliteTables(dbPath));
+  const stmts = [
+    "message_nodes",
+    "prompt_history",
+    "rendered_commits",
+    "live_row_times",
+    "subagent_heads",
+    "tool_call_state",
+    "sessions",
+  ]
+    .filter((t) => tables.has(t))
+    .map((t) =>
+      t === "sessions"
+        ? `DELETE FROM sessions WHERE id = ${q};`
+        : `DELETE FROM ${t} WHERE session_id = ${q};`,
+    );
+  if (stmts.length) {
+    await toPromise(fs.sqliteExec(dbPath, stmts.join("")));
+  }
+  // Best-effort: drop the transcript export if present.
+  try {
+    const transcript = joinPath(cliDir, "transcripts", `${sessionId}.json`);
+    if (await toPromise(fs.isFile(transcript))) {
+      await toPromise(fs.removePath(transcript, { root: cliDir }));
+    }
+  } catch {
+    /* transcript cleanup is best-effort */
+  }
+}
+
+/**
  * Rename a session title via host-fs.
  * @param {*} fs
  * @param {string} cli
@@ -438,6 +514,8 @@ export async function renameSessionJs(fs, cli, sessionId, newTitle) {
       return renameCopilot(fs, home, sessionId, newTitle);
     case "opencode":
       return renameOpenCode(fs, home, sessionId, newTitle);
+    case "devin":
+      return renameDevin(fs, home, sessionId, newTitle);
     default:
       throw new Error(`Rename not supported for CLI: ${cli}`);
   }
@@ -463,6 +541,8 @@ export async function deleteSessionJs(fs, cli, sessionId, cwd) {
       return deleteCursor(fs, home, sessionId);
     case "opencode":
       return deleteOpenCode(fs, home, sessionId);
+    case "devin":
+      return deleteDevin(fs, home, sessionId);
     default:
       throw new Error(`Delete not supported for CLI: ${cli}`);
   }

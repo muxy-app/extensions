@@ -12,6 +12,7 @@ const ICONS = {
   /** Chevron pointing down (menu closed); rotate 180° when open if needed. */
   chevron:
     '<path d="m6 9 6 6 6-6"/>',
+  user: '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
 };
 
 export function icon(name, size = 14, className = "", strokeWidth = 2) {

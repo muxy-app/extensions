@@ -446,15 +446,28 @@ export function isoToMs(value) {
 }
 
 /**
+ * Normalize a { text, at } message preview (last user prompt / last AI reply).
+ * @param {*} value
+ * @returns {{ text: string, at: number } | null}
+ */
+export function normalizePreview(value) {
+  if (!value || typeof value !== "object") return null;
+  const text = typeof value.text === "string" ? value.text.trim() : "";
+  if (!text) return null;
+  return { text: oneLine(text, 160), at: Math.trunc(Number(value.at) || 0) };
+}
+
+/**
  * @param {string} cli
  * @param {string} sid
  * @param {string} title
  * @param {number} updated
  * @param {string | null} [branch]
  * @param {string | null} [cwd]
+ * @param {{ lastUser?: *, lastAssistant?: * } | null} [meta]
  */
-export function sessionRow(cli, sid, title, updated, branch = null, cwd = null) {
-  return {
+export function sessionRow(cli, sid, title, updated, branch = null, cwd = null, meta = null) {
+  const row = {
     id: sid,
     title: oneLine(title) || "(untitled)",
     updatedAt: Math.trunc(updated || 0),
@@ -462,6 +475,13 @@ export function sessionRow(cli, sid, title, updated, branch = null, cwd = null) 
     cwd: typeof cwd === "string" && cwd ? cwd : null,
     cli,
   };
+  if (meta && typeof meta === "object") {
+    const lastUser = normalizePreview(meta.lastUser);
+    const lastAssistant = normalizePreview(meta.lastAssistant);
+    if (lastUser) row.lastUser = lastUser;
+    if (lastAssistant) row.lastAssistant = lastAssistant;
+  }
+  return row;
 }
 
 export function slugify(cwd) {

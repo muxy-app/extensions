@@ -17,6 +17,7 @@ const PROVIDERS = [
   { id: "copilot", displayName: "Copilot", binaries: ["copilot"] },
   { id: "cursor", displayName: "Cursor", binaries: ["cursor-agent", "cursor"] },
   { id: "opencode", displayName: "OpenCode", binaries: ["opencode"] },
+  { id: "devin", displayName: "Devin", binaries: ["devin"] },
 ];
 
 const RESUME = {
@@ -26,6 +27,7 @@ const RESUME = {
   copilot: (id) => "copilot --resume=" + shellQuote(id),
   cursor: (id) => "cursor-agent --resume " + shellQuote(id),
   opencode: (id) => "opencode --session " + shellQuote(id),
+  devin: (id) => "devin --resume " + shellQuote(id),
 };
 
 /** Soft cap for non–cwd-complete providers in the multi-CLI palette. */
