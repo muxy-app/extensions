@@ -96,6 +96,14 @@ button:focus-visible,
   gap: var(--s4);
 }
 
+.brand-icon {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  margin-right: -2px;
+  color: #2496ed;
+}
+
 .brand-title {
   flex: none;
   font-size: 13px;
@@ -253,7 +261,7 @@ body:not(.connected) .toolbar {
   color: var(--ok);
 }
 
-@container (max-width: 250px) {
+@container (max-width: 300px) {
   .tab-count {
     display: none;
   }
@@ -698,6 +706,54 @@ button.port:hover {
   font-weight: 650;
   letter-spacing: 0.05em;
   text-transform: uppercase;
+}
+
+/* project files */
+
+.project-head {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  margin: 0 var(--s2);
+  padding: 4px 10px 0;
+  color: var(--muted);
+}
+
+.project-head .i {
+  width: 13px;
+  height: 13px;
+}
+
+.project-name {
+  min-width: 0;
+  max-width: 65%;
+  flex: 0 1 auto;
+  overflow: hidden;
+  color: var(--fg);
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-path {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cf-row .chev {
+  margin: 0 -4px 0 -6px;
+}
+
+.list-note {
+  padding: 10px 14px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
 }
 
 /* states */
@@ -1464,4 +1520,264 @@ button.port:hover {
   .spin {
     animation-duration: 1.4s !important;
   }
+}
+
+/* ------------------------------------------------------------ live status */
+
+.live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.spin.tiny {
+  width: 8px;
+  height: 8px;
+  border-width: 1.5px;
+  border-top-color: currentColor;
+}
+
+.pulse {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+.row-icon.building {
+  background: color-mix(in srgb, var(--warn) 14%, transparent);
+  color: var(--warn);
+}
+
+.elapsed {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------ Dockerfile detail */
+
+.d-icon {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  place-items: center;
+  color: #2496ed;
+}
+
+.d-name-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.d-note {
+  margin: 0 8px 6px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.d-body .d-note {
+  margin: 8px 12px 0;
+}
+
+.d-hint {
+  color: var(--muted);
+  font-size: 10.5px;
+}
+
+.dot-mark {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: 1px;
+}
+
+.dot-mark.bad {
+  background: var(--bad);
+}
+
+.d-tab .spin.tiny {
+  margin-left: 5px;
+  vertical-align: -1px;
+}
+
+.action-btn.primary:not(:disabled) {
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.action-btn.primary:not(:disabled):hover {
+  background: color-mix(in srgb, var(--accent) 86%, #000);
+}
+
+.build-log {
+  max-height: none;
+  font-size: 10px;
+}
+
+/* code preview */
+
+.code {
+  padding: 6px 0;
+  border-radius: 6px;
+  background: var(--surface);
+  font: 11px/1.55 var(--font-mono);
+}
+
+.cl {
+  display: flex;
+}
+
+.ln {
+  flex: none;
+  width: 3ch;
+  padding: 0 10px 0 6px;
+  box-sizing: content-box;
+  color: var(--muted);
+  opacity: 0.7;
+  text-align: right;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.ln[data-action]:hover {
+  color: var(--accent);
+  opacity: 1;
+}
+
+.lc {
+  min-width: 0;
+  flex: 1;
+  padding-right: 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.tk-kw {
+  color: var(--accent);
+  font-weight: 650;
+}
+
+.tk-comment {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.tk-str {
+  color: color-mix(in srgb, #e0a05a 78%, var(--fg));
+}
+
+.tk-var {
+  color: color-mix(in srgb, #c387e8 78%, var(--fg));
+}
+
+.tk-flag {
+  color: color-mix(in srgb, #3fb8c0 78%, var(--fg));
+}
+
+.tk-name {
+  color: color-mix(in srgb, #d9b45a 78%, var(--fg));
+}
+
+.tk-op {
+  color: var(--muted);
+}
+
+/* editor (the Dockerfile tab, editor.html): a transparent textarea over a highlighted copy of its text */
+
+
+.editor {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  margin: 6px 8px 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  font: 11px/17px var(--font-mono);
+}
+
+.editor:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+}
+
+.editor-gutter {
+  position: relative;
+  flex: none;
+  width: calc(3ch + 14px);
+  overflow: hidden;
+  border-right: 1px solid var(--border);
+  color: var(--muted);
+  text-align: right;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.gutter-lines {
+  padding: 8px 6px 8px 0;
+  opacity: 0.7;
+}
+
+.editor-main {
+  position: relative;
+  min-width: 0;
+  flex: 1;
+}
+
+.editor-hl,
+.editor-input {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 8px 10px;
+  border: 0;
+  font: inherit;
+  letter-spacing: normal;
+  tab-size: 4;
+  white-space: pre;
+  overflow-wrap: normal;
+}
+
+.editor-hl {
+  overflow: hidden;
+  color: var(--fg);
+  pointer-events: none;
+}
+
+.editor-input {
+  overflow: auto;
+  resize: none;
+  outline: none;
+  background: transparent;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  caret-color: var(--fg);
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.editor-input::selection {
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.editor-input::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.editor-input::-webkit-scrollbar-thumb {
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--fg) 18%, transparent);
 }

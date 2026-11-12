@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dockerfile</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="editor.css">
+</head>
+<body class="editor-page">
+  <header class="ed-head">
+    <span class="ed-whale" id="ed-whale"></span>
+    <div class="ed-title" id="ed-title"><span class="ed-name">Dockerfile</span></div>
+    <div class="ed-modes" role="tablist" aria-label="Mode">
+      <button class="ed-mode active" role="tab" data-action="mode-edit" id="mode-edit">Edit</button>
+      <button class="ed-mode" role="tab" data-action="mode-preview" id="mode-preview">Preview</button>
+    </div>
+    <span class="ed-state" id="ed-state"></span>
+    <button class="icon-btn" data-action="find" id="find-btn" title="Find" aria-label="Find"></button>
+    <button class="ed-save" data-action="save" id="save-btn" disabled>Save</button>
+  </header>
+  <div class="ed-banner" id="banner" hidden></div>
+  <div class="ed-find" id="findbar" hidden>
+    <label class="search">
+      <span class="search-icon" id="find-icon"></span>
+      <input id="find-input" type="text" placeholder="Find" spellcheck="false" autocomplete="off">
+    </label>
+    <span class="ed-count" id="find-count"></span>
+    <button class="icon-btn" data-action="find-prev" id="find-prev" title="Previous match" aria-label="Previous match"></button>
+    <button class="icon-btn" data-action="find-next" id="find-next" title="Next match" aria-label="Next match"></button>
+    <button class="icon-btn" data-action="find-close" id="find-close" title="Close" aria-label="Close find"></button>
+  </div>
+  <main class="ed-main" id="ed-main"></main>
+  <footer class="ed-foot">
+    <span id="ed-pos"></span>
+    <span class="spacer"></span>
+    <span id="ed-eol"></span>
+    <span>Dockerfile</span>
+  </footer>
+  <script type="module" src="editor.js"></script>
+</body>
+</html>

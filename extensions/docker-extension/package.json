@@ -1,29 +1,44 @@
 {
   "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
   "name": "docker-extension",
-  "version": "0.1.0",
-  "description": "Manage Docker containers, Compose projects, images, volumes, and networks from a right-hand sidebar in Muxy.",
+  "version": "0.2.0",
+  "description": "Manage Docker containers, Compose projects, images, volumes, and networks, and build your project's Dockerfiles, from a right-hand sidebar in Muxy.",
   "private": true,
   "scripts": {
     "build": "node scripts/build.mjs"
   },
   "muxy": {
-    "description": "Manage Docker containers, Compose projects, images, volumes, and networks",
+    "description": "Manage Docker containers, Compose projects, images, volumes, and networks, and build your project's Dockerfiles",
     "permissions": [
       "commands:exec",
+      "files:read",
+      "files:write",
+      "projects:read",
       "tabs:write",
       "panels:write",
       "storage:read",
       "storage:write"
     ],
     "events": [
-      "project.switched"
+      "project.switched",
+      "worktree.switched",
+      "file.changed",
+      "tab.closed"
+    ],
+    "tabTypes": [
+      {
+        "id": "dockerfile",
+        "title": "Dockerfile",
+        "entry": "sidebar/editor.html"
+      }
     ],
     "panels": [
       {
         "id": "docker",
         "title": "Docker",
-        "icon": "shippingbox",
+        "icon": {
+          "svg": "assets/docker.svg"
+        },
         "entry": "sidebar/index.html",
         "position": "right",
         "mode": "pinned",
@@ -44,7 +59,7 @@
       {
         "id": "toggle-panel",
         "title": "Docker: Toggle Sidebar",
-        "subtitle": "containers images compose volumes networks panel",
+        "subtitle": "containers images compose dockerfile build volumes networks panel",
         "action": {
           "kind": "togglePanel",
           "panel": "docker"
@@ -60,7 +75,9 @@
     "topbarItems": [
       {
         "id": "docker",
-        "icon": "shippingbox",
+        "icon": {
+          "svg": "assets/docker.svg"
+        },
         "command": "toggle-panel",
         "tooltip": "Docker"
       }
@@ -72,11 +89,13 @@
       "categories": [
         "docker",
         "containers",
-        "devops"
+        "devops",
+        "dockerfile"
       ],
       "icon": "icon.svg",
       "screenshots": [
-        "screenshots/screenshot-1.png"
+        "screenshots/screenshot-1.png",
+        "screenshots/screenshot-2.png"
       ]
     }
   }

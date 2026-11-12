@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const dist = join(root, "dist");
-const files = ["package.json", "README.md", "icon.svg", "screenshots", "sidebar"];
+const files = ["package.json", "README.md", "icon.svg", "assets", "screenshots", "sidebar"];
 
 rmSync(dist, { recursive: true, force: true });
 mkdirSync(dist);

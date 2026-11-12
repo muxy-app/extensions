@@ -24,35 +24,57 @@ function cleanError(raw) {
     .slice(0, 500);
 }
 
-async function exec(args, { timeoutMs = 30000, stdin } = {}) {
+// Muxy couldn't start the program at all.
+function launchError(err) {
+  const msg = (err && err.message) || String(err);
+  if (MISSING_RE.test(msg)) return new DockerError("The docker command wasn't found", "missing", { raw: msg });
+  return new DockerError(msg, "exec", { raw: msg });
+}
+
+// The program ran but failed, or null when it succeeded.
+function resultError(args, res) {
+  if (res.timedOut) return new DockerError(`docker ${args[0]} timed out`, "timeout");
+  if (res.exitCode === 0) return null;
+  const raw = `${res.stderr || ""}\n${res.stdout || ""}`.trim();
+  if (DAEMON_RE.test(raw)) return new DockerError("The Docker engine isn't running", "daemon", { raw: cleanError(raw) });
+  if (res.exitCode === 127 || /docker: (?:command )?not found|exec: "?docker"?: executable file not found/i.test(raw)) {
+    return new DockerError("The docker command wasn't found", "missing", { raw: cleanError(raw) });
+  }
+  return new DockerError(cleanError(raw) || `docker ${args[0]} failed (exit ${res.exitCode})`, "command", {
+    raw,
+    exitCode: res.exitCode,
+  });
+}
+
+// A failed build prints its whole log; keep the line that says why.
+function buildError(e) {
+  if (!(e instanceof DockerError) || e.kind !== "command" || !e.raw) return e;
+  const lines = String(e.raw).split("\n").map((s) => s.trim()).filter(Boolean);
+  const why = [...lines].reverse().find((l) => /^error\b/i.test(l)) || lines[lines.length - 1];
+  return new DockerError(cleanError(why), "command", { raw: e.raw, exitCode: e.exitCode });
+}
+
+function muxyApi() {
   const muxy = window.muxy;
   if (!muxy || typeof muxy.exec !== "function") {
     throw new DockerError("The Muxy API isn't available on this page", "exec");
   }
+  return muxy;
+}
+
+async function exec(args, { timeoutMs = 30000, stdin, cwd } = {}) {
+  const muxy = muxyApi();
   const options = { timeoutMs };
   if (stdin != null) options.stdin = stdin;
+  if (cwd) options.cwd = cwd; // relative to the project folder
   let res;
   try {
     res = await muxy.exec(["docker", ...args], options);
   } catch (err) {
-    const msg = (err && err.message) || String(err);
-    if (MISSING_RE.test(msg)) throw new DockerError("The docker command wasn't found", "missing", { raw: msg });
-    throw new DockerError(msg, "exec", { raw: msg });
+    throw launchError(err);
   }
-  if (res.timedOut) {
-    throw new DockerError(`docker ${args[0]} timed out`, "timeout");
-  }
-  if (res.exitCode !== 0) {
-    const raw = `${res.stderr || ""}\n${res.stdout || ""}`.trim();
-    if (DAEMON_RE.test(raw)) throw new DockerError("The Docker engine isn't running", "daemon", { raw: cleanError(raw) });
-    if (res.exitCode === 127 || /docker: (?:command )?not found|exec: "?docker"?: executable file not found/i.test(raw)) {
-      throw new DockerError("The docker command wasn't found", "missing", { raw: cleanError(raw) });
-    }
-    throw new DockerError(cleanError(raw) || `docker ${args[0]} failed (exit ${res.exitCode})`, "command", {
-      raw,
-      exitCode: res.exitCode,
-    });
-  }
+  const error = resultError(args, res);
+  if (error) throw error;
   return res;
 }
 
@@ -91,6 +113,8 @@ const PS_FIELDS = {
   workingDir: '(.Label "com.docker.compose.project.working_dir")',
 };
 const PS_FORMAT = "{" + Object.entries(PS_FIELDS).map(([k, v]) => `"${k}":{{json ${v}}}`).join(",") + "}";
+
+const composeFileArgs = (cf) => cf.files.flatMap((f) => ["-f", f]);
 
 export const api = {
   async version() {
@@ -162,6 +186,62 @@ export const api = {
       args.push(verb);
     }
     return run(args, { timeoutMs: 300000 });
+  },
+
+  // A Compose file found in the project: `files` are relative to `dir`,
+  // which is relative to the project folder.
+  async composeConfig(cf) {
+    const out = await run(["compose", ...composeFileArgs(cf), "config", "--format", "json"], { cwd: cf.dir, timeoutMs: 20000 });
+    return JSON.parse(out.slice(out.indexOf("{")));
+  },
+
+  composeUp(cf) {
+    return run(["compose", ...composeFileArgs(cf), "up", "-d"], { cwd: cf.dir, timeoutMs: 300000 });
+  },
+
+  // Starts `docker build` and returns { result, cancel } right away, so a
+  // long build can be stopped. `result` resolves to the program's output.
+  startBuild(args) {
+    const muxy = muxyApi();
+    if (typeof muxy.execAsync !== "function") {
+      return { result: exec(["build", ...args], { timeoutMs: 300000 }).catch((e) => Promise.reject(buildError(e))), cancel: null };
+    }
+    let handle = null;
+    let cancelled = false;
+    const result = (async () => {
+      let res;
+      try {
+        handle = await muxy.execAsync(["docker", "build", ...args], { timeoutMs: 300000 });
+        if (cancelled) handle.cancel?.();
+        res = await handle.result;
+      } catch (err) {
+        throw launchError(err);
+      }
+      const error = resultError(["build"], res);
+      if (error) throw buildError(error);
+      return res;
+    })();
+    const cancel = () => {
+      cancelled = true;
+      handle?.cancel?.();
+    };
+    return { result, cancel };
+  },
+
+  // Recent and running builds from BuildKit's history (docker buildx history).
+  async buildHistory() {
+    return jsonLines(await run(["buildx", "history", "ls", "--format", "json"], { timeoutMs: 15000 }));
+  },
+
+  // Which Dockerfile a build used, and why it failed.
+  async buildRecord(ref) {
+    const out = await run(["buildx", "history", "inspect", String(ref).split("/").pop()], { timeoutMs: 15000 });
+    const info = {};
+    for (const line of out.split("\n")) {
+      const m = /^(Name|Dockerfile|Error|Build Steps):\s+(.*)$/.exec(line);
+      if (m && !(m[1] in info)) info[m[1]] = m[2].trim();
+    }
+    return { name: info.Name || "", dockerfile: info.Dockerfile || "", error: info.Error || "", steps: info["Build Steps"] || "" };
   },
 
   async images() {

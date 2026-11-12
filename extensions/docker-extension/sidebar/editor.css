@@ -1,0 +1,343 @@
+/* The Dockerfile editor tab. Shares tokens and .editor pieces with style.css. */
+
+.editor-page {
+  display: flex;
+  flex-direction: column;
+}
+
+.ed-head {
+  display: flex;
+  height: 40px;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px 0 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ed-whale {
+  display: grid;
+  flex: none;
+  place-items: center;
+  color: #2496ed;
+}
+
+.ed-whale .i {
+  width: 20px;
+  height: 20px;
+}
+
+.ed-title {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.ed-name {
+  flex: none;
+  font-size: 13px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.ed-dir {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ed-state {
+  flex: none;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.ed-state.dirty {
+  color: var(--accent);
+}
+
+.ed-save {
+  height: 24px;
+  flex: none;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-weight: 600;
+}
+
+.ed-save:disabled {
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.ed-banner {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 6px 14px;
+  background: color-mix(in srgb, var(--warn) 13%, transparent);
+}
+
+.ed-banner.error {
+  background: color-mix(in srgb, var(--bad) 13%, transparent);
+}
+
+.ed-banner[hidden],
+.ed-find[hidden] {
+  display: none;
+}
+
+.ed-banner .spacer {
+  flex: 1;
+}
+
+.ed-banner .button {
+  height: 22px;
+  padding: 0 10px;
+}
+
+.ed-find {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ed-find .search {
+  flex: 0 1 300px;
+}
+
+.ed-count {
+  min-width: 64px;
+  padding: 0 4px;
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ed-main {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex: 1;
+}
+
+.ed-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  text-align: center;
+}
+
+.ed-empty .i {
+  width: 24px;
+  height: 24px;
+  color: var(--muted);
+}
+
+.ed-empty .button {
+  margin-top: 6px;
+}
+
+.ed-foot {
+  display: flex;
+  height: 24px;
+  flex: none;
+  align-items: center;
+  gap: 14px;
+  padding: 0 14px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ed-foot .spacer {
+  flex: 1;
+}
+
+/* the editor, full bleed */
+
+.editor-page .editor {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--bg);
+  font: 12px/19px var(--font-mono);
+}
+
+.editor-page .editor-gutter {
+  width: calc(4ch + 20px);
+  border-right-color: transparent;
+}
+
+.editor-page .gutter-lines {
+  padding: 10px 10px 10px 0;
+  opacity: 1;
+}
+
+.editor-page .gutter-lines > div {
+  opacity: 0.5;
+}
+
+.editor-page .gutter-lines > .active {
+  color: var(--fg);
+  opacity: 0.9;
+}
+
+.editor-page .editor-hl,
+.editor-page .editor-input,
+.editor-marks {
+  padding: 10px 14px;
+}
+
+.editor-marks {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  margin: 0;
+  overflow: hidden;
+  border: 0;
+  color: transparent;
+  font: inherit;
+  pointer-events: none;
+  tab-size: 4;
+  white-space: pre;
+}
+
+.editor-marks mark {
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--warn) 32%, transparent);
+  color: transparent;
+}
+
+.editor-marks mark.current {
+  background: color-mix(in srgb, var(--warn) 70%, transparent);
+}
+
+.ed-probe {
+  position: absolute;
+  visibility: hidden;
+  white-space: pre;
+}
+
+/* edit / preview */
+
+.ed-modes {
+  display: flex;
+  flex: none;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 7px;
+  background: var(--surface);
+}
+
+.ed-mode {
+  height: 22px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 550;
+}
+
+.ed-mode:hover {
+  color: var(--fg);
+}
+
+.ed-mode.active {
+  background: var(--raised);
+  box-shadow: 0 0 0 0.5px var(--border), 0 1px 2px rgba(0, 0, 0, 0.12);
+  color: var(--fg);
+}
+
+.ed-preview {
+  position: absolute;
+  inset: 0;
+  display: none;
+  overflow: auto;
+  background: var(--bg);
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.preview-mode .ed-preview {
+  display: block;
+}
+
+.preview-mode .editor {
+  visibility: hidden;
+}
+
+.ed-preview-inner {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 6px 14px 28px;
+}
+
+.ed-preview .d-section {
+  padding: 12px 0 4px;
+}
+
+.ed-preview .kv {
+  grid-template-columns: 110px minmax(0, 1fr);
+  padding: 3px 0;
+  font-size: 12px;
+}
+
+.ed-preview .v.mono {
+  font-size: 11.5px;
+  line-height: 18px;
+}
+
+.ed-preview .code {
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.ed-preview .d-note {
+  margin: 12px 0 0;
+}
+
+.ed-preview .muted {
+  color: var(--muted);
+}
+
+.stage-flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+}
+
+.stage-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 1px 7px;
+  border-radius: 5px;
+  background: var(--surface);
+  font: 11.5px/18px var(--font-mono);
+}
+
+.stage-arrow {
+  color: var(--muted);
+}
