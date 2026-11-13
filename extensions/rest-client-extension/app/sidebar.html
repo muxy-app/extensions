@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>REST</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="sidebar.css">
+</head>
+<body class="side-page">
+  <div id="app" class="side">
+    <div class="side-top">
+      <div class="side-row">
+        <button class="env-select" id="env-btn" title="Environment"></button>
+        <button class="icon-btn" id="menu-btn" title="More" aria-label="More"></button>
+      </div>
+      <label class="search">
+        <span id="search-icon"></span>
+        <input id="filter" type="text" placeholder="Filter requests" spellcheck="false" autocomplete="off">
+        <button class="search-clear" id="filter-clear" title="Clear" aria-label="Clear filter" hidden></button>
+      </label>
+    </div>
+    <main class="side-list scroll" id="list"></main>
+    <section class="detail" id="detail" aria-hidden="true"></section>
+  </div>
+  <script type="module" src="sidebar.js"></script>
+</body>
+</html>
