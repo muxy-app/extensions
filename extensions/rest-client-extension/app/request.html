@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Request</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="request.css">
+</head>
+<body class="req-page">
+  <div id="app" class="rq">
+    <header class="rq-head">
+      <div class="rq-crumbs" id="crumbs"></div>
+      <div class="rq-head-actions">
+        <button class="env-pill" id="env-pill" title="Environment"></button>
+        <button class="btn" id="save-btn"></button>
+        <button class="icon-btn" id="more-btn" title="More" aria-label="More"></button>
+      </div>
+    </header>
+
+    <div class="rq-bar">
+      <div class="rq-url" id="rq-url">
+        <button class="method-btn" id="method-btn" title="Method"></button>
+        <div class="url-field">
+          <div class="url-hl" aria-hidden="true"><span id="url-hl"></span></div>
+          <input id="url" type="text" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" placeholder="Enter a URL, or paste a curl command" aria-label="URL">
+        </div>
+      </div>
+      <button class="send-btn" id="send-btn"></button>
+    </div>
+    <div class="url-preview" id="url-preview" hidden></div>
+
+    <div class="rq-split" id="split">
+      <section class="rq-config">
+        <nav class="subtabs" id="req-tabs" role="tablist"></nav>
+        <div class="rq-pane scroll" id="req-pane"></div>
+      </section>
+      <div class="rq-divider" id="divider" role="separator" aria-orientation="horizontal"><span></span></div>
+      <section class="rq-response" id="response"></section>
+    </div>
+  </div>
+
+  <datalist id="header-names">
+    <option value="Accept"></option>
+    <option value="Accept-Encoding"></option>
+    <option value="Accept-Language"></option>
+    <option value="Authorization"></option>
+    <option value="Cache-Control"></option>
+    <option value="Connection"></option>
+    <option value="Content-Type"></option>
+    <option value="Cookie"></option>
+    <option value="Host"></option>
+    <option value="If-Match"></option>
+    <option value="If-Modified-Since"></option>
+    <option value="If-None-Match"></option>
+    <option value="Idempotency-Key"></option>
+    <option value="Origin"></option>
+    <option value="Referer"></option>
+    <option value="User-Agent"></option>
+    <option value="X-API-Key"></option>
+    <option value="X-Request-ID"></option>
+    <option value="X-Forwarded-For"></option>
+  </datalist>
+  <datalist id="header-values">
+    <option value="application/json"></option>
+    <option value="application/x-www-form-urlencoded"></option>
+    <option value="multipart/form-data"></option>
+    <option value="text/plain"></option>
+    <option value="application/xml"></option>
+    <option value="text/html"></option>
+    <option value="*/*"></option>
+    <option value="no-cache"></option>
+    <option value="Bearer {{token}}"></option>
+    <option value="gzip, deflate, br"></option>
+  </datalist>
+
+  <script type="module" src="request.js"></script>
+</body>
+</html>
