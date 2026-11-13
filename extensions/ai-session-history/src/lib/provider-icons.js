@@ -11,6 +11,10 @@ const PROVIDER_ICONS = {
     viewBox: "0 0 24 24",
     html: `<title>OpenCode</title><path d="M16 6H8v12h8V6zm4 16H4V2h16v20z" fill="currentColor" fill-rule="evenodd"></path>`,
   },
+  devin: {
+    viewBox: "0 0 24 24",
+    html: `<title>Devin</title><path d="M7 3h5c4.4 0 8 3.6 8 9s-3.6 9-8 9H7V3zm3 4v10h2c2.8 0 5-2.2 5-5s-2.2-5-5-5H10z" fill="currentColor" fill-rule="evenodd"></path>`,
+  },
 };
 
 /**

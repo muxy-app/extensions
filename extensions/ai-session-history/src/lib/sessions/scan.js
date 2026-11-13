@@ -7,13 +7,13 @@ import {
   chain,
 } from "../host-fs.js";
 import { listSessionsJs } from "./scan/index.js";
-import { toPromise } from "./scan/helpers.js";
+import { toPromise, normalizePreview } from "./scan/helpers.js";
 
 function normalizeSession(raw, cli) {
   if (!raw || typeof raw !== "object") return null;
   const id = raw.id;
   if (!isSafeSessionId(id)) return null;
-  return {
+  const row = {
     id,
     title: oneLine(raw.title) || "(untitled)",
     updatedAt: Number(raw.updatedAt) || 0,
@@ -21,6 +21,11 @@ function normalizeSession(raw, cli) {
     cwd: typeof raw.cwd === "string" && raw.cwd ? raw.cwd : null,
     cli,
   };
+  const lastUser = normalizePreview(raw.lastUser);
+  const lastAssistant = normalizePreview(raw.lastAssistant);
+  if (lastUser) row.lastUser = lastUser;
+  if (lastAssistant) row.lastAssistant = lastAssistant;
+  return row;
 }
 
 /** @type {boolean | null} */
@@ -104,7 +109,7 @@ export async function listSessionsForCli(cli, cwd, opts = {}) {
   } catch (err) {
     // Soft-fail message for sqlite-dependent CLIs
     if (
-      (cli === "codex" || cli === "copilot" || cli === "opencode") &&
+      (cli === "codex" || cli === "copilot" || cli === "opencode" || cli === "devin") &&
       !sqliteAvailable &&
       /sqlite/i.test(String(err?.message || err))
     ) {

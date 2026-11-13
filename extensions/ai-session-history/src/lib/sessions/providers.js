@@ -43,6 +43,13 @@ export const PROVIDERS = [
     binaries: ["opencode"],
     capabilities: { rename: true, delete: true },
   },
+  {
+    id: "devin",
+    displayName: "Devin",
+    binary: "devin",
+    binaries: ["devin"],
+    capabilities: { rename: true, delete: true },
+  },
 ];
 
 /** Preference order for "Start new" when preferredCli is missing. */
@@ -53,6 +60,7 @@ export const START_PREFERENCE = [
   "copilot",
   "cursor",
   "opencode",
+  "devin",
 ];
 
 export function providerById(id) {
