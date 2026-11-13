@@ -1042,6 +1042,8 @@ export class SessionsPanel {
               secondary,
             )
           : null,
+        this.previewBadge("user", session.lastUser, "Last prompt"),
+        this.previewBadge("sparkles", session.lastAssistant, "Last reply"),
       ),
       actionButtons.length
         ? h(
@@ -1049,6 +1051,29 @@ export class SessionsPanel {
             { class: "flex items-center gap-0.5 pr-1.5" },
             ...actionButtons,
           )
+        : null,
+    );
+  }
+
+  /**
+   * One-line preview badge: role icon + truncated text + relative timestamp.
+   * @param {"user"|"sparkles"} kind
+   * @param {{ text: string, at: number } | null | undefined} preview
+   * @param {string} label
+   */
+  previewBadge(kind, preview, label) {
+    if (!preview || typeof preview.text !== "string" || !preview.text) return null;
+    const when = relativeTime(preview.at);
+    return h(
+      "div",
+      {
+        class: "flex w-full items-center gap-1.5 pl-5 text-[10px] text-muted-foreground",
+        title: label,
+      },
+      icon(kind, 10, "shrink-0"),
+      h("span", { class: "min-w-0 flex-1 truncate" }, preview.text),
+      when
+        ? h("span", { class: "shrink-0 font-mono opacity-70" }, when)
         : null,
     );
   }

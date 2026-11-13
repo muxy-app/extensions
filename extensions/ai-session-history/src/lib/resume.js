@@ -8,6 +8,7 @@ const RESUME = {
   copilot: (id) => `copilot --resume=${shellQuote(id)}`,
   cursor: (id) => `cursor-agent --resume ${shellQuote(id)}`,
   opencode: (id) => `opencode --session ${shellQuote(id)}`,
+  devin: (id) => `devin --resume ${shellQuote(id)}`,
 };
 
 const START = {
@@ -17,6 +18,7 @@ const START = {
   copilot: "copilot",
   cursor: "cursor-agent",
   opencode: "opencode",
+  devin: "devin",
 };
 
 export function buildResumeCommand(cli, sessionId) {
