@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/muxy-app/muxy/main/docs/extensions/schema/manifest.schema.json",
   "name": "sticky-notes",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "license": "MIT",
   "scripts": {
     "build": "node scripts/build.mjs"

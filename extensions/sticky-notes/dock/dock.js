@@ -1177,13 +1177,28 @@ muxy.events.subscribe("project.switched", async (event) => {
 // ---- How much of the window the panel covers ----
 // Even with clicks passing through, a panel over the whole window catches
 // files dragged onto it, so they never reach the terminal or tab underneath.
-// At rest the panel covers only the ribbons, and it spreads over the window
-// only while the pointer is on them or a note, menu, or settings is open.
+// At rest the panel covers only the ribbons and the label that names them, and
+// it spreads over the window only while a note, menu, or settings is open.
+//
+// Everything is drawn on a window-sized stage, shifted by where the panel
+// sits. Muxy moves the panel before the page can shift the stage to match, so
+// for a frame or two the page shows what it drew for the old frame in the new
+// one, and the ribbons and notes flash in the wrong place. So hovering never
+// resizes the panel, and for the moves that remain, the stage hides until it
+// lines up with the new frame.
 
 const COLLAPSE_MS = 180; // lets closing animations finish first
+const SETTLE_MS = 400;   // shows the stage again if Muxy never confirms a move
+const TIP_W = 250 + 20;  // the label at its widest (max-width and padding), and its shadow
+const TIP_H = 48 + 20;   // the label at its tallest, and its shadow
 let wanted = null;       // the frame last asked for
 let collapseTimer = null;
 let framing = false;     // on once the panel's real frame is known
+let moving = false;      // the stage is hidden while the panel takes a new frame
+let moveSeq = 0;
+let sent = 0;            // the last move Muxy has been asked for
+let settleTimer = null;
+let reported = null;     // the frame Muxy last reported
 
 function setOrigin(x, y) {
   x = Math.round(x || 0);
@@ -1194,25 +1209,79 @@ function setOrigin(x, y) {
 }
 
 function needsWindow() {
-  return pointerA != null || [card, prefs, menu, toast, tip].some((el) => el.classList.contains("show"));
+  return [card, prefs, menu, toast].some((el) => el.classList.contains("show"));
 }
 
-// The ribbons, the strip that takes the pointer, and a little room for shadows.
+// The ribbons, the strip that takes the pointer, the label beside them, and a
+// little room for shadows. The label centers on a ribbon, so it reaches past
+// the strip's ends by half its height.
 function restFrame() {
   const pad = 8;
-  const a0 = Math.max(0, strip.start - HALO - pad);
-  const a1 = Math.min(edgeLength(), strip.start + strip.total + HALO + pad);
-  const r = rectAt(a0, a1 - a0, 0, Math.max(S.touch, S.max) + HALO + pad);
-  const x = Math.floor(r.x);
-  const y = Math.floor(r.y);
+  const reach = Math.max(HALO, TIP_H / 2) + pad;
+  const a0 = Math.max(0, strip.start - reach);
+  const a1 = Math.min(edgeLength(), strip.start + strip.total + reach);
+  const depth = Math.max(S.touch + HALO, S.max + 8 + TIP_W) + pad;
+  const r = rectAt(a0, a1 - a0, 0, Math.min(depth, vertical() ? W : H));
+  const x = Math.max(0, Math.floor(r.x));
+  const y = Math.max(0, Math.floor(r.y));
   return { x, y, width: Math.ceil(r.x + r.w) - x, height: Math.ceil(r.y + r.h) - y };
+}
+
+const near = (a, b) => Math.abs(a - b) < 1;
+
+// Runs once the page has painted what it shows now, or soon in any case.
+function afterPaint(fn) {
+  let done = false;
+  const run = () => {
+    if (done) return;
+    done = true;
+    fn();
+  };
+  requestAnimationFrame(() => requestAnimationFrame(run));
+  setTimeout(run, 60);
+}
+
+function showStage() {
+  clearTimeout(settleTimer);
+  settleTimer = null;
+  if (!moving) return;
+  moving = false;
+  stage.style.opacity = "";
+}
+
+// The panel sits at `f` now: shift the stage there, and show it from the next
+// frame on.
+function settle(f) {
+  if (!moving || sent !== moveSeq) return;
+  setOrigin(f.x, f.y);
+  const seq = moveSeq;
+  requestAnimationFrame(() => {
+    if (seq === moveSeq) showStage();
+  });
 }
 
 function request(f) {
   const w = wanted;
   if (w && w.x === f.x && w.y === f.y && w.width === f.width && w.height === f.height) return;
   wanted = f;
-  Promise.resolve(muxy.panel.setFrame(f)).catch((e) => console.warn("Couldn't place the notes:", e && e.message));
+  const seq = ++moveSeq;
+  // Hide first, and move only once nothing is left on screen to flash.
+  moving = true;
+  stage.style.opacity = "0";
+  clearTimeout(settleTimer);
+  settleTimer = setTimeout(() => {
+    if (seq !== moveSeq) return;
+    if (reported) setOrigin(reported.x, reported.y);
+    showStage();
+  }, SETTLE_MS);
+  afterPaint(() => {
+    if (seq !== moveSeq) return; // a newer move takes over
+    sent = seq;
+    Promise.resolve(muxy.panel.setFrame(f)).catch((e) => {
+      console.warn("Couldn't place the notes:", e && e.message);
+      if (seq === moveSeq) showStage();
+    });
+  });
 }
 
 function fitFrame(now = false) {
@@ -1239,12 +1308,23 @@ function fitFrame(now = false) {
 // line the stage up then, if the new size is the one asked for.
 window.addEventListener("resize", () => {
   const f = wanted;
-  if (f && Math.abs(window.innerWidth - f.width) < 1 && Math.abs(window.innerHeight - f.height) < 1) setOrigin(f.x, f.y);
+  if (f && near(window.innerWidth, f.width) && near(window.innerHeight, f.height)) {
+    if (moving) settle(f);
+    else setOrigin(f.x, f.y);
+  }
 });
 
 function panelChanged(state) {
   if (!state) return;
-  if (state.frame) setOrigin(state.frame.x, state.frame.y);
+  const f = state.frame;
+  const w = wanted;
+  if (f) reported = f;
+  if (moving) {
+    // Until Muxy reports the frame asked for, the stage stays where it is.
+    if (f && w && near(f.x, w.x) && near(f.y, w.y) && near(f.width, w.width) && near(f.height, w.height)) settle(f);
+  } else if (f) {
+    setOrigin(f.x, f.y);
+  }
   const b = state.bounds;
   if (b && b.width && b.height && (b.width !== bounds.width || b.height !== bounds.height)) {
     bounds = { width: b.width, height: b.height };
