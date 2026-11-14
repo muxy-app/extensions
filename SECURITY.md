@@ -122,6 +122,19 @@ fork code. Copilot gets only read-only file tools, confined to a directory
 holding the PR's files. A separate job, which never sees the model or the fork,
 validates the verdict and posts the review.
 
+Spend limits stop push or PR spam from draining Copilot credits:
+
+- Each run waits 90 seconds before doing anything, so a burst of pushes
+  collapses into one review.
+- Copilot runs at most 30 times per 24 hours for the whole repository and 10
+  times per author. Only runs that reached Copilot count, including runs
+  cancelled partway through. Owners, members and collaborators are exempt.
+- Over a limit, the PR gets a single "paused" notice and Copilot is not run.
+- Each review is capped at 30 AI credits.
+- **Manual run:** a maintainer adds the `ai-review` label to the PR. The review
+  starts immediately, skips the wait and the limits, and removes the label
+  when it finishes so it can be added again.
+
 Maintainer setup:
 
 1. Org setting **Copilot → Policies → Copilot CLI → "Allow use of Copilot CLI
@@ -130,9 +143,11 @@ Maintainer setup:
 2. Repo setting **Actions → General → Workflow permissions → "Allow GitHub
    Actions to create and approve pull requests"**.
 3. Optional repo variables: `AI_REVIEW_MODEL` (pin a model),
-   `AI_REVIEW_REASONING_EFFORT`, `AI_REVIEW_MAX_AI_CREDITS` (cost cap per run),
-   and `AI_REVIEW_ESCALATE` (for example `@muxy-app/maintainers`, pinged on a
-   malicious verdict).
+   `AI_REVIEW_REASONING_EFFORT`, `AI_REVIEW_MAX_AI_CREDITS` (cost cap per run,
+   default 30), `AI_REVIEW_DAILY_LIMIT` (default 30),
+   `AI_REVIEW_AUTHOR_DAILY_LIMIT` (default 10; `0` disables either limit),
+   `AI_REVIEW_DEBOUNCE_SECONDS` (default 90), and `AI_REVIEW_ESCALATE` (for
+   example `@muxy-app/maintainers`, pinged on a malicious verdict).
 4. Optionally make **AI security review / Approve or flag** a required status
    check, and turn on "Dismiss stale pull request approvals when new commits
    are pushed".

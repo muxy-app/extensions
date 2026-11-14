@@ -105,3 +105,17 @@ test("AI review: only the decide job can post reviews, and it never runs Copilot
   assert.doesNotMatch(decide, /copilot/i);
   assert.match(decide, /needs: review/);
 });
+
+test("AI review: Copilot only runs when the collector allows it, after the wait", () => {
+  const review = aiReviewJob("review");
+  const steps = review.split("\n      - name: ");
+  const step = (name) => steps.find((chunk) => chunk.startsWith(name));
+  for (const name of ["Install Copilot CLI", "Ask Copilot for a verdict"]) {
+    assert.match(step(name), /if: hashFiles\('ai-review-run\.flag'\) != ''/, name);
+  }
+  assert.ok(review.indexOf("Wait for more pushes") < review.indexOf("Collect the pull request"));
+  assert.match(review, /actions:\s*read/);
+  // Only the manual label may start a review from a "labeled" event.
+  assert.match(review, /if: github\.event\.action != 'labeled' \|\| github\.event\.label\.name == 'ai-review'/);
+  assert.match(review, /AI_REVIEW_MAX_AI_CREDITS \|\| '30'/);
+});

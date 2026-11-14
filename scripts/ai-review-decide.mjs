@@ -22,8 +22,11 @@ import {
 } from "./lib/github-pr.mjs";
 import {
   decide,
+  MANUAL_LABEL,
   parseVerdict,
+  PAUSED_MARKER,
   renderReview,
+  REVIEW_MARKER,
   unreviewedFiles,
 } from "./lib/ai-review.mjs";
 
@@ -65,6 +68,13 @@ function readMeta(dir, context) {
   ) {
     throw new Error("meta.json is malformed");
   }
+  if (
+    meta.limited !== null && meta.limited !== undefined &&
+    !(["author", "repository"].includes(meta.limited.scope) &&
+      Number.isSafeInteger(meta.limited.count) && Number.isSafeInteger(meta.limited.limit))
+  ) {
+    throw new Error("meta.json has a malformed limit");
+  }
   return meta;
 }
 
@@ -103,8 +113,9 @@ async function main() {
     error = `The review job did not produce results (job result: ${reviewJobResult || "unknown"}).`;
   }
 
+  const limited = meta?.limited ?? null;
   let verdict = null;
-  if (meta) {
+  if (meta && !limited) {
     const exitCode = (readOptional(path.join(dir, "copilot-exit-code"), 64) ?? "").trim();
     const output = readOptional(path.join(dir, "model-output.txt"), MAX_OUTPUT_BYTES);
     try {
@@ -116,7 +127,7 @@ async function main() {
 
   const signals = meta?.signals ?? [];
   const missingFiles = verdict ? unreviewedFiles(meta.requiredFiles, verdict.filesReviewed) : [];
-  const { outcome, event } = decide({ verdict, error, signals, missingFiles });
+  const { outcome, event } = decide({ verdict, error, signals, missingFiles, limited });
 
   const escalateRaw = (process.env.AI_REVIEW_ESCALATE ?? "").trim();
   const escalate = ESCALATE_RE.test(escalateRaw) ? escalateRaw : "";
@@ -135,6 +146,7 @@ async function main() {
     extensionNames: meta?.extensionNames ?? [],
     runUrl,
     escalate,
+    limited,
   });
   if (body.length > MAX_BODY_CHARS) body = `${body.slice(0, MAX_BODY_CHARS)}\n\n…(truncated; see the workflow run)`;
 
@@ -155,8 +167,23 @@ async function main() {
     return;
   }
 
+  if (meta?.manual) {
+    // Remove the trigger label so a maintainer can add it again later.
+    try {
+      await api.delete(`/repos/${repository}/issues/${context.number}/labels/${encodeURIComponent(MANUAL_LABEL)}`);
+    } catch (e) {
+      workflowMessage("warning", `Could not remove the '${MANUAL_LABEL}' label: ${e.message}`);
+    }
+  }
+
+  let skipPost = false;
   if (event !== "APPROVE") {
     const reviews = await listReviews(api, repository, context.number);
+    const ours = reviews.filter(
+      (r) => r?.user?.login === BOT_LOGIN && typeof r.body === "string" && r.body.includes(REVIEW_MARKER),
+    );
+    // One "paused" notice is enough; do not repeat it on every push.
+    if (outcome === "paused" && ours.at(-1)?.body.includes(PAUSED_MARKER)) skipPost = true;
     for (const review of reviews) {
       if (review?.user?.login === BOT_LOGIN && review.state === "APPROVED" && Number.isSafeInteger(review.id)) {
         await api.request(`/repos/${repository}/pulls/${context.number}/reviews/${review.id}/dismissals`, {
@@ -168,12 +195,16 @@ async function main() {
     }
   }
 
-  await api.post(`/repos/${repository}/pulls/${context.number}/reviews`, {
-    commit_id: context.headSha,
-    event,
-    body,
-  });
-  console.log(`Posted ${event} review.`);
+  if (skipPost) {
+    console.log("A paused notice is already the latest review; not posting another.");
+  } else {
+    await api.post(`/repos/${repository}/pulls/${context.number}/reviews`, {
+      commit_id: context.headSha,
+      event,
+      body,
+    });
+    console.log(`Posted ${event} review.`);
+  }
 
   if (outcome !== "approved") {
     workflowMessage("error", `Automated security review did not approve: ${outcome}.`);

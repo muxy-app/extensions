@@ -3,6 +3,8 @@ import test from "node:test";
 
 import {
   buildPrompt,
+  checkLimits,
+  copilotStepStarted,
   decide,
   deterministicSignals,
   findHiddenUnicode,
@@ -10,6 +12,7 @@ import {
   isProbablyText,
   mustReview,
   parseVerdict,
+  PAUSED_MARKER,
   REVIEW_MARKER,
   renderReview,
   safeCode,
@@ -218,4 +221,46 @@ test("the prompt carries the nonce and the list of files to read", () => {
   assert.match(prompt, new RegExp(`<verdict-${NONCE}>`));
   assert.match(prompt, /- files\/extensions\/demo\/src\/index\.js/);
   assert.match(prompt, /prompt-injection/);
+});
+
+test("a run counts as spend only once its Copilot step has started", () => {
+  const jobs = (step) => [{ name: "Copilot review", steps: step ? [{ name: "Ask Copilot for a verdict", ...step }] : [] }];
+  assert.equal(copilotStepStarted(jobs({ status: "completed", conclusion: "success" })), true);
+  assert.equal(copilotStepStarted(jobs({ status: "completed", conclusion: "cancelled" })), true);
+  assert.equal(copilotStepStarted(jobs({ status: "in_progress", conclusion: null })), true);
+  assert.equal(copilotStepStarted(jobs({ status: "completed", conclusion: "skipped" })), false);
+  assert.equal(copilotStepStarted(jobs({ status: "queued", conclusion: null })), false);
+  // Cancelled while waiting for more pushes: the step never appears.
+  assert.equal(copilotStepStarted(jobs(null)), false);
+  assert.equal(copilotStepStarted(undefined), false);
+});
+
+test("limits apply per author first, then per repository, and 0 disables them", () => {
+  const runs = [
+    ...Array.from({ length: 3 }, () => ({ actorLogin: "Spammer", spent: true })),
+    ...Array.from({ length: 5 }, () => ({ actorLogin: "spammer", spent: false })),
+    ...Array.from({ length: 4 }, () => ({ actorLogin: "other", spent: true })),
+  ];
+  assert.deepEqual(checkLimits({ runs, author: "spammer", repoLimit: 30, authorLimit: 3 }), { scope: "author", count: 3, limit: 3 });
+  assert.equal(checkLimits({ runs, author: "spammer", repoLimit: 30, authorLimit: 4 }), null);
+  assert.deepEqual(checkLimits({ runs, author: "new", repoLimit: 7, authorLimit: 10 }), { scope: "repository", count: 7, limit: 7 });
+  assert.equal(checkLimits({ runs, author: "spammer", repoLimit: 0, authorLimit: 0 }), null);
+});
+
+test("a limited run is paused, never approved, and explains the manual label", () => {
+  const limited = { scope: "repository", count: 30, limit: 30 };
+  const verdict = parseVerdict(verdictBlock(SAFE), NONCE);
+  const decision = decide({ verdict, signals: [], limited });
+  assert.deepEqual(decision, { outcome: "paused", event: "COMMENT" });
+  const body = renderReview({
+    outcome: "paused",
+    signals: [],
+    headSha: "b".repeat(40),
+    extensionNames: ["demo"],
+    limited,
+  });
+  assert.ok(body.includes(PAUSED_MARKER));
+  assert.ok(body.includes(REVIEW_MARKER));
+  assert.match(body, /`ai-review` label/);
+  assert.match(body, /30 of 30/);
 });

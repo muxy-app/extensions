@@ -26,14 +26,18 @@ import {
 } from "./lib/github-pr.mjs";
 import {
   buildPrompt,
+  checkLimits,
+  copilotStepStarted,
   deterministicSignals,
   findHiddenUnicode,
   isImagePath,
   isProbablyText,
+  MANUAL_LABEL,
   mustReview,
   permissionsOf,
   summariseDependencies,
   summariseLockfile,
+  TRUSTED_ASSOCIATIONS,
   untrustedBlock,
 } from "./lib/ai-review.mjs";
 
@@ -43,6 +47,52 @@ const MAX_FILE_BYTES = 1024 * 1024;
 const MAX_TOTAL_BYTES = 4 * 1024 * 1024;
 const MAX_LOCKFILE_BYTES = 8 * 1024 * 1024;
 const INLINE_CHANGES_LIMIT = 150 * 1024;
+const LIMIT_WINDOW_MS = 24 * 60 * 60 * 1000;
+const MAX_RUN_PAGES = 5;
+
+function limitFromEnv(name, fallback) {
+  const raw = (process.env[name] ?? "").trim();
+  if (raw === "") return fallback;
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new Error(`${name} must be a non-negative integer (0 disables it)`);
+  }
+  return value;
+}
+
+// Lists this workflow's runs from the last 24 hours and marks which ones
+// reached the Copilot step. Runs cancelled before that step spent nothing.
+async function recentRuns(api, repository) {
+  const workflowFile =
+    (process.env.GITHUB_WORKFLOW_REF ?? "").match(/\/([^/@]+\.ya?ml)@/)?.[1] ?? "ai-review.yml";
+  const since = new Date(Date.now() - LIMIT_WINDOW_MS).toISOString();
+  const currentRun = String(process.env.GITHUB_RUN_ID ?? "");
+  const runs = [];
+  for (let page = 1; page <= MAX_RUN_PAGES; page += 1) {
+    const result = await api.get(
+      `/repos/${repositoryAPIName(repository)}/actions/workflows/${encodeURIComponent(workflowFile)}/runs` +
+        `?created=${encodeURIComponent(`>=${since}`)}&per_page=100&page=${page}`,
+    );
+    const batch = Array.isArray(result?.workflow_runs) ? result.workflow_runs : [];
+    for (const run of batch) {
+      if (String(run?.id) === currentRun) continue;
+      if (run?.status === "completed" && run?.conclusion === "skipped") continue;
+      const jobs = await api.get(
+        `/repos/${repositoryAPIName(repository)}/actions/runs/${encodeURIComponent(run.id)}/jobs?per_page=50`,
+      );
+      runs.push({
+        id: run.id,
+        actorLogin: run.actor?.login ?? "",
+        spent: copilotStepStarted(jobs?.jobs),
+      });
+    }
+    if (batch.length < 100) return runs;
+  }
+  // More runs than we are willing to inspect: treat the repository as over
+  // its limit rather than guessing.
+  runs.push(...Array.from({ length: 10_000 }, () => ({ id: 0, actorLogin: "", spent: true })));
+  return runs;
+}
 
 function outDir() {
   const index = process.argv.indexOf("--out");
@@ -285,8 +335,13 @@ async function main() {
     .flatMap((f) => [f.filename, f.previous_filename])
     .filter((p) => typeof p === "string" && !p.startsWith("extensions/"));
 
+  const manual = event.action === "labeled" && event.label?.name === MANUAL_LABEL;
+  const trusted = TRUSTED_ASSOCIATIONS.has(author);
+
   const meta = {
     version: 1,
+    manual,
+    limited: null,
     number: context.number,
     headSha: context.headSha,
     baseSha: context.baseSha,
@@ -302,6 +357,29 @@ async function main() {
     writeMeta(dir, meta);
     console.log("No extension changed; nothing to review.");
     return;
+  }
+
+  if (manual) {
+    console.log(`Manual review requested with the '${MANUAL_LABEL}' label; limits do not apply.`);
+  } else if (trusted) {
+    console.log(`Author association ${author}; limits do not apply.`);
+  } else {
+    const repoLimit = limitFromEnv("AI_REVIEW_DAILY_LIMIT", 30);
+    const authorLimit = limitFromEnv("AI_REVIEW_AUTHOR_DAILY_LIMIT", 10);
+    const runs = await recentRuns(api, context.baseRepository);
+    meta.limited = checkLimits({ runs, author: context.opener, repoLimit, authorLimit });
+    if (meta.limited) {
+      writeMeta(dir, meta);
+      console.log(
+        `Limit reached (${meta.limited.scope}: ${meta.limited.count}/${meta.limited.limit} in 24h); Copilot will not run.`,
+      );
+      return;
+    }
+    const spent = runs.filter((r) => r.spent);
+    console.log(
+      `Usage in the last 24h: ${spent.length}/${repoLimit || "∞"} repository, ` +
+        `${spent.filter((r) => r.actorLogin.toLowerCase() === context.opener.toLowerCase()).length}/${authorLimit || "∞"} by ${context.opener}.`,
+    );
   }
 
   const tree = await getRepositoryTree(api, context.baseRepository, context.headSha);
@@ -345,6 +423,9 @@ async function main() {
     reviewFiles: meta.requiredFiles,
   });
   fs.writeFileSync(path.join(dir, "prompt.txt"), prompt);
+  // The workflow runs the Copilot step only when this flag exists, so runs
+  // that never reach Copilot show it as skipped and do not count as spend.
+  if (process.env.AI_REVIEW_FLAG) fs.writeFileSync(process.env.AI_REVIEW_FLAG, "run\n");
   writeMeta(dir, meta);
 
   console.log(`Prepared review of ${extensionNames.join(", ")} at ${context.headSha}.`);

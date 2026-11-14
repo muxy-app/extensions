@@ -12,6 +12,13 @@
 // untrusted. Nothing here executes it.
 
 export const REVIEW_MARKER = "<!-- muxy-ai-security-review -->";
+export const PAUSED_MARKER = "<!-- muxy-ai-security-review:paused -->";
+export const MANUAL_LABEL = "ai-review";
+export const COPILOT_JOB_NAME = "Copilot review";
+export const COPILOT_STEP_NAME = "Ask Copilot for a verdict";
+
+// Authors who are never rate limited.
+export const TRUSTED_ASSOCIATIONS = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
 export const NPM_REGISTRY = "https://registry.npmjs.org/";
 
 export const VERDICTS = ["safe", "suspicious", "malicious"];
@@ -495,15 +502,45 @@ export function unreviewedFiles(requiredFiles, filesReviewed) {
   return requiredFiles.filter((file) => !reviewed.has(file));
 }
 
+// ---------------------------------------------------------------------------
+// Spend limits. A run "spent" credits if its Copilot step started, whatever
+// happened afterwards; cancelling a run mid-review does not refund anything.
+
+export function copilotStepStarted(jobs) {
+  const job = (Array.isArray(jobs) ? jobs : []).find((j) => j?.name === COPILOT_JOB_NAME);
+  const step = (Array.isArray(job?.steps) ? job.steps : []).find((s) => s?.name === COPILOT_STEP_NAME);
+  if (!step) return false;
+  if (step.status === "in_progress") return true;
+  return step.status === "completed" && step.conclusion !== "skipped";
+}
+
+// runs: [{ id, actorLogin, spent }]. Returns the first limit that is reached.
+export function checkLimits({ runs, author, repoLimit, authorLimit }) {
+  const spent = runs.filter((run) => run.spent);
+  const byAuthor = spent.filter(
+    (run) => String(run.actorLogin).toLowerCase() === String(author).toLowerCase(),
+  );
+  if (authorLimit > 0 && byAuthor.length >= authorLimit) {
+    return { scope: "author", count: byAuthor.length, limit: authorLimit };
+  }
+  if (repoLimit > 0 && spent.length >= repoLimit) {
+    return { scope: "repository", count: spent.length, limit: repoLimit };
+  }
+  return null;
+}
+
 // Outcomes:
 //   approved        — APPROVE, check passes.
 //   malicious       — REQUEST_CHANGES, check fails, maintainers escalated.
 //   changes         — REQUEST_CHANGES, check fails.
 //   needs-maintainer— COMMENT, check fails (no approval).
 //   inconclusive    — COMMENT, check fails (review could not complete).
-export function decide({ verdict, error, signals, missingFiles = [] }) {
+//   paused          — COMMENT, check fails (spend limit reached; no review).
+export function decide({ verdict, error, signals, missingFiles = [], limited = null }) {
   const blockers = signals.filter((s) => s.level === "blocker");
   const maintainer = signals.filter((s) => s.level === "maintainer");
+
+  if (limited) return { outcome: "paused", event: "COMMENT" };
 
   if (verdict?.verdict === "malicious") {
     return { outcome: "malicious", event: "REQUEST_CHANGES" };
@@ -558,6 +595,7 @@ const HEADLINES = {
   changes: "⚠️ Security concerns — changes requested",
   "needs-maintainer": "👀 Needs a maintainer — not auto-approved",
   inconclusive: "❔ Review could not complete — not auto-approved",
+  paused: "⏸️ Automated review paused — daily limit reached",
 };
 
 const SEVERITY_BADGE = {
@@ -577,13 +615,24 @@ export function renderReview({
   extensionNames,
   runUrl,
   escalate,
+  limited = null,
 }) {
   const lines = [REVIEW_MARKER, `## ${HEADLINES[outcome]}`, ""];
+  if (outcome === "paused") lines.splice(1, 0, PAUSED_MARKER);
   const names = extensionNames.map((n) => safeCode(n, 100)).join(", ") || "no extension";
   lines.push(`Automated malware review of ${names} at \`${headSha.slice(0, 12)}\`.`, "");
 
   if (outcome === "malicious" && escalate) {
     lines.push(`${escalate}: this PR was flagged as possibly malicious. Please review it before anything else happens.`, "");
+  }
+  if (outcome === "paused" && limited) {
+    const who = limited.scope === "author" ? "This PR's author has" : "This repository has";
+    lines.push(
+      `${who} used ${limited.count} of ${limited.limit} automated reviews in the last 24 hours, so Copilot was not run for this commit.`,
+      "",
+      `A maintainer can run it now by adding the \`${MANUAL_LABEL}\` label to this PR. Otherwise a review runs on the next push after the limit resets.`,
+      "",
+    );
   }
   if (outcome === "changes" || outcome === "malicious") {
     lines.push(
@@ -615,11 +664,14 @@ export function renderReview({
     lines.push("");
   }
 
-  lines.push("### Automated checks", "");
+  // A paused run did not run the checks, so do not claim they passed.
+  if (outcome !== "paused") lines.push("### Automated checks", "");
   const icon = { blocker: "⛔", maintainer: "👀", info: "ℹ️" };
   for (const s of signals) lines.push(`- ${icon[s.level]} ${s.message}`);
-  if (signals.length === 0) lines.push("- ✅ No deterministic flags.");
-  lines.push("");
+  if (outcome !== "paused") {
+    if (signals.length === 0) lines.push("- ✅ No deterministic flags.");
+    lines.push("");
+  }
 
   if (missingFiles.length > 0) {
     lines.push(

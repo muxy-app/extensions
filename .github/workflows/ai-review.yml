@@ -15,32 +15,61 @@ name: AI security review
 #            model, only the artifact. It validates the verdict as untrusted
 #            JSON and posts the review.
 #
+# Spend limits (to stop push or PR spam from draining Copilot credits):
+#   - Each run waits AI_REVIEW_DEBOUNCE_SECONDS (default 90) before doing
+#     anything, so a burst of pushes cancels down to one review.
+#   - Copilot runs at most AI_REVIEW_DAILY_LIMIT times per 24h for the whole
+#     repository (default 30) and AI_REVIEW_AUTHOR_DAILY_LIMIT per author
+#     (default 10). Owners, members and collaborators are exempt. Over the
+#     limit, the PR gets one "paused" notice instead of a review.
+#   - Each review is capped at AI_REVIEW_MAX_AI_CREDITS (default 30).
+#   - A maintainer can always run a review now, skipping the wait and the
+#     limits, by adding the `ai-review` label to the PR. The label is removed
+#     again afterwards.
+#
 # Setup: see "Automated malware review" in SECURITY.md.
 on:
   pull_request_target:
     branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
     paths:
       - "extensions/**"
 
 permissions: {}
 
 concurrency:
-  group: ai-review-${{ github.event.pull_request.number }}
+  # Adding an unrelated label must not cancel a review in progress, so those
+  # events get a group of their own (and then skip every job).
+  group: ai-review-${{ github.event.pull_request.number }}${{ github.event.action == 'labeled' && github.event.label.name != 'ai-review' && format('-label-{0}', github.run_id) || '' }}
   cancel-in-progress: true
 
 jobs:
   review:
     name: Copilot review
+    if: github.event.action != 'labeled' || github.event.label.name == 'ai-review'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     permissions:
       contents: read
       pull-requests: read
+      # Read this workflow's recent runs to enforce the daily limits.
+      actions: read
       copilot-requests: write
     env:
       COPILOT_VERSION: "1.0.105"
     steps:
+      # A newer push cancels this run (see concurrency) before any API call or
+      # Copilot request is made.
+      - name: Wait for more pushes
+        if: github.event.action != 'labeled'
+        env:
+          DEBOUNCE_VAR: ${{ vars.AI_REVIEW_DEBOUNCE_SECONDS }}
+        run: |
+          seconds="${DEBOUNCE_VAR:-90}"
+          case "$seconds" in ''|*[!0-9]*) seconds=90 ;; esac
+          echo "Waiting ${seconds}s before reviewing."
+          sleep "$seconds"
+
       # pull_request_target resolves github.sha to the trusted base branch.
       - name: Checkout trusted tooling
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -57,12 +86,20 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           AI_REVIEW_DIR: ${{ runner.temp }}/ai-review
+          AI_REVIEW_FLAG: ${{ github.workspace }}/ai-review-run.flag
+          AI_REVIEW_DAILY_LIMIT: ${{ vars.AI_REVIEW_DAILY_LIMIT }}
+          AI_REVIEW_AUTHOR_DAILY_LIMIT: ${{ vars.AI_REVIEW_AUTHOR_DAILY_LIMIT }}
         run: node scripts/ai-review-collect.mjs
 
+      # The collector writes the flag only when Copilot should run. When it is
+      # missing, these steps show as skipped, which is how later runs tell
+      # that this one spent no credits.
       - name: Install Copilot CLI
+        if: hashFiles('ai-review-run.flag') != ''
         run: npm install --global --ignore-scripts --no-audit --no-fund "@github/copilot@${COPILOT_VERSION}"
 
       - name: Ask Copilot for a verdict
+        if: hashFiles('ai-review-run.flag') != ''
         env:
           GITHUB_TOKEN: ${{ github.token }}
           AI_REVIEW_DIR: ${{ runner.temp }}/ai-review
@@ -72,7 +109,7 @@ jobs:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
           COPILOT_MODEL_VAR: ${{ vars.AI_REVIEW_MODEL }}
           COPILOT_EFFORT_VAR: ${{ vars.AI_REVIEW_REASONING_EFFORT }}
-          COPILOT_MAX_CREDITS_VAR: ${{ vars.AI_REVIEW_MAX_AI_CREDITS }}
+          COPILOT_MAX_CREDITS_VAR: ${{ vars.AI_REVIEW_MAX_AI_CREDITS || '30' }}
         run: |
           set -uo pipefail
           if [ -z "${COPILOT_GITHUB_TOKEN:-}" ]; then unset COPILOT_GITHUB_TOKEN; fi
@@ -135,7 +172,7 @@ jobs:
   decide:
     name: Approve or flag
     needs: review
-    if: always() && needs.review.result != 'cancelled'
+    if: always() && needs.review.result != 'cancelled' && needs.review.result != 'skipped'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
