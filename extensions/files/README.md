@@ -9,8 +9,16 @@ npm run build   # -> dist/, then Reload the extension in Muxy
 npm test
 ```
 
-Select Files under Muxy Settings → General → Open Files With to route terminal
-file links into the editor tab.
+On Muxy versions with file-type routing, Files registers its supported source,
+text, configuration, Markdown, image, and PDF types automatically. Unsupported
+types go to the system file manager. When another extension registers the same
+type, choose Files in the opener or save it as the default for that type.
+**Settings → General → Files** lets you add custom file types and change defaults.
+
+On older Muxy versions, select Files under **Settings → General → Open Files
+With** as before. The manifest keeps its legacy `patterns: ["*"]`, opener ID,
+and tab type; the new `fileTypes` list is additional metadata that older Muxy
+versions ignore. The editor continues using the same APIs and tab data.
 
 ## How it's put together
 
