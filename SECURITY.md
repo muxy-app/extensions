@@ -95,6 +95,48 @@ Extensions run arbitrary JavaScript inside Muxy, so review and least privilege
 are the primary defenses — declare only the permissions you use, and ship
 readable source.
 
+### Automated malware review
+
+On every push to an extension PR, `.github/workflows/ai-review.yml` asks GitHub
+Copilot whether the change is malicious. It looks for exfiltration, remote code,
+obfuscation, persistence, backdoors, build-time attacks and prompt injection.
+Bugs and quality are out of scope. Deterministic checks also run: binaries,
+submodules, symlinks that escape the extension, hidden Unicode,
+non-registry dependencies, install scripts, `.npmrc`, and changes outside
+`extensions/`.
+
+- **Approved** when Copilot is confident nothing is malicious, it confirms it
+  read every changed file, and no deterministic check fires.
+- **Changes requested** when anything looks malicious or suspicious. The review
+  lists the findings so the author can fix them, or a maintainer can dismiss a
+  false positive or block the author.
+- **Comment only** when a human must look (tooling changes, oversized PRs) or
+  the review could not complete.
+
+Earlier bot approvals are dismissed whenever a later push is not approved. The
+check is green only when the bot approves. Copilot is a filter, not a
+guarantee: a maintainer still owns the merge.
+
+The job that runs Copilot has a read-only token and never checks out or runs
+fork code. Copilot gets only read-only file tools, confined to a directory
+holding the PR's files. A separate job, which never sees the model or the fork,
+validates the verdict and posts the review.
+
+Maintainer setup:
+
+1. Org setting **Copilot → Policies → Copilot CLI → "Allow use of Copilot CLI
+   billed to the organization"** (or add a `COPILOT_GITHUB_TOKEN` secret: a
+   fine-grained PAT with the *Copilot Requests* permission).
+2. Repo setting **Actions → General → Workflow permissions → "Allow GitHub
+   Actions to create and approve pull requests"**.
+3. Optional repo variables: `AI_REVIEW_MODEL` (pin a model),
+   `AI_REVIEW_REASONING_EFFORT`, `AI_REVIEW_MAX_AI_CREDITS` (cost cap per run),
+   and `AI_REVIEW_ESCALATE` (for example `@muxy-app/maintainers`, pinged on a
+   malicious verdict).
+4. Optionally make **AI security review / Approve or flag** a required status
+   check, and turn on "Dismiss stale pull request approvals when new commits
+   are pushed".
+
 **SVG listing icons can contain scripts** (`<script>`, `foreignObject`, event
 handlers). Wherever an icon is rendered untrusted (the marketplace UI), it must
 be rasterized or script-stripped, or served behind a CSP that blocks execution —
