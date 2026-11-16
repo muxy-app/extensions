@@ -1,6 +1,6 @@
 {
   "name": "files",
-  "version": "2.0.4",
+  "version": "2.0.5",
   "scripts": {
     "dev": "vite",
     "build": "vite build && node scripts/copy-build-assets.mjs",
@@ -39,6 +39,7 @@
     "jsonc-parser": "^3.3.1",
     "mermaid": "^11.15.0",
     "pdfjs-dist": "^6.1.200",
+    "prettier": "^3.10.1",
     "web-tree-sitter": "^0.26.9",
     "yaml": "^2.9.0"
   },
