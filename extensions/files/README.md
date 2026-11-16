@@ -60,6 +60,16 @@ toggle (or the `e` key), so working through several files in Edit mode doesn't
 need a toggle per file. Switching to Edit to search or jump to a line doesn't
 change it.
 
+In Markdown **Edit** mode, click **Format Markdown** in the toolbar or press
+**Shift+Option+F** (`⇧⌥F`, **Shift+Alt+F** on other platforms) to format the
+document. Formatting uses Prettier for Markdown and MDX and wraps paragraphs
+at a target width of **80 characters by default**. Change **Markdown line width**
+in **Editor settings** (the gear in the toolbar) to choose a different width;
+the preference is saved and shared across editor tabs. It takes effect the next
+time you format. Formatting preserves explicit Markdown hard breaks, leaves
+embedded languages unformatted, and follows the editor's auto-save setting.
+Undo (`⌘Z` / `Ctrl+Z`) restores the content from before formatting in one step.
+
 ## Keyboard (file tree)
 
 Focus lands in the tree when the panel opens (or click any row), then:

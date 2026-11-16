@@ -75,6 +75,19 @@ export class SettingsSheet {
       type: "checkbox",
       onChange: (event) => this.update({ reuseTab: event.target.checked }),
     });
+    this.markdownLineWidth = h("input", {
+      id: "cfg-markdown-line-width",
+      class: "sheet-number",
+      type: "number",
+      min: 1,
+      step: 1,
+      title: "Target characters per line when formatting Markdown (default: 80)",
+      onChange: (event) => {
+        const value = event.target.valueAsNumber;
+        if (Number.isSafeInteger(value) && value > 0) this.update({ markdownLineWidth: value });
+        else this.markdownLineWidth.value = String(this.config.markdownLineWidth);
+      },
+    });
 
     this.overlay = h(
       "div",
@@ -172,7 +185,13 @@ export class SettingsSheet {
         h(
           "div",
           { class: "sheet-row" },
-          h("label", { class: "sheet-label", title: "How wide the text runs in the markdown preview" }, "Markdown width"),
+          h("label", { class: "sheet-label", for: "cfg-markdown-line-width" }, "Markdown line width"),
+          this.markdownLineWidth,
+        ),
+        h(
+          "div",
+          { class: "sheet-row" },
+          h("label", { class: "sheet-label", title: "How wide the text runs in the markdown preview" }, "Markdown preview width"),
           h(
             "div",
             { class: "segmented" },
@@ -216,6 +235,7 @@ export class SettingsSheet {
     this.treeSitter.checked = config.treeSitter !== false;
     this.autoSave.checked = config.autoSave !== false;
     this.reuseTab.checked = config.reuseTab !== false;
+    this.markdownLineWidth.value = String(config.markdownLineWidth);
 
     for (const [size, button] of this.tabButtons) {
       button.className = cls("segment", config.tabSize === size && "segment-active");
