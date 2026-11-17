@@ -1,7 +1,7 @@
 import { keymap } from "@codemirror/view";
 import { linter, lintGutter, lintKeymap } from "@codemirror/lint";
 import { parse as parseJsonc } from "jsonc-parser";
-import { parseDocument } from "yaml";
+import { parseAllDocuments } from "yaml";
 import { extname } from "@/shared/paths";
 
 const STRICT_JSON_EXT = new Set([".json", ".webmanifest"]);
@@ -63,7 +63,7 @@ const yamlLinter = linter((view) => {
   const length = doc.length;
   let parsed;
   try {
-    parsed = parseDocument(text, { prettyErrors: true });
+    parsed = parseAllDocuments(text, { prettyErrors: true });
   } catch (error) {
     return [{ from: 0, to: Math.min(1, length), severity: "error", message: error.message ?? "Invalid YAML" }];
   }
@@ -79,8 +79,10 @@ const yamlLinter = linter((view) => {
       });
     }
   };
-  collect(parsed.errors, "error");
-  collect(parsed.warnings, "warning");
+  for (const document of Array.isArray(parsed) ? parsed : [parsed]) {
+    collect(document.errors, "error");
+    collect(document.warnings, "warning");
+  }
   return diagnostics;
 });
 

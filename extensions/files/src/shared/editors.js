@@ -177,6 +177,21 @@ export async function open_file(path, position = null, { reuse = reuse_tabs() } 
 }
 
 /**
+ * Opens `path` in a new editor tab and splits it beside the tab that is active
+ * now, so both show side by side in the current tab group.
+ */
+export async function open_file_beside(path, edge = "right") {
+  const tabs = await muxy.tabs.list();
+  const anchor = tabs.find((tab) => tab.isActive)?.id;
+  const tab = await muxy.tabs.open({
+    kind: "extensionWebView",
+    extension: { id: muxy.extensionID, tabType: TAB_TYPE, data: { filePath: path } },
+  });
+  if (typeof tab !== "string" || !tab) return;
+  if (anchor && anchor !== tab) await muxy.tabs.split(tab, anchor, edge);
+}
+
+/**
  * Tells editor tabs that `from` (a file, or a folder ending in "/") is now
  * `to`, so a tab showing it keeps saving to the right place.
  */
