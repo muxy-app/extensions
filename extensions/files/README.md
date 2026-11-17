@@ -70,6 +70,10 @@ time you format. Formatting preserves explicit Markdown hard breaks, leaves
 embedded languages unformatted, and follows the editor's auto-save setting.
 Undo (`⌘Z` / `Ctrl+Z`) restores the content from before formatting in one step.
 
+In the editor, **Option-click** (**Alt-click** on other platforms) to add a cursor
+at each location you want to edit. Typing edits all cursors at once. **Option-drag**
+selects a rectangle across lines.
+
 ## Keyboard (file tree)
 
 Focus lands in the tree when the panel opens (or click any row), then:
