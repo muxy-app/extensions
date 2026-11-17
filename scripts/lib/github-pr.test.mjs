@@ -90,6 +90,18 @@ test("changedExtensionNames handles renames and rejects unsafe directories", () 
   );
 });
 
+test("changedExtensionNames preserves full hyphenated names without prefix matching", () => {
+  assert.deepEqual(
+    changedExtensionNames([
+      { filename: "extensions/files-custom/package.json" },
+      { filename: "extensions/files-custom/src/panel.js" },
+      { filename: "extensions/files/package.json" },
+      { filename: "extensions/files-custom-tools/package.json" },
+    ]),
+    ["files", "files-custom", "files-custom-tools"],
+  );
+});
+
 test("changedExtensionNames ignores files that sit directly in extensions/", () => {
   assert.deepEqual(
     changedExtensionNames([

@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import { fileURLToPath } from "node:url";
+
 import {
   changedExtensionNames,
   compareVersionCores,
@@ -70,9 +72,7 @@ async function pingExtensionAuthor(api, context, name, authorGitHub) {
   console.log(`Pinged extension author @${authorGitHub}.`);
 }
 
-async function main() {
-  const context = pullRequestContextFromEnvironment();
-  const api = new GitHubAPI(process.env.GITHUB_TOKEN);
+export async function updatePullRequestMetadata(api, context) {
   const files = await listPullRequestFiles(api, context);
   const names = changedExtensionNames(files);
 
@@ -119,6 +119,9 @@ async function main() {
     packagePath,
     { allow404: true },
   );
+  // Resolve ownership only from the exact extension on the trusted base.
+  // New submissions may copy another extension's marketplace metadata.
+  let baseAuthorGitHub = null;
   if (baseText === null) {
     console.log(`New extension '${name}' at ${submission.version}.`);
   } else {
@@ -127,6 +130,10 @@ async function main() {
       name,
       `${packagePath} at base`,
     );
+    baseAuthorGitHub = base.authorGitHub;
+    if (base.authorWarning) {
+      workflowMessage("warning", base.authorWarning);
+    }
     const comparison = compareVersionCores(submission.version, base.version);
     console.log(
       `Existing '${name}': ${base.version} (base) -> ${submission.version} (PR).`,
@@ -158,11 +165,19 @@ async function main() {
     api,
     context,
     name,
-    submission.authorGitHub,
+    baseAuthorGitHub,
   );
 }
 
-main().catch((error) => {
-  workflowMessage("error", error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
-});
+async function main() {
+  const context = pullRequestContextFromEnvironment();
+  const api = new GitHubAPI(process.env.GITHUB_TOKEN);
+  await updatePullRequestMetadata(api, context);
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch((error) => {
+    workflowMessage("error", error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  });
+}
