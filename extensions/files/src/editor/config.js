@@ -15,6 +15,8 @@ export const DEFAULT_CONFIG = {
   reuseTab: true,
   // How wide the markdown preview's text column runs: "narrow", "wide", or "full".
   previewWidth: "wide",
+  // Target characters per line when formatting Markdown source.
+  markdownLineWidth: 80,
 };
 
 export const PREVIEW_WIDTHS = [

@@ -1156,6 +1156,18 @@
   font-size: var(--font-body);
 }
 
+.sheet-number {
+  width: 72px;
+  min-height: var(--control);
+  flex: 0 0 auto;
+  padding: var(--s2) var(--s3);
+  border: 1px solid var(--muxy-border);
+  border-radius: var(--radius);
+  background: var(--muxy-surface);
+  color: var(--muxy-foreground);
+  font: var(--font-body) "SF Mono", Menlo, monospace;
+}
+
 .stepper {
   display: flex;
   align-items: center;

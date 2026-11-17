@@ -25,7 +25,7 @@ import { tab_symbol } from "@/shared/file-types";
 import { is_binary_kind, is_html, is_svg, kind_of } from "./kinds";
 import { AUTO_SAVE_DELAY_MS, load_editor_config, update_editor_config, watch_editor_config } from "./config";
 import { clear_draft, prune_drafts, read_draft, write_draft } from "./drafts";
-import { OpenIcon, RevealIcon, SaveIcon, SettingsIcon, TocIcon } from "./icons";
+import { FormatIcon, OpenIcon, RevealIcon, SaveIcon, SettingsIcon, TocIcon } from "./icons";
 // Most files are code, so CodeMirror ships with the shell and loads while the
 // page parses; every other view is fetched only when a file needs it.
 import * as code_module from "./code/code-editor";
@@ -433,6 +433,27 @@ export class EditorApp {
 
   // ---- Editing, saving -----------------------------------------------------
 
+  async formatMarkdown() {
+    const child = this.child;
+    if (this.kind !== "markdown" || this.mdMode !== "edit" || !child?.code || this.formatting === child || this.settings) return;
+    const mountId = this.mountId;
+    // A mode switch starts loading its replacement before destroying this view.
+    const isCurrent = () => this.child === child && this.mountId === mountId && this.mdMode === "edit";
+    this.formatting = child;
+    this.updateTopbar();
+    try {
+      await child.format(isCurrent);
+    } catch (err) {
+      if (isCurrent()) await alert_error("Format Markdown failed", err);
+    } finally {
+      if (this.formatting === child) this.formatting = null;
+      if (this.child === child) {
+        this.updateTopbar();
+        if (isCurrent() && !this.settings) this.focusEditor();
+      }
+    }
+  }
+
   onChange(isExternal) {
     if (isExternal) return;
     this.keep();
@@ -733,6 +754,16 @@ export class EditorApp {
   onKeyDown(event) {
     const key = event.key.toLowerCase();
     const modified = event.metaKey || event.ctrlKey;
+    // Use the physical key too: Option+Shift+F produces a symbol on macOS.
+    if (
+      this.kind === "markdown" && this.mdMode === "edit" && !this.settings && !event.isComposing &&
+      !modified && event.altKey && event.shiftKey && (key === "f" || event.code === "KeyF")
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (!event.repeat) void this.formatMarkdown();
+      return;
+    }
     if (this.kind === "markdown" && this.mdMode === "preview") {
       const find = modified && !event.shiftKey && key === "f";
       const replace = modified && !event.shiftKey && !event.altKey && key === "r";
@@ -789,6 +820,7 @@ export class EditorApp {
     const actions = h("div", { class: "toolbar-actions" });
     const updaters = [];
     let toc = null;
+    let format = null;
     if (is_svg(path) || is_html(path)) {
       const field = is_svg(path) ? "svgView" : "htmlView";
       const control = segmented(field, [
@@ -810,7 +842,11 @@ export class EditorApp {
         this.child?.setShowToc?.(this.showToc);
         this.updateTopbar();
       });
-      actions.append(control.element, toc);
+      format = toolButton("Format Markdown", FormatIcon, () => void this.formatMarkdown(), {
+        title: "Format Markdown (⇧⌥F / Shift+Alt+F)",
+        "aria-keyshortcuts": "Alt+Shift+F",
+      });
+      actions.append(control.element, toc, format);
     }
     const save = binary ? null : toolButton("Save", SaveIcon, () => void this.save());
     if (save) actions.append(save);
@@ -825,7 +861,7 @@ export class EditorApp {
     const dot = h("span", { class: "editor-dirty", "aria-label": "Unsaved", hidden: true });
     const name = h("span", { class: "editor-name", title: path }, basename(path));
     const title = h("div", { class: "editor-title" }, name, dot);
-    this.topbarParts = { dot, name, save, toc, updaters };
+    this.topbarParts = { dot, name, save, toc, format, updaters };
     this.body = h("div", { class: "editor-body" });
     this.shell = h("div", { class: "editor" }, h("div", { class: "topbar" }, title, actions), this.body);
     this.root.replaceChildren(this.shell);
@@ -849,6 +885,12 @@ export class EditorApp {
       parts.toc.hidden = this.mdMode !== "preview";
       parts.toc.classList.toggle("tool-button-active", this.showToc);
       parts.toc.setAttribute("aria-pressed", String(this.showToc));
+    }
+    if (parts.format) {
+      const formatting = Boolean(this.child && this.formatting === this.child);
+      parts.format.hidden = this.mdMode !== "edit";
+      parts.format.disabled = !this.child?.code || formatting;
+      parts.format.setAttribute("aria-busy", String(formatting));
     }
     for (const update of parts.updaters) update();
   }
