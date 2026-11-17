@@ -1,0 +1,254 @@
+import { FONT_SIZE_MAX, FONT_SIZE_MIN, PREVIEW_WIDTHS } from "./config";
+import { cls, h } from "@/shared/dom";
+
+const TAB_SIZES = [2, 4, 8];
+
+export class SettingsSheet {
+  constructor({ parent, config, update, onClose }) {
+    this.parent = parent;
+    this.config = config;
+    this.update = update;
+    this.onClose = onClose;
+    this.tabButtons = new Map();
+    this.widthButtons = new Map();
+
+    this.keyHandler = (event) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      this.onClose();
+    };
+    window.addEventListener("keydown", this.keyHandler);
+
+    this.fontMinus = h("button", {
+      class: "button stepper-btn",
+      type: "button",
+      onClick: () => this.setFont(this.config.fontSize - 1),
+    }, "-");
+    this.fontValue = h("span", { class: "stepper-value" });
+    this.fontPlus = h("button", {
+      class: "button stepper-btn",
+      type: "button",
+      onClick: () => this.setFont(this.config.fontSize + 1),
+    }, "+");
+    this.lineNumbers = h("input", {
+      id: "cfg-line-numbers",
+      type: "checkbox",
+      onChange: (event) => this.update({ lineNumbers: event.target.checked }),
+    });
+    this.wordWrap = h("input", {
+      id: "cfg-word-wrap",
+      type: "checkbox",
+      onChange: (event) => this.update({ wordWrap: event.target.checked }),
+    });
+    this.autocomplete = h("input", {
+      id: "cfg-autocomplete",
+      type: "checkbox",
+      onChange: (event) => this.update({ autocomplete: event.target.checked }),
+    });
+    this.codeFolding = h("input", {
+      id: "cfg-code-folding",
+      type: "checkbox",
+      onChange: (event) => this.update({ codeFolding: event.target.checked }),
+    });
+    this.linting = h("input", {
+      id: "cfg-linting",
+      type: "checkbox",
+      onChange: (event) => this.update({ linting: event.target.checked }),
+    });
+    this.colorPreview = h("input", {
+      id: "cfg-color-preview",
+      type: "checkbox",
+      onChange: (event) => this.update({ colorPreview: event.target.checked }),
+    });
+    this.treeSitter = h("input", {
+      id: "cfg-tree-sitter",
+      type: "checkbox",
+      onChange: (event) => this.update({ treeSitter: event.target.checked }),
+    });
+    this.autoSave = h("input", {
+      id: "cfg-auto-save",
+      type: "checkbox",
+      onChange: (event) => this.update({ autoSave: event.target.checked }),
+    });
+    this.reuseTab = h("input", {
+      id: "cfg-reuse-tab",
+      type: "checkbox",
+      onChange: (event) => this.update({ reuseTab: event.target.checked }),
+    });
+    this.markdownLineWidth = h("input", {
+      id: "cfg-markdown-line-width",
+      class: "sheet-number",
+      type: "number",
+      min: 1,
+      step: 1,
+      title: "Target characters per line when formatting Markdown (default: 80)",
+      onChange: (event) => {
+        const value = event.target.valueAsNumber;
+        if (Number.isSafeInteger(value) && value > 0) this.update({ markdownLineWidth: value });
+        else this.markdownLineWidth.value = String(this.config.markdownLineWidth);
+      },
+    });
+
+    this.overlay = h(
+      "div",
+      { class: "sheet-overlay", onMouseDown: () => this.onClose() },
+      h(
+        "div",
+        {
+          class: "sheet",
+          role: "dialog",
+          "aria-label": "Editor settings",
+          onMouseDown: (event) => event.stopPropagation(),
+        },
+        h("div", { class: "sheet-header" }, h("span", { class: "sheet-title" }, "Editor settings"), h("button", { class: "button", type: "button", onClick: () => this.onClose() }, "Done")),
+        h(
+          "div",
+          { class: "sheet-row" },
+          h("label", { class: "sheet-label" }, "Font size"),
+          h("div", { class: "stepper" }, this.fontMinus, this.fontValue, this.fontPlus),
+        ),
+        h(
+          "div",
+          { class: "sheet-row" },
+          h("label", { class: "sheet-label", for: "cfg-line-numbers" }, "Line numbers"),
+          this.lineNumbers,
+        ),
+        h(
+          "div",
+          { class: "sheet-row" },
+          h("label", { class: "sheet-label", for: "cfg-word-wrap" }, "Word wrap"),
+          this.wordWrap,
+        ),
+        h(
+          "div",
+          { class: "sheet-row" },
+          h("label", { class: "sheet-label", for: "cfg-autocomplete" }, "Autocomplete"),
+          this.autocomplete,
+        ),
+        h(
+          "div",
+          { class: "sheet-row" },
+          h("label", { class: "sheet-label", for: "cfg-code-folding" }, "Code folding"),
+          this.codeFolding,
+        ),
+        h(
+          "div",
+          { class: "sheet-row" },
+          h("label", { class: "sheet-label", for: "cfg-linting" }, "Linting"),
+          this.linting,
+        ),
+        h(
+          "div",
+          { class: "sheet-row" },
+          h("label", { class: "sheet-label", for: "cfg-color-preview" }, "Color preview"),
+          this.colorPreview,
+        ),
+        h(
+          "div",
+          { class: "sheet-row" },
+          h("label", { class: "sheet-label", for: "cfg-tree-sitter" }, "Tree-sitter highlighting"),
+          this.treeSitter,
+        ),
+        h(
+          "div",
+          { class: "sheet-row" },
+          h("label", { class: "sheet-label", for: "cfg-auto-save" }, "Auto save"),
+          this.autoSave,
+        ),
+        h(
+          "div",
+          { class: "sheet-row" },
+          h(
+            "label",
+            { class: "sheet-label", for: "cfg-reuse-tab", title: "Off: every file opens in a new tab" },
+            "Open files in the current tab until edited",
+          ),
+          this.reuseTab,
+        ),
+        h(
+          "div",
+          { class: "sheet-row" },
+          h("label", { class: "sheet-label" }, "Tab size"),
+          h(
+            "div",
+            { class: "segmented" },
+            TAB_SIZES.map((size) => {
+              const button = h("button", {
+                type: "button",
+                onClick: () => this.update({ tabSize: size }),
+              }, size);
+              this.tabButtons.set(size, button);
+              return button;
+            }),
+          ),
+        ),
+        h(
+          "div",
+          { class: "sheet-row" },
+          h("label", { class: "sheet-label", for: "cfg-markdown-line-width" }, "Markdown line width"),
+          this.markdownLineWidth,
+        ),
+        h(
+          "div",
+          { class: "sheet-row" },
+          h("label", { class: "sheet-label", title: "How wide the text runs in the markdown preview" }, "Markdown preview width"),
+          h(
+            "div",
+            { class: "segmented" },
+            PREVIEW_WIDTHS.map(([value, label]) => {
+              const button = h("button", {
+                type: "button",
+                onClick: () => this.update({ previewWidth: value }),
+              }, label);
+              this.widthButtons.set(value, button);
+              return button;
+            }),
+          ),
+        ),
+      ),
+    );
+
+    this.parent.appendChild(this.overlay);
+    this.syncControls();
+  }
+
+  setConfig(config) {
+    this.config = config;
+    this.syncControls();
+  }
+
+  setFont(value) {
+    this.update({ fontSize: Math.min(FONT_SIZE_MAX, Math.max(FONT_SIZE_MIN, value)) });
+  }
+
+  syncControls() {
+    const config = this.config;
+    this.fontMinus.disabled = config.fontSize <= FONT_SIZE_MIN;
+    this.fontPlus.disabled = config.fontSize >= FONT_SIZE_MAX;
+    this.fontValue.textContent = `${config.fontSize}px`;
+    this.lineNumbers.checked = Boolean(config.lineNumbers);
+    this.wordWrap.checked = Boolean(config.wordWrap);
+    this.autocomplete.checked = config.autocomplete !== false;
+    this.codeFolding.checked = config.codeFolding !== false;
+    this.linting.checked = config.linting !== false;
+    this.colorPreview.checked = config.colorPreview !== false;
+    this.treeSitter.checked = config.treeSitter !== false;
+    this.autoSave.checked = config.autoSave !== false;
+    this.reuseTab.checked = config.reuseTab !== false;
+    this.markdownLineWidth.value = String(config.markdownLineWidth);
+
+    for (const [size, button] of this.tabButtons) {
+      button.className = cls("segment", config.tabSize === size && "segment-active");
+      button.setAttribute("aria-pressed", String(config.tabSize === size));
+    }
+    for (const [value, button] of this.widthButtons) {
+      button.className = cls("segment", config.previewWidth === value && "segment-active");
+      button.setAttribute("aria-pressed", String(config.previewWidth === value));
+    }
+  }
+
+  destroy() {
+    window.removeEventListener("keydown", this.keyHandler);
+    this.overlay.remove();
+  }
+}
