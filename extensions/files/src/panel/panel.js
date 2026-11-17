@@ -16,7 +16,7 @@ import {
   strip_slash,
 } from "@/shared/paths";
 import { material_icon, stroke_icon } from "@/shared/icons";
-import { ACTIVE_KEY, announce_move, keep_editor, open_file, project_root } from "@/shared/editors";
+import { ACTIVE_KEY, announce_move, keep_editor, open_file, open_file_beside, project_root } from "@/shared/editors";
 import { alert_error, confirm_action, copy_text, error_message, open_externally, reveal_in_finder, toast } from "@/shared/actions";
 import {
   load_icon_theme,
@@ -663,6 +663,14 @@ export class FilesPanel {
     }
   }
 
+  async openFileBeside(path, edge) {
+    try {
+      await open_file_beside(path, edge);
+    } catch (err) {
+      toast(error_message(err), "error", "Open in split pane");
+    }
+  }
+
   async toggle(dir, open = !this.isOpen(this.model.get(dir) ?? { path: dir, dir: true })) {
     if (this.filter) {
       if (open) this.filterCollapsed.delete(dir);
@@ -905,7 +913,7 @@ export class FilesPanel {
     const dir = entry.dir ? entry.path : parent_of(entry.path);
     open_menu(
       [
-        ...(entry.dir ? [] : [{ label: "Open", run: () => void this.openFile(entry.path) }, { label: "Open with Default App", run: () => open_externally(entry.path) }, "-"]),
+        ...(entry.dir ? [] : [{ label: "Open", run: () => void this.openFile(entry.path) }, { label: "Open in Vertical Split (Right)", run: () => void this.openFileBeside(entry.path, "right") }, { label: "Open in Horizontal Split (Below)", run: () => void this.openFileBeside(entry.path, "down") }, { label: "Open with Default App", run: () => open_externally(entry.path) }, "-"]),
         { label: "New File…", run: () => void this.startCreate(dir, "file") },
         { label: "New Folder…", run: () => void this.startCreate(dir, "folder") },
         "-",
