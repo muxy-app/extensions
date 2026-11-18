@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>이슈 관리</title>
+  <link rel="stylesheet" href="tab.css">
+</head>
+<body>
+  <div class="top">
+    <h1 id="title">이슈 관리</h1>
+    <div class="seg" id="source">
+      <button data-src="github" class="on">GitHub</button>
+      <button data-src="linear">Linear</button>
+    </div>
+    <button class="btn" id="refresh" title="새로고침">새로고침</button>
+    <button class="btn" id="agents" title="에이전트 추가·수정·삭제">에이전트 관리</button>
+    <button class="btn primary" id="new">이슈 등록</button>
+  </div>
+  <div class="banner" id="banner" hidden></div>
+  <div class="main">
+    <div class="list">
+      <div class="filters" id="filters"></div>
+      <div class="items" id="items"><div class="loading">불러오는 중…</div></div>
+    </div>
+    <div class="detail" id="detail"><div class="empty">왼쪽에서 이슈를 고르세요.</div></div>
+  </div>
+  <script src="../i18n.js"></script>
+  <script src="lib.js"></script>
+  <script src="agents.js"></script>
+  <script src="issues.js"></script>
+</body>
+</html>

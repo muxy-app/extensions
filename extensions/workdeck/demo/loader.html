@@ -1,0 +1,18 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Workdeck demo page</title>
+<body>
+<script>
+/* Loads one of the real extension pages with the fake muxy object in front of it (see muxy-stub.js). */
+(async () => {
+  const q = new URLSearchParams(location.search);
+  const page = q.get("page");
+  try { localStorage.setItem("workdeck.lang", q.get("lang") || "en"); } catch {}
+  const html = await (await fetch("/" + page)).text();
+  const dir = "/" + page.split("/").slice(0, -1).join("/") + "/";
+  const out = html
+    .replace(/<head>/i, (m) => m + `<base href="${dir}"><script src="/demo/muxy-stub.js${location.search}"><\/script>`)
+    .replace(/<\/body>/i, `<script src="/demo/scenario.js"><\/script></body>`);
+  document.open(); document.write(out); document.close();
+})();
+</script>

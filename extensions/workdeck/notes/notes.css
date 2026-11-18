@@ -1,0 +1,52 @@
+.main { min-height: 0; }
+.nd { display: flex; flex-direction: column; padding: 0; min-width: 0; }
+.nd .nhead { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--muxy-border); flex: none; flex-wrap: wrap; }
+.nd .nhead h2 { margin: 0; font-size: 15px; flex: 1; min-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nd .nhead .path { color: var(--muxy-foreground-muted); font-size: 11px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nd .btn, .helper .btn { white-space: nowrap; flex: none; }
+.entries { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 16px 12px; }
+.day { margin: 14px 0 4px; font-size: 11px; color: var(--muxy-foreground-muted); }
+.memo { display: flex; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--muxy-border); }
+.memo time { flex: none; width: 40px; color: var(--muxy-foreground-muted); font-variant-numeric: tabular-nums; font-size: 12px; padding-top: 1px; }
+.memo .mb { flex: 1; min-width: 0; overflow-wrap: anywhere; user-select: text; -webkit-user-select: text; }
+.memo .mb .md p { margin: 0; }
+.memo .acts { flex: none; display: flex; gap: 2px; align-items: flex-start; opacity: 0; }
+.memo:hover .acts, .memo .acts.on { opacity: 1; }
+.memo .acts .btn { padding: 1px 6px; border-color: transparent; line-height: 18px; }
+.memo .acts .btn:hover { border-color: var(--muxy-border); }
+.memo .ask { color: #ff6b61; font-size: 12px; align-self: center; }
+.memo textarea { width: 100%; min-height: 64px; resize: vertical; }
+.memo .erow { display: flex; gap: 6px; align-items: center; margin-top: 6px; }
+.thread { margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--muxy-border); font-size: 12.5px; }
+.thread .tst { font-size: 11px; color: var(--muxy-foreground-muted); }
+.thread .tst.live { color: var(--muxy-foreground); }
+.thread .tst.dead { color: #ff6b61; }
+.thread pre { margin: 4px 0 0; white-space: pre-wrap; word-break: break-word; font: inherit; }
+.thread details { margin-top: 4px; }
+.thread summary { cursor: pointer; font-size: 11px; color: var(--muxy-foreground-muted); }
+.thread .msg { font-size: 12px; color: var(--muxy-foreground-muted); margin-top: 2px; }
+.empty-note { color: var(--muxy-foreground-muted); font-size: 12px; }
+.compose { flex: none; border-top: 1px solid var(--muxy-border); padding: 10px 16px 12px; }
+.compose textarea { width: 100%; min-height: 64px; resize: vertical; }
+.compose .crow2 { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+.compose .crow2 .grow { flex: 1; }
+.hint { color: var(--muxy-foreground-muted); font-size: 11px; margin-top: 6px; }
+.entries { min-height: 90px; }
+.hpanel { flex: 0 0 42%; min-height: 150px; border-top: 1px solid var(--muxy-border); display: flex; flex-direction: column; }
+.hpanel .hhead { display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--muxy-border); flex: none; }
+.hpanel .hhead b { flex: none; }
+.hpanel .hstat { flex: 1; min-width: 0; font-size: 11px; color: var(--muxy-foreground-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hpanel .hscreen { flex: 1; min-height: 0; overflow: auto; padding: 8px 16px; }
+.hpanel .hscreen .screen { border: 0; padding: 0; max-height: none; background: transparent; }
+.hpanel .hwarn { margin: 8px 16px; }
+.hpanel .btn { white-space: nowrap; flex: none; }
+.nlist-item .sub { margin-top: 2px; font-size: 11px; color: var(--muxy-foreground-muted); display: flex; gap: 6px; align-items: center; }
+.sform { padding: 18px 20px; max-width: 560px; }
+.sform label { display: block; margin: 14px 0 4px; font-size: 12px; color: var(--muxy-foreground-muted); }
+.sform input[type=text], .sform select { width: 100%; }
+.sform .frow { display: flex; gap: 6px; }
+.sform .frow input { flex: 1; min-width: 0; }
+.sform .fhint { margin-top: 4px; font-size: 11px; color: var(--muxy-foreground-muted); }
+.sform .fact { margin-top: 18px; display: flex; gap: 8px; }
+.ico { width: 13px; height: 13px; vertical-align: -2px; }
+.banner[hidden] { display: none; }

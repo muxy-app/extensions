@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>노트</title>
+  <link rel="stylesheet" href="../tab/tab.css">
+  <link rel="stylesheet" href="../tab/board.css">
+  <link rel="stylesheet" href="notes.css">
+</head>
+<body>
+  <div class="top">
+    <h1 id="title">노트</h1>
+    <div class="seg" id="scopes">
+      <button data-s="all" class="on">전체</button>
+      <button data-s="global">전역</button>
+      <button data-s="ws">워크스페이스</button>
+      <button data-s="proj">프로젝트</button>
+    </div>
+    <button class="btn" id="settings">설정</button>
+    <button class="btn primary" id="new">새 노트</button>
+  </div>
+  <div class="banner" id="banner" hidden></div>
+  <div class="main">
+    <div class="list" id="list"></div>
+    <div class="detail nd" id="detail"></div>
+  </div>
+  <script src="../i18n.js"></script>
+  <script src="../tab/lib.js"></script>
+  <script src="../sidebar/shared.js"></script>
+  <script src="../tab/agents.js"></script>
+  <script src="../tab/screen.js"></script>
+  <script src="store.js"></script>
+  <script src="notes.js"></script>
+</body>
+</html>
