@@ -1,0 +1,39 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Workdeck demo shell</title>
+<style>
+  html,body{margin:0;height:100%;background:#111113;font:13px -apple-system,BlinkMacSystemFont,sans-serif;color:#f2f2f7;overflow:hidden}
+  .win{position:absolute;inset:0;display:flex;flex-direction:column;background:#1c1c1e}
+  .bar{height:38px;flex:none;display:flex;align-items:center;gap:8px;padding:0 14px;background:#232326;border-bottom:1px solid #3d3d42}
+  .dot{width:12px;height:12px;border-radius:50%}
+  .tabs{display:flex;gap:2px;margin-left:18px}
+  .tab{padding:5px 14px;border-radius:7px;color:#9a9aa3}
+  .tab.on{background:#3a3a3f;color:#f2f2f7}
+  .body{flex:1;display:flex;min-height:0}
+  iframe{border:0;height:100%}
+  .side{width:300px;flex:none;border-right:1px solid #3d3d42}
+  .main{flex:1;min-width:0}
+  .scrim[hidden]{display:none}
+  .scrim{position:absolute;inset:38px 0 0 0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center}
+  .modal{width:840px;height:760px;max-height:92%;border-radius:12px;overflow:hidden;border:1px solid #4a4a50;box-shadow:0 24px 80px #000a;background:#1c1c1e}
+  .modal iframe{width:100%}
+</style>
+<body>
+<div class="win">
+  <div class="bar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><div class="tabs" id="tabs"></div></div>
+  <div class="body"><iframe class="side" id="left"></iframe><iframe class="main" id="right"></iframe></div>
+  <div class="scrim" id="scrim" hidden><div class="modal"><iframe id="modal"></iframe></div></div>
+</div>
+<script>
+  const q = new URLSearchParams(location.search);
+  const quiet = q.get("debug") ? "" : "&quiet=1"; // add ?debug=1 to see script errors on the page
+  const src = (page, sc, extra = "") => `/demo/loader.html?page=${encodeURIComponent(page)}&scenario=${sc || ""}${quiet}${extra}`;
+  document.getElementById("left").src = src("sidebar/index.html", q.get("lscenario"));
+  const right = q.get("right");
+  if (right) document.getElementById("right").src = src(right, q.get("rscenario"));
+  const modal = q.get("modal");
+  if (modal) { document.getElementById("scrim").hidden = false; document.getElementById("modal").src = src(modal, q.get("mscenario")); }
+  const names = (q.get("tabs") || "npm run dev,Checkout flow — payment step,Issues").split(",");
+  const on = +(q.get("on") || names.length - 1);
+  document.getElementById("tabs").innerHTML = names.map((n, i) => `<div class="tab${i === on ? " on" : ""}">${n}</div>`).join("");
+</script>

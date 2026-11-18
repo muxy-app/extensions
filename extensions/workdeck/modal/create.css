@@ -1,0 +1,89 @@
+.mbody { flex: 1; min-height: 0; overflow: auto; padding: 10px 16px 16px; }
+.mbody .form { margin-top: 0; }
+.top .seg { margin-left: auto; }
+.done { text-align: center; padding: 30px 10px; }
+.done .bar { justify-content: center; }
+
+.modebar { margin-left: 8px; }
+.pplist.tall { max-height: 360px; }
+.ppitem.msg { align-items: flex-start; gap: 8px; }
+.ppitem.msg .title { white-space: normal; }
+.kakao { display: flex; flex-direction: column; gap: 8px; }
+.kakao .row { display: flex; gap: 6px; justify-content: flex-end; }
+.kakao textarea { min-height: 70px; }
+.editor { display: flex; flex-direction: column; gap: 8px; }
+.kakao .preview { max-height: 300px; overflow: auto; }
+
+.modehead { margin-bottom: 14px; }
+.aipick select { max-width: 220px; }
+.kakao textarea, .kakao > input, .kakao .preview input, .kakao .preview textarea, .editor textarea, .editor > input { width: 100%; box-sizing: border-box; }
+.kakao .field { align-items: stretch; }
+
+/* room picker: search box with breathing room, the list takes the rest of the modal */
+.mbody { display: flex; flex-direction: column; }
+.mbody > .kakao { flex: 1; min-height: 0; }
+.kakao > .roomstep { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
+.roomstep input { margin-bottom: 4px; }
+.pplist.roomlist { flex: 1; min-height: 0; max-height: none; }
+.grouphead { position: sticky; top: 0; z-index: 1; padding: 6px 8px 4px; font-size: 11px; font-weight: 600; color: var(--muxy-foreground-muted); background: var(--muxy-surface); border-bottom: 1px solid var(--muxy-border); }
+.grouphead .meta { display: inline; margin-left: 4px; }
+
+/* spacing: every row of tools/buttons keeps room below it, and the modal never ends flush with its last control */
+.mbody { padding-bottom: 28px; }
+.kakao { gap: 12px; }
+.kakao .tools, .editor .tools, .form .tools { margin-bottom: 6px; }
+.kakao .row, .editor .row { margin-top: 8px; }
+.editor { gap: 12px; }
+.modehead { margin-bottom: 16px; }
+.kakao textarea { margin-bottom: 4px; }
+.kakao .preview { margin-bottom: 4px; }
+.favbtn { flex: none; background: none; border: 0; padding: 0 4px; font-size: 15px; line-height: 1; cursor: pointer; color: var(--muxy-foreground-muted); }
+.favbtn.on { color: #e0a030; }
+.favbtn:hover { color: #e0a030; }
+.msgbody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.photos { display: flex; gap: 6px; flex-wrap: wrap; }
+.photo { max-width: 180px; max-height: 140px; border-radius: 6px; border: 1px solid var(--muxy-border); object-fit: cover; cursor: zoom-in; }
+.photo.ph { display: flex; align-items: center; justify-content: center; width: 120px; height: 70px; font-size: 11px; color: var(--muxy-foreground-muted); background: var(--muxy-surface); cursor: default; text-align: center; padding: 4px; box-sizing: border-box; }
+.lightbox { position: fixed; inset: 0; z-index: 50; background: #000c; display: flex; align-items: center; justify-content: center; cursor: zoom-out; }
+.lightbox img { max-width: 92%; max-height: 92%; border-radius: 8px; }
+.draftphotos { margin-bottom: 4px; }
+.editor .row, .kakao .row { display: flex; gap: 6px; justify-content: flex-end; align-items: center; }
+
+/* message / draft steps: the children of the step container are spaced evenly */
+.kakao > div:not(.roomstep) { display: flex; flex-direction: column; gap: 14px; }
+.kakao > div:not(.roomstep) > .pplist { margin: 0; }
+.kakao .preview { margin: 0; }
+.kakao .draftphotos { margin: 0; }
+.kakao .draftphotos:empty { display: none; }
+
+/* chat bubbles */
+.pplist.chat { padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; background: color-mix(in srgb, var(--muxy-surface) 70%, var(--muxy-background)); max-height: 420px; }
+.daysep { align-self: center; margin: 10px 0 6px; padding: 2px 12px; font-size: 11px; border-radius: 10px; color: var(--muxy-foreground-muted); background: var(--muxy-surface); border: 1px solid var(--muxy-border); }
+.sysmsg { align-self: center; font-size: 11px; color: var(--muxy-foreground-muted); padding: 2px 0; }
+.cmsg { display: flex; gap: 8px; align-items: flex-start; padding: 2px 4px; border-radius: 10px; cursor: pointer; }
+.cmsg:hover { background: color-mix(in srgb, var(--muxy-hover) 60%, transparent); }
+.cmsg.picked { background: var(--muxy-accent-soft); }
+.cmsg > input { flex: none; margin-top: 8px; }
+.cmsg .cstack { display: flex; flex-direction: column; gap: 2px; min-width: 0; max-width: 78%; }
+.cmsg.mine { flex-direction: row; }
+.cmsg.mine .cstack { margin-left: auto; align-items: flex-end; }
+.cmsg.theirs .cstack { align-items: flex-start; }
+.cname { font-size: 11px; color: var(--muxy-foreground-muted); padding-left: 4px; }
+.cline { display: flex; gap: 6px; align-items: flex-end; min-width: 0; }
+.btime { flex: none; font-size: 10px; color: var(--muxy-foreground-muted); white-space: nowrap; }
+.bubble { min-width: 0; padding: 7px 11px; border-radius: 14px; background: var(--muxy-surface); border: 1px solid var(--muxy-border); display: flex; flex-direction: column; gap: 6px; }
+.cmsg.theirs .bubble { border-top-left-radius: 4px; }
+.cmsg.mine .bubble { background: color-mix(in srgb, #fee500 22%, var(--muxy-surface)); border-color: color-mix(in srgb, #fee500 40%, var(--muxy-border)); border-top-right-radius: 4px; }
+.cmsg.picked .bubble { box-shadow: 0 0 0 1px var(--muxy-accent); }
+.btext { white-space: pre-wrap; overflow-wrap: anywhere; }
+.btext.dim { color: var(--muxy-foreground-muted); }
+.quote { display: flex; flex-direction: column; gap: 1px; padding: 3px 8px; font-size: 11.5px; border-left: 3px solid var(--muxy-border); color: var(--muxy-foreground-muted); background: color-mix(in srgb, var(--muxy-background) 40%, transparent); border-radius: 4px; }
+.quote b { color: var(--muxy-foreground); }
+
+/* the modal is as tall as Muxy allows; whatever sits at the bottom (action rows, toolbars) keeps room below it */
+.mbody { padding-bottom: 36px; }
+.mbody .row:last-child, .mbody .tools:last-child, .mbody > div > .row:last-child { margin-bottom: 12px; }
+.kakao > div:not(.roomstep) > .row:last-child { margin-bottom: 12px; }
+.roomstep { padding-bottom: 8px; }
+
+.hint { margin-top: 6px; font-size: 11px; color: var(--muxy-foreground-muted); }

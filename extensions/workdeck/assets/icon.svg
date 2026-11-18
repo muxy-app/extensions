@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4f46e5"/>
+      <stop offset="1" stop-color="#0ea5a5"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="58" fill="url(#bg)"/>
+  <!-- the deck: two cards peeking out behind the front panel -->
+  <rect x="62" y="34" width="132" height="30" rx="12" fill="#fff" opacity=".35"/>
+  <rect x="50" y="46" width="156" height="30" rx="13" fill="#fff" opacity=".6"/>
+  <!-- front panel: sidebar + content cards -->
+  <rect x="34" y="62" width="188" height="160" rx="20" fill="#fff"/>
+  <path d="M34 82a20 20 0 0 1 20-20h28v160H54a20 20 0 0 1-20-20z" fill="#e0e7ff"/>
+  <circle cx="58" cy="90" r="6" fill="#4f46e5"/>
+  <rect x="49" y="108" width="24" height="7" rx="3.5" fill="#818cf8"/>
+  <rect x="49" y="126" width="24" height="7" rx="3.5" fill="#a5b4fc"/>
+  <rect x="49" y="144" width="24" height="7" rx="3.5" fill="#a5b4fc"/>
+  <rect x="98" y="82" width="104" height="46" rx="12" fill="#ccfbf1"/>
+  <rect x="98" y="138" width="48" height="66" rx="12" fill="#e0e7ff"/>
+  <rect x="154" y="138" width="48" height="66" rx="12" fill="#ccfbf1"/>
+  <circle cx="190" cy="96" r="7" fill="#22c55e"/>
+  <rect x="110" y="94" width="48" height="8" rx="4" fill="#0ea5a5"/>
+  <rect x="110" y="110" width="30" height="7" rx="3.5" fill="#5eead4"/>
+</svg>

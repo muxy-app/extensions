@@ -1,0 +1,149 @@
+{
+  "name": "workdeck",
+  "version": "0.1.0",
+  "author": "Wonjin",
+  "license": "MIT",
+  "scripts": {
+    "build": "node scripts/build.mjs"
+  },
+  "muxy": {
+    "description": "Workdeck: project-group sidebar, issue and deploy management, branch cleanup, KakaoTalk-to-issue and an agent control room",
+    "permissions": [
+      "agents:read",
+      "agents:write",
+      "clipboard:write",
+      "commands:exec",
+      "commands:read",
+      "commands:run",
+      "git:read",
+      "panels:write",
+      "preferences:read",
+      "projects:delete",
+      "projects:read",
+      "projects:write",
+      "storage:read",
+      "storage:write",
+      "system:open",
+      "tabs:read",
+      "tabs:write",
+      "ui:write",
+      "worktrees:read",
+      "worktrees:write"
+    ],
+    "events": [
+      "agent.status",
+      "preferences.changed",
+      "project.switched",
+      "projects.changed",
+      "tab.closed",
+      "tab.created",
+      "tab.focused",
+      "tab.updated",
+      "ui.changed",
+      "worktree.headChanged",
+      "worktree.switched"
+    ],
+    "sidebar": {
+      "id": "main",
+      "title": "Workdeck",
+      "icon": {
+        "svg": "assets/icon-mono.svg"
+      },
+      "entry": "sidebar/index.html"
+    },
+    "popovers": [
+      {
+        "id": "switcher",
+        "entry": "switcher/index.html",
+        "width": 300,
+        "height": 200
+      }
+    ],
+    "commands": [
+      {
+        "id": "switch-sidebar",
+        "title": "Workdeck: Switch sidebar",
+        "action": {
+          "kind": "openPopover",
+          "popover": "switcher"
+        }
+      },
+      {
+        "id": "quick-note",
+        "title": "Workdeck: Quick note",
+        "action": {
+          "kind": "openModal",
+          "entry": "notes/quick.html",
+          "width": 480,
+          "height": 330,
+          "dismissOnOutsideClick": true
+        },
+        "defaultShortcut": "ctrl+shift+n"
+      },
+      {
+        "id": "open-notes",
+        "title": "Workdeck: Notes",
+        "action": {
+          "kind": "openTab",
+          "tabType": "notes"
+        }
+      }
+    ],
+    "topbarItems": [
+      {
+        "id": "switch-sidebar",
+        "icon": "sidebar.left",
+        "command": "switch-sidebar",
+        "tooltip": "Switch sidebar"
+      },
+      {
+        "id": "quick-note",
+        "icon": "note.text",
+        "command": "quick-note",
+        "tooltip": "Quick note"
+      }
+    ],
+    "tabTypes": [
+      {
+        "id": "issues",
+        "title": "Issues",
+        "entry": "tab/issues.html"
+      },
+      {
+        "id": "deploys",
+        "title": "Deploys",
+        "entry": "tab/deploys.html"
+      },
+      {
+        "id": "cleanup",
+        "title": "Branch cleanup",
+        "entry": "tab/cleanup.html"
+      },
+      {
+        "id": "board",
+        "title": "Agent board",
+        "entry": "tab/board.html"
+      },
+      {
+        "id": "notes",
+        "title": "Notes",
+        "entry": "notes/notes.html"
+      }
+    ],
+    "marketplace": {
+      "author": "Wonjin",
+      "categories": [
+        "productivity"
+      ],
+      "icon": "assets/icon.svg",
+      "screenshots": [
+        "assets/screenshots/01-sidebar-issues.png",
+        "assets/screenshots/02-linear-groups.png",
+        "assets/screenshots/03-pr-review.png",
+        "assets/screenshots/05-branch-cleanup.png",
+        "assets/screenshots/06-agent-board.png",
+        "assets/screenshots/08-chat-to-issue.png"
+      ]
+    }
+  }
+}
