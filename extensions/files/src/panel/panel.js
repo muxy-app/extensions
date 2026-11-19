@@ -657,7 +657,9 @@ export class FilesPanel {
 
   async openFile(path) {
     try {
-      await open_file(path);
+      const get = (key) => muxy.settings.get(key).catch(() => false);
+      if (await get("openInSplit")) await open_file_beside(path, (await get("splitBelow")) ? "down" : "right");
+      else await open_file(path);
     } catch (err) {
       toast(error_message(err), "error", "Open file");
     }
