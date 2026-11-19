@@ -49,8 +49,8 @@ async function removeWorktree(repo, branch, dirty) {
     });
     if (!ok) return false;
   }
-  await muxy.git.worktree.switchTo({ identifier: target.path });
-  await muxy.git.worktree.remove({ path: repo.root, force: dirty });
+  git.followWorktree(target.path);
+  await git.worktreeRemove(repo.root, target.path, dirty);
   if (branch) {
     await git.deleteBranch(branch, true).catch(() => undefined);
     await git.deleteRemoteBranch(branch).catch(() => undefined);

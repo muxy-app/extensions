@@ -1,4 +1,4 @@
-import { run, tryRun } from "@/core/git";
+import { run, tryRun, worktreeAdd } from "@/core/git";
 import { fromTea, parseTeaList, teaQueryState, timeline } from "@/core/forge/normalize";
 import { branchSteps, fetchStep, prRef } from "@/core/forge/tea-steps";
 
@@ -90,7 +90,7 @@ export async function checkout(number) {
 
 export async function checkoutWorktree(number, path) {
   const branch = await prepareBranch(number);
-  await muxy.git.worktree.add({ path, branch, createBranch: false });
+  await worktreeAdd(path, branch);
 }
 
 export async function diff(number) {

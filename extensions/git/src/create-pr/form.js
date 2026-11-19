@@ -67,7 +67,7 @@ export class CreatePrForm {
   async start() {
     this.title.focus();
     try {
-      const [status, branches, repo] = await Promise.all([git.readStatus({ fresh: true }), git.localBranches(), muxy.git.repoInfo()]);
+      const [status, branches, repo] = await Promise.all([git.readStatus(), git.localBranches(), git.repoInfo()]);
       this.status = status;
       this.forge = await forgeFor(repo.root);
       this.defaultBranch = (await git.defaultBranchOf(status)) ?? "";
