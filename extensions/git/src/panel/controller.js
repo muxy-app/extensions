@@ -3,9 +3,12 @@ import { isMissingRepo, statusKey } from "@/core/status";
 import { forgeFor } from "@/core/forge";
 import { alertError, errorMessage } from "@/shared/actions";
 import { isInside } from "@/shared/paths";
+import { lastTerminalDir, terminalDir } from "@/core/target";
 import { createStore } from "@/panel/store";
 
 const FETCH_INTERVAL_MS = 5 * 60 * 1000;
+const FOLLOW_INTERVAL_MS = 2000;
+const POLL_STATUS_EVERY = 2;
 const NO_UPSTREAM = { hasUpstream: false, ahead: 0, behind: 0 };
 
 const INITIAL = {
@@ -32,6 +35,7 @@ export class Controller {
     this.lastFetch = new Map();
     this.cache = new Map();
     this.disposers = [];
+    this.ticks = 0;
   }
 
   get state() {
@@ -52,7 +56,20 @@ export class Controller {
       if (event?.extensionID === muxy.extensionID) this.onVisible();
     });
     this.disposers.push(muxy.onFocus?.((focused) => focused && this.onVisible()) ?? (() => {}));
+    const follow = setInterval(() => void this.follow(), FOLLOW_INTERVAL_MS);
+    this.disposers.push(() => clearInterval(follow));
     void this.load();
+  }
+
+  async follow() {
+    if (this.following) return;
+    this.following = true;
+    try {
+      if ((await terminalDir()) !== lastTerminalDir()) await this.load();
+      else if (this.state.phase === "ready" && !this.state.busy && ++this.ticks % POLL_STATUS_EVERY === 0) this.scheduleStatus(0);
+    } finally {
+      this.following = false;
+    }
   }
 
   async load() {
@@ -63,7 +80,7 @@ export class Controller {
     this.timer = null;
     let repo;
     try {
-      repo = await muxy.git.repoInfo();
+      repo = await git.repoInfo({ follow: true });
     } catch (err) {
       if (generation !== this.generation) return;
       const message = errorMessage(err);
@@ -106,7 +123,7 @@ export class Controller {
     let status = null;
     let error = null;
     try {
-      status = await git.readStatus({ fresh });
+      status = await git.readStatus();
     } catch (err) {
       error = err;
     }

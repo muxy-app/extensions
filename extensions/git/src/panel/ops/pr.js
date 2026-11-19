@@ -104,7 +104,8 @@ export async function worktreePr(ctl, pr, anchor, onDone = () => {}) {
           const forge = await api(ctl);
           await forge.checkoutWorktree(pr.number, path);
           await muxy.worktrees.refresh().catch(() => undefined);
-          await muxy.git.worktree.switchTo({ identifier: path });
+          const created = (await git.worktreeList(ctl.root)).find((entry) => entry.branch === pr.headBranch);
+          if (created) git.followWorktree(created.path);
         })
         .then((result) => result.ok && onDone()),
   });
