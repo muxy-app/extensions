@@ -1,6 +1,6 @@
 {
   "name": "files",
-  "version": "2.0.9",
+  "version": "2.0.10",
   "scripts": {
     "dev": "vite",
     "build": "vite build && node scripts/copy-build-assets.mjs",
@@ -494,6 +494,22 @@
         "screenshots/screenshot-1.png",
         "screenshots/screenshot-2.png"
       ]
-    }
+    },
+    "settings": [
+      {
+        "key": "openInSplit",
+        "title": "Open files in a split pane",
+        "description": "Open files from the file tree in a new pane next to the active pane instead of a tab in it.",
+        "type": "bool",
+        "defaultValue": false
+      },
+      {
+        "key": "splitBelow",
+        "title": "Split below instead of right",
+        "description": "Only applies when \"Open files in a split pane\" is on. Off opens to the right of the active pane, on opens below it.",
+        "type": "bool",
+        "defaultValue": false
+      }
+    ]
   }
 }
