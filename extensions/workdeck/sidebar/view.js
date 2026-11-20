@@ -115,6 +115,13 @@ function structureSignature() {
 
 function renderNow() {
   if (drag.kind) { drag.pending = true; return; } // re-rendering mid-drag would cancel it
+  // Before: a project was open only while current unless clicked, so moving to another project folded it (and with
+  // worktrees, every worktree folded). Now: a project that was current stays open, and its last active worktree keeps
+  // its tabs unfolded; only a click on the row folds it. Why: switching projects should not lose the open lists.
+  let remembered = false;
+  for (const p of data.projects) if (isCurrent(p) && state.expanded[p.id] === undefined) { state.expanded[p.id] = true; remembered = true; }
+  for (const p of data.projects) { const w = (data.worktrees[p.id] || []).find((x) => x.isActive); if (w && state.lastWt[p.id] !== w.id) { state.lastWt[p.id] = w.id; remembered = true; } }
+  if (remembered) save();
   const sig = structureSignature();
   if (sig === lastSig) { patchSoftTexts(); return; } // same structure: only text changed, nothing is replaced
   lastSig = sig;
@@ -400,12 +407,22 @@ function projectBlock(p, depth, groupID) {
 
 /* Worktrees of a project. Muxy only lists the tabs of the active worktree, so only that one unfolds its tabs;
  * clicking another worktree switches to it, and its ＋ opens a new tab there. */
+/* Which worktree's tab list is shown: the active one; while another project is being viewed none is active, so the one
+ * that was active last stays unfolded (primary worktree when nothing was seen yet). */
+function shownWt(p, wts) {
+  const active = wts.find((x) => x.isActive);
+  if (active) return active.id;
+  const last = wts.find((x) => x.id === state.lastWt[p.id]);
+  return (last || wts.find((x) => norm(x.path) === norm(p.path)) || wts[0]).id;
+}
+
 function worktreesBlock(p, wts) {
   const box = el("div", { class: "tabs wts" });
   for (const w of wts) {
     const here = !!w.isActive;
     const label = w.branch || w.name;
-    const unfolded = here && (state.expanded["w:" + w.id] ?? true);
+    const holds = w.id === shownWt(p, wts);
+    const unfolded = holds && (state.expanded["w:" + w.id] ?? true);
     const primary = norm(w.path) === norm(p.path);
     box.append(el(
       "div",
@@ -414,7 +431,7 @@ function worktreesBlock(p, wts) {
         "data-key": "w:" + w.id,
         title: `${label}\n${w.path}`,
         onclick: async () => {
-          if (here) { state.expanded["w:" + w.id] = !unfolded; save(); render(); return; }
+          if (holds && (here || !isCurrent(p))) { state.expanded["w:" + w.id] = !unfolded; save(); render(); return; }
           if (!isCurrent(p)) await muxy.projects.switchTo(p.id);
           await muxy.worktrees.switchTo(w.id, p.id);
         },
@@ -565,6 +582,7 @@ function projectMenu(e, p) {
     { label: tr(" 노트…"), run: () => openManager(p, "notes", { scope: { kind: "proj", id: p.id, name: p.name } }) },
     "-",
     isHome(p) ? null : { label: tr("그룹 이동…"), run: () => pickGroupFor(p) },
+    isHome(p) ? null : { label: tr("저장소 다시 읽기"), run: () => rescanProject(p) }, // never a scan of the whole home folder
     "-",
     { label: tr("이름 변경"), run: () => renameProject(p) },
     { label: tr("색상 변경…"), run: () => changeColor(p) },
@@ -679,19 +697,113 @@ function agentBadge(providerID) {
 }
 
 /* A running agent: type badge, the tab title it works under (truncated, full text on hover), and where it runs. */
+/* An agent paired with its pane is matched by pane id. Only XITA rows still without a pane fall back to the focused
+ * pane's folder, and when several share it, to the one whose session title is the pane's title.
+ * Before: every XITA row went through the folder-and-title guess, which could not separate two agents in one folder.
+ * Now: a row built from a pane's status line is matched by pane id, and a row still without a pane (terminal reading not
+ *      allowed yet) falls back to the folder. When the focused pane already belongs to a row, the others stand down.
+ * Why: the focused XITA agent was often not highlighted at all, and once some rows were paired the folder guess could
+ *      highlight a second row alongside the paired one.
+ * Affects: the highlight in the Agents section; unpaired XITA rows behave as before. */
+function isFocusedAgent(a) {
+  const f = data.focus;
+  if (!f) return false;
+  if (a.sub) return false; // a subagent has no pane of its own: it follows its parent's row
+  if (a.paneID === f.paneID) return true;
+  if (a.paneMatched) return false;
+  // the focused pane already belongs to a paired row: an unpaired one in the same folder must not claim it too
+  if (data.agents.some((x) => x.paneMatched && x.paneID === f.paneID)) return false;
+  if (!a.external || norm(a.cwd) !== norm(f.cwd)) return false;
+  const same = data.agents.filter((x) => x.external && !x.sub && !x.paneMatched && norm(x.cwd) === norm(f.cwd));
+  if (same.length < 2) return true;
+  const key = (t) => String(t || "").replace(/\s+/g, "").slice(0, 20);
+  const fits = (x) => key(x.title).length >= 4 && (f.title.replace(/\s+/g, "").includes(key(x.title)) || String(x.title || "").replace(/\s+/g, "").includes(f.title.replace(/\s+/g, "").slice(0, 20)));
+  return fits(a) && same.filter(fits).length === 1 ? true : false;
+}
+
+/* Click on an agent row (or a subagent row, which goes to its parent): show the tab that pane lives in.
+ * Before: it called agents.focus, which answers "ok" but does not move the focus for an agent Muxy does not recognize —
+ *         so clicking a XITA row, and any subagent row, did nothing at all.
+ * Now: switch to the pane's project, then to its tab. Both are covered by permissions already declared.
+ * Why: the owner clicked a subagent row and nothing happened.
+ * Affects: clicks on Agents rows. A row with no pane yet only switches project. */
+async function focusAgentRow(a) {
+  if (a.sub) { await openSubagentTab(a); return; }
+  const pane = (data.panes || []).find((p) => p.id === a.paneID);
+  if (!pane) { await muxy.projects.switchTo(a.projectID); return; }
+  if (pane.projectID) await muxy.projects.switchTo(pane.projectID);
+  await muxy.tabs.switchTo(pane.tabID);
+}
+
+/* A subagent's task and report open in their own tab: the sidebar column is too narrow to read a report in.
+ * Before: they were shown inline under the row.
+ * Now: the row opens a tab, and one already open for the same subagent is brought forward instead of duplicated.
+ * Why: the owner asked to read it in a tab, not in the section list.
+ * Affects: subagent rows only. */
+async function openSubagentTab(a) {
+  const title = tr("하위 작업 · {0}", a.title || a.childID);
+  const mine = (data.projectTabs[a.projectID] || []).find((t) => t.title === title || t.customTitle === title);
+  if (mine) { await muxy.tabs.switchTo(mine.id); return; }
+  const proj = data.projects.find((p) => p.id === a.projectID) || {};
+  await muxy.tabs.open({ kind: "extensionWebView", extension: { id: muxy.extensionID, tabType: "subagent", data: { parent: a.parentSess, child: a.childID, parentPane: a.parentPane, projectID: a.projectID, name: proj.name, path: proj.path } } });
+}
+
+/* Ends the terminal an agent runs in, for cleaning up. A subagent has no terminal of its own, so it ends its parent's.
+ * Asks first: this kills whatever runs in that pane and cannot be undone. */
+async function killAgentRow(a) {
+  const paneID = a.sub ? a.parentPane : a.paneID;
+  const label = data.agentTitles[a.paneID] || a.paneID;
+  const yes = tr("종료");
+  const answer = await muxy.dialog.confirm({
+    title: tr("이 터미널을 종료할까요?"),
+    message: a.sub ? tr("하위 작업은 별도 터미널이 없어서 상위 에이전트의 터미널을 종료해요.\n\n{0}", label) : label,
+    buttons: [yes, tr("취소")], default: tr("취소"), cancel: tr("취소"),
+  });
+  if (answer !== yes) return;
+  await muxy.panes.close(paneID);
+  data.paneScreen.delete(paneID);
+  await refreshFocus(); await refreshAgents(); refreshXita();
+}
+
+/* Right-click an agent row: name it yourself, clear that name, jump to the tab, or end the terminal. */
+function agentMenu(e, a) {
+  const named = !!data.agentAlias[a.sub ? "sub:" + a.childID : a.sess || a.paneID];
+  showMenu(e, [
+    { label: tr("이름 변경"), run: async () => {
+      const n = await muxy.dialog.prompt({ title: tr("에이전트 이름"), placeholder: data.agentTitles[a.paneID] || "" });
+      if (n && n.trim()) await setAgentAlias(a, n.trim());
+    } },
+    named ? { label: tr("이름 되돌리기"), run: () => setAgentAlias(a, "") } : null,
+    { label: a.sub ? tr("과제·보고 탭 열기") : tr("에이전트 탭으로 이동"), run: () => focusAgentRow(a).catch(failAlert(tr("에이전트 탭으로 이동하지 못했어요"))) },
+    a.sub ? { label: tr("목록에서 정리"), run: () => hideSubagent(a).catch(failAlert(tr("정리하지 못했어요"))) } : null,
+    { label: tr("세션 강제 종료"), run: () => killAgentRow(a).catch(failAlert(tr("터미널을 종료하지 못했어요"))) },
+  ].filter(Boolean));
+}
+
 function agentRow(a, showIdle) {
   const p = data.projects.find((x) => x.id === a.projectID);
   const wt = (data.worktrees[a.projectID] || []).find((w) => w.id === a.worktreeID);
-  const where = wt && a.worktreeID !== a.projectID ? wt.branch || wt.name : null;
+  const where = a.where || (wt && a.worktreeID !== a.projectID ? wt.branch || wt.name : null);
   const title = data.agentTitles[a.paneID];
+  // selected = the agent's pane sits in the tab Muxy is showing right now
+  const proj = data.projects.find((x) => x.id === a.projectID);
+  const selected = isFocusedAgent(a)
+    || (!!proj && isCurrent(proj) && (data.projectTabs[a.projectID] || []).some((t) => t.isActive && (t.paneIDs || []).includes(a.paneID)));
   const statusWord = { working: tr("작업 중"), waiting: tr("입력 대기"), idle: tr("대기") }[a.status] || a.status;
   const name = AGENT_BRAND[a.providerID] ? AGENT_BRAND[a.providerID][2] : a.providerID;
+  const pane = (data.panes || []).find((p) => p.id === a.paneID);
+  const own = pane && pane.title && pane.title !== title ? pane.title : null; // the agent's own tab title, kept on hover
+  const kids = a.sub ? [] : data.agents.filter((x) => x.sub && x.parentSess && x.parentSess === a.sess);
+  const kidsKey = "sub:" + a.sess;
+  const kidsClosed = !!state.collapsed[kidsKey];
   return el(
-    "div", { class: "row agent-row" + (a.status === "idle" ? " idle" : ""), title: [title, p && p.name, where, `${name} · ${statusWord}`].filter(Boolean).join("\n"), onclick: () => (a.external ? muxy.projects.switchTo(a.projectID) : muxy.agents.focus(a.paneID)) },
+    "div", { class: "row agent-row" + (a.sub ? " wt" : "") + (a.status === "idle" ? " idle" : "") + (selected ? " active" : ""), title: [title, own, p && p.name, where, `${name} · ${statusWord}`].filter(Boolean).join("\n"), onclick: () => focusAgentRow(a).catch(failAlert(tr("에이전트 탭으로 이동하지 못했어요"))), oncontextmenu: (e) => { e.preventDefault(); agentMenu(e, a); } },
     agentBadge(a.providerID),
     el("div", { class: "text" },
       el("div", { class: "name", "data-soft": "agent:" + a.paneID }, title || (p ? p.name : "?")),
-      el("div", { class: "sub" }, [p && p.name, where].filter(Boolean).join(" · "))),
+      el("div", { class: "sub" }, [a.sub ? tr("하위 작업") + (a.kind ? " · " + a.kind : "") : null, p && p.name, where].filter(Boolean).join(" · "))),
+    kids.length ? el("button", { class: "sec-btn", title: kidsClosed ? tr("하위 작업 펼치기") : tr("하위 작업 접기"), onclick: (e) => { e.stopPropagation(); state.collapsed[kidsKey] = !kidsClosed; save(); render(); } }, String(kids.length)) : null,
+    kids.length ? chevron(!kidsClosed, (e) => { e.stopPropagation(); state.collapsed[kidsKey] = !kidsClosed; save(); render(); }) : null,
     statusDot(a.status, true)
   );
 }
@@ -718,11 +830,16 @@ function sectionHead(key, title, count, iconName, iconKind, extra) {
   );
 }
 
-/* Running / waiting agents; click jumps to the agent's pane. The eye button also lists idle ones. */
+/* Running / waiting agents, grouped by state; click jumps to the agent's pane. The eye button also lists idle ones.
+ * Before: one flat list ordered by state, so with several agents it was hard to see which ones needed an answer.
+ * Now: agents are grouped under a collapsible header per state (waiting, working, idle), each with its count. The headers
+ *      only appear when more than one state is on screen; a single state stays a plain list.
+ * Why: the request was to see the agents grouped by state inside the section.
+ * Affects: the Agents section only. Folded groups are remembered in state.collapsed like folder groups. */
 function agentsSection() {
-  const rank = { waiting: 0, working: 1, idle: 2 };
-  const all = [...data.agents].sort((x, y) => rank[x.status] - rank[y.status]);
-  if (!all.length) return null;
+  const order = [["waiting", tr("입력 대기")], ["working", tr("작업 중")], ["idle", tr("대기")]];
+  const all = data.agents.filter((a) => !a.sub); // subagents follow their parent's row, not a group of their own
+  if (!data.agents.length) return null;
   const visible = state.showIdle ? all : all.filter((a) => a.status !== "idle");
   const toggle = el("button", {
     class: "sec-btn" + (state.showIdle ? " on" : ""),
@@ -730,10 +847,38 @@ function agentsSection() {
     onclick: (e) => { e.stopPropagation(); state.showIdle = !state.showIdle; save(); render(); },
   });
   toggle.append(icon(state.showIdle ? "eye" : "eyeoff", "window"));
-  const rows = visible.length ? visible.map((a) => agentRow(a)) : [el("div", { class: "hint" }, tr("작업 중인 agent가 없어요 · 눈 아이콘으로 대기 중인 agent 보기"))];
+  const groups = order.map(([status, label]) => ({ status, label, list: visible.filter((a) => a.status === status) })).filter((g) => g.list.length);
+  const rows = [];
+  if (!visible.length) rows.push(el("div", { class: "hint" }, tr("작업 중인 agent가 없어요 · 눈 아이콘으로 대기 중인 agent 보기")));
+  for (const g of groups) {
+    if (groups.length > 1) rows.push(agentGroupHead(g));
+    if (groups.length < 2 || !state.collapsed["ag:" + g.status]) {
+      for (const a of g.list) {
+        rows.push(agentRow(a));
+        for (const k of data.agents.filter((x) => x.sub && x.parentSess && x.parentSess === a.sess)) {
+          if (state.collapsed["sub:" + a.sess]) continue;
+          rows.push(agentRow(k));
+        }
+      }
+    }
+  }
   const board = el("button", { class: "sec-btn", title: tr("관제 대시보드 크게 보기 (새 탭)"), onclick: (e) => { e.stopPropagation(); openBoard().catch(failAlert(tr("대시보드를 열지 못했어요"))); } });
   board.append(icon("expand", "window"));
   return { title: "Agents", count: visible.length, iconName: "bot", iconKind: "sec-agent", rows, extra: el("span", { class: "sec-actions" }, board, toggle) };
+}
+
+/* Header of one state group, shaped like the sidebar's folder groups. */
+function agentGroupHead(g) {
+  const key = "ag:" + g.status;
+  const closed = !!state.collapsed[key];
+  return el(
+    "div",
+    { class: "row folder", "data-key": key, title: g.label, onclick: () => { state.collapsed[key] = !closed; save(); render(); } },
+    statusDot(g.status, true),
+    el("div", { class: "text" }, el("div", { class: "name" }, g.label)),
+    el("span", { class: "count" }, String(g.list.length)),
+    chevron(!closed)
+  );
 }
 
 /* Configured remote servers. Click opens the connection (one tab per server, focused again on later clicks);

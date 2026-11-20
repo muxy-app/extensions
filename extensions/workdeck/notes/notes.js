@@ -4,14 +4,20 @@
 const SC = ctx.scope || null; // the scope this tab was opened for; null shows every note
 const S = { mode: "helper", hdraft: "", notes: [], filter: SC ? SC.kind : "all", cur: null, known: new Set(), editId: null, delId: null, draft: "", projects: [], workspaces: [], view: "note", panel: null };
 let H = null; // the running helper session: { note, entry, agent, sid, screen, miss, busy, dirty, lastRaw }
-const HELPER_SID_FILE = "/tmp/workdeck-helper-session";
+/* Before: the helper's session id and heartbeat files were /tmp/workdeck-helper-session and /tmp/workdeck-hb-<session>.
+ * Now: both live in ~/.local/share/workdeck/run (the private folder agent launches already use), the session id read back
+ * is accepted only as [A-Za-z0-9._-], and it reaches shell commands through the environment, not the command text.
+ * Why: /tmp is shared by every account, so another user could have pre-created the file and supplied the "session id".
+ * Affects: the writing helper only. */
+const HELPER_SID_FILE = '"$HOME/.local/share/workdeck/run/helper-session"';
+const SID_OK = /^[A-Za-z0-9._-]+$/;
 const POLL_MS = 3000;
-/* Safety net against stray agents: the notes page refreshes /tmp/workdeck-hb-<session> every few seconds while the helper
- * runs. This watchdog starts with the agent (in a detached subshell, so the terminal prints no job line) and, once that
+/* Safety net against stray agents: the notes page refreshes the heartbeat file run/hb-<session> every few seconds while
+ * the helper runs. This watchdog starts with the agent (in a detached subshell, so the terminal prints no job line) and, once that
  * file has not been touched for 3 minutes (the tab was closed, the page crashed, the extension reloaded), ends the
  * agent's session. It also stops by itself when its shell is gone. */
 const MUXY_BIN = "/Applications/Muxy.app/Contents/MacOS/muxy";
-const HELPER_WATCHDOG = `{ HB=/tmp/workdeck-hb-$MUXY_SESSION_ID; touch "$HB"; ( ( while sleep 15; do kill -0 $$ 2>/dev/null || exit; [ -n "$(find "$HB" -mmin -3 2>/dev/null)" ] || { ${MUXY_BIN} session end "$MUXY_SESSION_ID" --yes >/dev/null 2>&1; rm -f "$HB"; pkill -TERM -P $$ 2>/dev/null; exit; }; done ) & ); } &&`;
+const HELPER_WATCHDOG = `{ HB="$HOME/.local/share/workdeck/run/hb-$MUXY_SESSION_ID"; touch "$HB"; ( ( while sleep 15; do kill -0 $$ 2>/dev/null || exit; [ -n "$(find "$HB" -mmin -3 2>/dev/null)" ] || { ${MUXY_BIN} session end "$MUXY_SESSION_ID" --yes >/dev/null 2>&1; rm -f "$HB"; pkill -TERM -P $$ 2>/dev/null; exit; }; done ) & ); } &&`;
 
 const IC = {
   chat: '<path d="M3 3.5h10v7H8.5L5.5 13v-2.5H3Z"/>',
@@ -291,10 +297,12 @@ async function startHelper(agent, entry, withNote) {
   await NS.writeThread(entry.id, entry.thread.summary || "");
   const noteAbs = await NS.abs(note.file);
   await muxy.exec({ shell: `rm -f ${HELPER_SID_FILE}`, timeoutMs: 5000 });
-  await muxy.exec({ shell: `cat > ${AGENT_FILE}`, stdin: helperPrompt(agent.name, entry, draftPath, withNote, noteAbs), timeoutMs: 10000 });
   const proj = note.scope.kind === "proj" ? S.projects.find((p) => p.id === note.scope.id) : null;
   const dir = proj ? shellQuote(proj.path) : '"$HOME"';
-  const command = `cd ${dir} && echo "$MUXY_SESSION_ID" > ${HELPER_SID_FILE} && ${HELPER_WATCHDOG} ` + agent.command.split("{file}").join(AGENT_FILE).split("{dir}").join(dir);
+  // same prompt file and saved model / effort as every other agent launch (see tab/agents.js)
+  let command;
+  try { command = `cd ${dir} && echo "$MUXY_SESSION_ID" > ${HELPER_SID_FILE} && ${HELPER_WATCHDOG} ` + await agentCommand(agent, helperPrompt(agent.name, entry, draftPath, withNote, noteAbs), dir); }
+  catch (e) { entry.thread.state = "dead"; await persist(note).catch(() => {}); renderNote(); throw e; } // nothing was started
   S.mode = "helper";
   H = { note, entry, agent, sid: null, tabId: null, screen: "", miss: 0, busy: false, dirty: false, lastRaw: 0, tries: 0, err: null };
   renderNote();
@@ -320,11 +328,12 @@ async function tick() {
   let changed = false;
   try {
     const t = h.entry.thread;
-    const d = await NS.readThread(h.entry.id, h.sid ? `/tmp/workdeck-hb-${h.sid}` : "");
+    const d = await NS.readThread(h.entry.id, h.sid || "");
     if (d != null && d.trim() !== (t.summary || "").trim()) { t.summary = d.trim(); h.dirty = true; changed = true; }
     if (!h.sid) {
       const r = await muxy.exec({ shell: `cat ${HELPER_SID_FILE} 2>/dev/null`, timeoutMs: 5000 });
-      h.sid = r.stdout.trim() || null;
+      const sid = r.stdout.trim();
+      h.sid = SID_OK.test(sid) ? sid : null;
       if (!h.sid && ++h.tries > 10) h.err = tr("에이전트 세션을 찾지 못했어요. 터미널 탭에서 에이전트가 시작됐는지 확인해 주세요.");
     }
     if (h.sid) {
@@ -364,7 +373,7 @@ async function sendToAgent(text) {
 async function closeHelperTab(h) {
   if (h.sid) {
     await muxyCLI(["session", "end", h.sid, "--yes"], { timeoutMs: 15000 }).catch(() => {});
-    await muxy.exec({ shell: `rm -f /tmp/workdeck-hb-${h.sid}`, timeoutMs: 5000 }).catch(() => {});
+    await muxy.exec({ shell: 'rm -f "$HOME/.local/share/workdeck/run/hb-$HB_SID"', env: { HB_SID: h.sid }, timeoutMs: 5000 }).catch(() => {});
   }
   if (h.tabId) await Promise.resolve(muxy.tabs.close(h.tabId)).catch(() => {}); // already closed by the user is fine
 }

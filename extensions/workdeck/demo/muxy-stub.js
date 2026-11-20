@@ -259,6 +259,42 @@ diff --git a/src/checkout/money.ts b/src/checkout/money.ts
     return { exitCode: 0, stdout: "", stderr: "" };
   };
 
+  /* ---- notes: files under the notes folder, answered for the fixed shell commands in notes/store.js ---- */
+  const nh = (meta) => `<!-- workdeck-note ${JSON.stringify({ v: 1, ...meta })} -->`;
+  const notes = {
+    "proj-acme-web/20261117-checkout-redesign-n1a2b3.md": { mtime: 1795017900, text: [
+      nh({ id: "n1a2b3", scope: "proj:web", scopeName: "acme-web", created: "2026-11-17 10:05" }), "# Checkout redesign", "",
+      "## 2026-11-17 10:12 · m1", "Payment step: keep saved cards above the new-card form. Ask design about the empty state when there are no saved cards.", "",
+      "## 2026-11-17 14:40 · m2", "Why do totals sometimes differ by one cent from the API?",
+      `<!-- thread ${JSON.stringify({ agent: "Claude Code", state: "done", summary: "- The cart rounds each line, the API rounds the sum after tax\n- Fix: round once, after tax, in `cart/totals.ts`\n- Add a test with 3 × 0.335 and a 10% coupon\n- Ask the API team whether invoices use the same rule", msgs: [{ x: "why do cart totals differ by a cent?" }, { x: "where would you fix it?" }] })} -->`, "",
+      "## 2026-11-18 09:30 · m3", "Rounding fix filed as an issue; pairing with Mina on the test cases.",
+      `<!-- issue ${JSON.stringify({ label: "ACM-143", url: "https://linear.app/acme/issue/ACM-143" })} -->`, "",
+      "## 2026-11-18 16:05 · m4", "Release notes: mention the new address autocomplete and the faster card form.", "",
+    ].join("\n") },
+    "ws-acme-platform/20261118-platform-sync-n4d5e6.md": { mtime: 1794994800, text: [
+      nh({ id: "n4d5e6", scope: "ws:ws1", scopeName: "Acme Platform", created: "2026-11-18 11:00" }), "# Platform sync — Nov 18", "",
+      "## 2026-11-18 11:02 · m5", "Webhook retries: back off up to 1 h, then alert the on-call channel.", "",
+      "## 2026-11-18 11:20 · m6", "Staging database upgrade moves to Thursday night.", "",
+    ].join("\n") },
+    "global/quick.md": { mtime: 1794928300, text: [
+      nh({ id: "n7f8g9", scope: "global", scopeName: "", created: "2026-11-16 08:40" }), "# Quick notes", "",
+      "## 2026-11-16 08:41 · m7", "Renew the code-signing certificate before Dec 3.", "",
+      "## 2026-11-17 18:12 · m8", "Try the new terminal font at 13 px.", "",
+    ].join("\n") },
+    "proj-acme-api/20261115-webhook-retries-n0h1i2.md": { mtime: 1794841500, text: [
+      nh({ id: "n0h1i2", scope: "proj:api", scopeName: "acme-api", created: "2026-11-15 15:00" }), "# Webhook retries", "",
+      "## 2026-11-15 15:04 · m9", "Retries pile up when the partner endpoint is down; dedupe by event id.", "",
+      "## 2026-11-15 15:25 · m10", "Check how long the partner keeps failed deliveries before giving up.", "",
+    ].join("\n") },
+  };
+  const notesShell = (sh, env) => {
+    const f = env.NOTES_FILE || "";
+    if (sh.includes("-maxdepth 3")) return Object.entries(notes).map(([file, n]) => `${file}\t${n.mtime}\t${(n.text.match(/^## \d/gm) || []).length}\t${n.text.slice(0, 700).replace(/\n/g, "\x01")}`).join("\n") + "\n";
+    if (sh.includes('echo "$R/$NOTES_FILE"')) return `${H}/.workdeck/notes/${f}\n`;
+    if (sh.endsWith('cat "$R/$NOTES_FILE"')) return notes[f] ? notes[f].text : null;
+    return "";
+  };
+
   const base = (p) => String(p).replace(/\/+$/, "").split("/").pop();
   const exec = async (arg, opts = {}) => {
     if (Array.isArray(arg)) {
@@ -272,6 +308,7 @@ diff --git a/src/checkout/money.ts b/src/checkout/money.ts
     }
     const sh = arg.shell || "";
     opts = { ...arg, ...opts }; // object form: { shell, stdin, timeoutMs }
+    if (opts.env && "NOTES_ROOT" in opts.env) { const out = notesShell(sh, opts.env); return out == null ? { exitCode: 1, stdout: "", stderr: "no such note" } : { exitCode: 0, stdout: out, stderr: "" }; }
     if (sh.includes("desktop-state.json")) return { exitCode: 0, stdout: JSON.stringify(members) + "\n" + H + "\n", stderr: "" };
     if (sh.includes("api.linear.app")) { const body = JSON.parse(opts.stdin || "{}"); return { exitCode: 0, stdout: JSON.stringify({ data: linearHandler(body.query, body.variables || {}) }), stderr: "" }; }
     if (sh.includes("##CUR")) return { exitCode: 0, stdout: cleanupScan(), stderr: "" };

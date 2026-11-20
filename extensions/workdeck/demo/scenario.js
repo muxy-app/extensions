@@ -7,6 +7,14 @@
   const click = (el) => el && el.click();
   const SCENARIOS = {
     async "issues-gh"() { await wait(900); click($$(".item")[0]); await wait(600); },
+    async "issues-agent"() {
+      await SCENARIOS["issues-gh"](); await wait(500);
+      click(byText(".agentbox.issue .btn.primary", "Run with an agent")); await wait(700);
+      const sel = document.querySelector(".runask select"); if (sel) { sel.value = "claude"; sel.dispatchEvent(new Event("change")); }
+      const [model, effort] = $$(".runask input[type=text]"); if (model) model.value = "opus"; if (effort) effort.value = "high";
+      const extra = document.querySelector(".runask textarea"); if (extra) extra.value = "Keep the old endpoint working until the mobile app ships 4.2.";
+      const keep = $$(".runask input[type=checkbox]").pop(); if (keep) keep.checked = true; // "save as default"
+    },
     async "issues-linear"() {
       await wait(500); click(byText("#source button", "Linear")); await wait(1400);
       click($$(".item.group")[0]); await wait(900);

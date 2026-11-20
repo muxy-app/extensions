@@ -82,3 +82,38 @@ muxy.events.subscribe("ui.changed", () => schedule("ui", async () => { await ref
   refreshXita();
   setInterval(() => { if (document.visibilityState === "visible") refreshXita(); }, 6000);
 })();
+
+/* Text the list cuts off with "…" shows in full after the pointer rests on it for a moment. When the row carries its own
+ * title (name + path, ...) that fuller text is shown instead, and the native tooltip is held back while ours is up. */
+(function fullTextTip() {
+  const tip = el("div", { id: "fulltip", hidden: true });
+  document.body.append(tip);
+  let timer = null, held = null;
+  const clipped = (n) => n.scrollWidth > n.clientWidth + 1 && getComputedStyle(n).textOverflow === "ellipsis";
+  const hide = () => {
+    clearTimeout(timer); timer = null; tip.hidden = true;
+    if (held) { held.node.setAttribute("title", held.title); held = null; }
+  };
+  document.addEventListener("mouseover", (e) => {
+    hide();
+    let n = e.target;
+    for (let i = 0; n && n !== document.body && i < 5; i++, n = n.parentElement) if (n instanceof Element && clipped(n)) break;
+    if (!n || n === document.body || !(n instanceof Element) || !clipped(n)) return;
+    const node = n, x = e.clientX, y = e.clientY;
+    timer = setTimeout(() => {
+      const titled = node.closest("[title]");
+      const text = titled ? titled.getAttribute("title") : node.textContent.trim();
+      if (!text) return;
+      if (titled) { held = { node: titled, title: text }; titled.removeAttribute("title"); }
+      tip.textContent = text;
+      tip.hidden = false;
+      const r = tip.getBoundingClientRect();
+      tip.style.left = Math.max(4, Math.min(x + 8, window.innerWidth - r.width - 4)) + "px";
+      tip.style.top = Math.max(4, Math.min(y + 18, window.innerHeight - r.height - 4)) + "px";
+    }, 900);
+  });
+  document.addEventListener("mouseleave", hide);
+  document.addEventListener("mousedown", hide, true);
+  document.addEventListener("scroll", hide, true);
+  document.addEventListener("mouseout", (e) => { if (!e.relatedTarget) hide(); });
+})();

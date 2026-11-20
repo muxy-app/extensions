@@ -9,7 +9,7 @@ const out = process.env.OUT || join(root, "dist");
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
 for (const item of ["package.json", "package-lock.json", "README.md", "LICENSE", "i18n.js", "sidebar", "tab", "notes", "modal", "switcher", "assets"]) {
-  if (existsSync(join(root, item))) cpSync(join(root, item), join(out, item), { recursive: true });
+  if (existsSync(join(root, item))) cpSync(join(root, item), join(out, item), { recursive: true, filter: (src) => !src.endsWith(".DS_Store") });
 }
 const pkg = JSON.parse(readFileSync(join(out, "package.json"), "utf8"));
 console.log(`built ${pkg.name}@${pkg.version} -> ${out}`);

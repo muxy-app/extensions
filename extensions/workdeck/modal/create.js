@@ -10,7 +10,9 @@ const M = { mode: "manual", source: "github", slug: null, slugError: null, teams
 const body = $("#body");
 const normName = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9가-힣]/g, "");
 const mapKey = () => "linearMap:" + (M.slug || norm(ctx.path));
-const finish = (result) => muxy.modal.submitWebview(result || null).catch(() => muxy.modal.closeWebview());
+/* Issues created in this window so far; closing (button, Esc, outside) hands the last one back so the opener reloads. */
+let lastCreated = null;
+const finish = (result) => muxy.modal.submitWebview(result || lastCreated || null).catch(() => muxy.modal.closeWebview());
 
 /* Same matching the issue manager uses: a saved choice wins, otherwise the repo or folder name. */
 async function loadProjects() {
@@ -163,10 +165,18 @@ function githubForm(ghLabels) {
   return wrap;
 }
 
+/* Before: a "created" line at the top with a single Close button. Now: the confirmation sits in the middle of the modal
+ * with Close and "New issue", which opens a clean form for the next one; closing in any way (button, Esc, header Close)
+ * hands back the last created issue so the opener reloads. Why: filing several issues in a row without reopening. */
 function showDone(source, url) {
+  lastCreated = { source, url };
   $("#source").hidden = true;
+  ctx.prefill = null; // the handed-over draft was used by the first issue
   body.replaceChildren(el("div", { class: "done" }, el("h2", {}, tr("이슈를 등록했어요")),
-    el("div", { class: "bar" }, el("button", { class: "btn primary", onclick: () => finish({ source, url }) }, tr("닫기")))));
+    url ? el("div", { class: "meta" }, el("a", { href: "#", onclick: (e) => { e.preventDefault(); openUrl(url); } }, url)) : null,
+    el("div", { class: "bar" },
+      el("button", { class: "btn", onclick: () => finish() }, tr("닫기")),
+      el("button", { class: "btn primary", onclick: () => { $("#source").hidden = false; M.mode = "manual"; show(M.source); } }, tr("신규 등록")))));
 }
 
 function manualForm(teams) {
@@ -569,8 +579,8 @@ function draftStep(teams, redraw) {
 }
 
 $("#source").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) show(b.dataset.src); });
-$("#close").addEventListener("click", () => finish(null));
-document.addEventListener("keydown", (e) => { if (e.key === "Escape") finish(null); });
+$("#close").addEventListener("click", () => finish());
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") finish(); });
 (async () => {
   $("#title").textContent = tr("이슈 등록 · {0}", ctx.name || "");
   try { M.slug = await repoSlug(ctx.path); } catch (e) { M.slugError = e.message; }

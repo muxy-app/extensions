@@ -1,23 +1,23 @@
 {
   "name": "workdeck",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "Wonjin",
   "license": "MIT",
   "scripts": {
     "build": "node scripts/build.mjs"
   },
   "muxy": {
-    "description": "Workdeck: project-group sidebar, issue and deploy management, branch cleanup, KakaoTalk-to-issue and an agent control room",
+    "description": "Workdeck: project-group sidebar, issues handed to agents in their own worktrees, deploys, branch cleanup, notes, KakaoTalk-to-issue and an agent control room",
     "permissions": [
       "agents:read",
-      "agents:write",
       "clipboard:write",
       "commands:exec",
       "commands:read",
       "commands:run",
       "git:read",
       "panels:write",
-      "preferences:read",
+      "panes:read",
+      "panes:write",
       "projects:delete",
       "projects:read",
       "projects:write",
@@ -32,7 +32,6 @@
     ],
     "events": [
       "agent.status",
-      "preferences.changed",
       "project.switched",
       "projects.changed",
       "tab.closed",
@@ -128,6 +127,11 @@
         "id": "notes",
         "title": "Notes",
         "entry": "notes/notes.html"
+      },
+      {
+        "id": "subagent",
+        "title": "Subagent",
+        "entry": "tab/subagent.html"
       }
     ],
     "marketplace": {
@@ -138,9 +142,9 @@
       "icon": "assets/icon.svg",
       "screenshots": [
         "assets/screenshots/01-sidebar-issues.png",
-        "assets/screenshots/02-linear-groups.png",
+        "assets/screenshots/11-issue-agent.png",
+        "assets/screenshots/10-notes.png",
         "assets/screenshots/03-pr-review.png",
-        "assets/screenshots/05-branch-cleanup.png",
         "assets/screenshots/06-agent-board.png",
         "assets/screenshots/08-chat-to-issue.png"
       ]
