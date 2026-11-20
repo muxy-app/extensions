@@ -195,3 +195,15 @@ pre.log { margin: 0; padding: 10px 12px; white-space: pre-wrap; word-break: brea
 .rvlogbody .lerr { color: #ff6b61; white-space: pre-wrap; word-break: break-word; }
 .rvlogbody .lwarn { color: #e3b341; white-space: pre-wrap; word-break: break-word; }
 @keyframes pulse { 50% { opacity: .35; } }
+
+.agentedit.def { grid-template-columns: 150px 1fr auto auto; }
+.agentedit.def .tools { gap: 6px; flex-wrap: nowrap; }
+.agentedit.def .tools input { flex: 1; }
+textarea.guide { min-height: 220px; width: 100%; font: 12px/1.5 ui-monospace, Menlo, monospace; }
+.dialog .row { display: flex; justify-content: flex-end; gap: 6px; }
+.runask { width: min(480px, 100%); }
+.runask .field { display: flex; flex-direction: column; gap: 3px; }
+.runask .tools { display: flex; gap: 8px; align-items: flex-end; }
+.runask .field input, .runask .field select { width: 100%; }
+.runtag { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 9px; background: #d2992233; color: #d29922; white-space: nowrap; }
+.agentbox .row.between { justify-content: space-between; align-items: center; }

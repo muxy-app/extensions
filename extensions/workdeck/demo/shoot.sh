@@ -7,7 +7,7 @@ OUT="$ROOT/assets/screenshots"
 CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 PORT=8765
 mkdir -p "$OUT"
-python3 -m http.server "$PORT" --directory "$ROOT" >/dev/null 2>&1 &
+python3 -m http.server "$PORT" --bind 127.0.0.1 --directory "$ROOT" >/dev/null 2>&1 &
 SERVER=$!
 trap 'kill $SERVER 2>/dev/null' EXIT
 sleep 1
@@ -37,4 +37,6 @@ shot 05-branch-cleanup   "right=tab/cleanup.html&tabs=npm%20run%20dev,Checkout%2
 shot 06-agent-board      "right=tab/board.html&rscenario=board-alert&tabs=npm%20run%20dev,Checkout%20flow,Agent%20control%20room"
 shot 07-new-issue-linear "right=tab/board.html&modal=modal/create.html&mscenario=modal-linear&tabs=npm%20run%20dev,Checkout%20flow,Agent%20control%20room" 150000
 shot 08-chat-to-issue    "right=tab/board.html&modal=modal/create.html&mscenario=modal-chat&tabs=npm%20run%20dev,Checkout%20flow,Agent%20control%20room" 150000
+shot 11-issue-agent      "right=tab/issues.html&rscenario=issues-agent&tabs=npm%20run%20dev,Checkout%20flow,Issues"
+shot 10-notes            "right=notes/notes.html&tabs=npm%20run%20dev,Checkout%20flow,Notes"
 shot 09-chat-draft       "right=tab/board.html&modal=modal/create.html&mscenario=modal-draft&tabs=npm%20run%20dev,Checkout%20flow,Agent%20control%20room" 150000
