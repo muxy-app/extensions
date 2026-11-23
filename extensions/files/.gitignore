@@ -3,3 +3,4 @@ node_modules/
 dist/
 *.log
 bench-dist/
+src/shared/icon-themes/material.generated.json

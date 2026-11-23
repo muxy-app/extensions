@@ -6,6 +6,7 @@ import { resolve } from "node:path";
 const ENTRIES = {
   files: resolve(__dirname, "panel/index.html"),
   editor: resolve(__dirname, "panel/editor.html"),
+  import: resolve(__dirname, "panel/import.html"),
 };
 
 export default defineConfig({

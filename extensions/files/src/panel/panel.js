@@ -15,19 +15,21 @@ import {
   split_name,
   strip_slash,
 } from "@/shared/paths";
-import { material_icon, stroke_icon } from "@/shared/icons";
+import { stroke_icon } from "@/shared/icons";
+import {
+  STROKE,
+  active_theme_id,
+  list_themes,
+  load_theme,
+  remove_themes,
+  set_active_theme,
+  watch_active_theme,
+  watch_revision,
+} from "@/shared/icon-themes/index";
+import { IconResolver } from "@/shared/icon-themes/resolve";
 import { ACTIVE_KEY, announce_move, keep_editor, open_file, open_file_beside, project_root } from "@/shared/editors";
 import { alert_error, confirm_action, copy_text, error_message, open_externally, reveal_in_finder, toast } from "@/shared/actions";
-import {
-  load_icon_theme,
-  read_json,
-  remove_key,
-  save_icon_theme,
-  watch_icon_theme,
-  watch_key,
-  write_json,
-  write_string,
-} from "@/shared/prefs";
+import { read_json, remove_key, watch_key, write_json, write_string } from "@/shared/prefs";
 
 const ROW_HEIGHT = 24;
 const MEMORY_PREFIX = "muxy.files.tree:";
@@ -90,7 +92,11 @@ export class FilesPanel {
 
     this.filter = false;
     this.filterCollapsed = new Set();
-    this.iconTheme = load_icon_theme();
+    this.iconTheme = active_theme_id();
+    this.iconResolver = null;
+    this.iconUris = new Map();
+    this.iconVersion = 0;
+    this.iconToken = 0;
 
     this.editing = null;
     this.drag = null;
@@ -160,18 +166,20 @@ export class FilesPanel {
       if ((payload?.panelID ?? payload?.panelId ?? payload?.id) === "files") requestAnimationFrame(() => this.focusTree());
     });
     sub("command.files-toggle-dirty-filter", () => void this.toggleFilter());
-    sub("command.files-toggle-icon-theme", () => save_icon_theme(this.iconTheme === "material" ? "stroke" : "material"));
+    sub("command.files-select-icon-theme", () => void this.openThemeMenu());
     sub("command.files-collapse-all", () => this.collapseAll());
     this.disposers.push(
       muxy.onFocus?.((focused) => focused && this.focusTree()) ?? (() => {}),
-      watch_icon_theme((theme) => {
-        this.iconTheme = theme;
-        this.list.invalidate();
-        this.list.render();
-      }),
+      watch_active_theme((id) => void this.applyIconTheme(id)),
+      watch_revision(() => void this.applyIconTheme(active_theme_id())),
+      muxy.onThemeChange?.(() => {
+        this.iconResolver?.setScheme(this.colorScheme());
+        this.refreshIcons();
+      }) ?? (() => {}),
       watch_key(ACTIVE_KEY, () => this.onActiveEditor()),
     );
 
+    void this.applyIconTheme(this.iconTheme);
     void this.reload();
   }
 
@@ -456,7 +464,7 @@ export class FilesPanel {
     const git = this.git.statusOf(entry) ?? "";
     return `${entry.depth}${entry.dir ? (this.isOpen(entry) ? "o" : "c") : "f"}${this.selection.has(entry.path) ? "s" : ""}${
       this.cursor === entry.path ? "k" : ""
-    }${this.drop === entry.path ? "d" : ""}${this.editing?.path === entry.path ? "e" : ""}${git}${this.iconTheme[0]}`;
+    }${this.drop === entry.path ? "d" : ""}${this.editing?.path === entry.path ? "e" : ""}${git}|${this.iconVersion}`;
   }
 
   createRow() {
@@ -495,25 +503,163 @@ export class FilesPanel {
     else row.removeAttribute("aria-expanded");
     row.draggable = !entry.draft;
 
-    const iconKey = `${this.iconTheme}:${entry.dir ? (open ? "o" : "d") : entry.name}`;
+    const iconKey = `${this.iconVersion}:${entry.dir ? (open ? "o" : "d") : "f"}:${entry.path}`;
     if (row._iconKey !== iconKey) {
       row._iconKey = iconKey;
-      if (this.iconTheme === "material") {
-        let img = row._icon.firstElementChild;
-        if (!(img instanceof HTMLImageElement)) {
-          img = h("img", { alt: "", width: "14", height: "14", draggable: "false" });
-          row._icon.replaceChildren(img);
-        }
-        img.src = material_icon(entry.name, entry.dir);
-      } else {
-        row._icon.innerHTML = stroke_icon(entry.name, entry.dir ? (open ? "open" : "folder") : "file");
-      }
+      this.renderIcon(row._icon, entry, open);
     }
     if (row._name.textContent !== entry.name) row._name.textContent = entry.name;
     row.title = entry.draft ? "" : entry.path.replace(/\/$/, "");
     const badge = !entry.dir && git ? GIT_BADGE[git] : "";
     if (row._badge.textContent !== badge) row._badge.textContent = badge;
     row._badge.title = git ? GIT_LABEL[git] : "";
+  }
+
+  // ---- File icon themes ----------------------------------------------------------
+
+  colorScheme() {
+    return muxy.theme?.colorScheme === "light" ? "light" : "dark";
+  }
+
+  refreshIcons() {
+    this.iconUris.clear();
+    this.iconVersion += 1;
+    this.list.invalidate();
+    this.list.render();
+  }
+
+  /** Loads a theme and swaps every visible icon once it's ready (stroke icons meanwhile). */
+  async applyIconTheme(id) {
+    const token = ++this.iconToken;
+    this.iconTheme = id;
+    let theme = null;
+    try {
+      theme = await load_theme(id);
+    } catch (err) {
+      toast(`Couldn’t load the icon theme: ${error_message(err)}`, "error");
+    }
+    if (token !== this.iconToken) return;
+    if (!theme && id !== STROKE) {
+      // Removed or unreadable (e.g. deleted from another window): fall back.
+      set_active_theme(STROKE);
+      return;
+    }
+    this.iconResolver = theme ? new IconResolver(theme, this.colorScheme()) : null;
+    this.scroller.classList.toggle("hide-twisties", Boolean(theme?.hidesExplorerArrows));
+    this.refreshIcons();
+  }
+
+  renderIcon(host, entry, open) {
+    const icon = this.iconResolver?.icon(entry.path, entry.dir, open);
+    host.dataset.icon = icon?.id ?? "";
+    if (icon && (icon.svg || icon.uri)) {
+      let img = host.firstElementChild;
+      if (!(img instanceof HTMLImageElement)) {
+        img = h("img", { alt: "", width: "14", height: "14", draggable: "false" });
+        host.replaceChildren(img);
+      }
+      let uri = this.iconUris.get(icon.id);
+      if (uri === undefined) {
+        uri = icon.uri ?? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(icon.svg)}`;
+        this.iconUris.set(icon.id, uri);
+      }
+      if (img.getAttribute("src") !== uri) img.src = uri;
+    } else if (icon?.font) {
+      const font = this.iconResolver.theme.fonts[icon.font];
+      const glyph = h("span", { class: "row-glyph" }, icon.char);
+      glyph.style.fontFamily = `"${font.family}"`;
+      if (icon.color) glyph.style.color = icon.color;
+      const size = icon.size ?? font.size;
+      if (size) glyph.style.fontSize = size;
+      host.replaceChildren(glyph);
+    } else {
+      host.innerHTML = stroke_icon(entry.name, entry.dir ? (open ? "open" : "folder") : "file");
+    }
+  }
+
+  async openThemeMenu() {
+    const { builtin, imported, error } = await list_themes();
+    const current = this.iconTheme;
+    const title = (id, label) => (id === current ? `✓ ${label}` : label);
+    const describe = (meta) =>
+      `${meta.pack.displayName}${meta.pack.version ? ` ${meta.pack.version}` : ""} · ${meta.stats.icons} icons`;
+    const items = [
+      ...builtin.map((t) => ({ id: `theme:${t.id}`, title: title(t.id, t.label), subtitle: t.detail })),
+      ...imported.map((m) => ({ id: `theme:${m.id}`, title: title(m.id, m.label), subtitle: describe(m) })),
+      {
+        id: "import",
+        title: "Import VS Code Icon Theme (.vsix)…",
+        subtitle: "Drop a .vsix file from Finder",
+      },
+    ];
+    if (imported.length > 0) {
+      items.push({ id: "remove", title: "Remove Imported Icon Themes…", subtitle: `${imported.length} imported` });
+    }
+    if (error) toast(`Imported icon themes are unavailable: ${error_message(error)}`, "error");
+
+    let picked = null;
+    try {
+      picked = await muxy.modal.open({ placeholder: "Select file icon theme", items });
+    } catch (err) {
+      return alert_error("Can’t open the icon theme menu", err);
+    }
+    if (!picked) return;
+    if (picked.id.startsWith("theme:")) set_active_theme(picked.id.slice(6));
+    else if (picked.id === "import") await this.importIconTheme();
+    else if (picked.id === "remove") await this.removeIconThemes(imported);
+  }
+
+  async importIconTheme() {
+    let result = null;
+    try {
+      result = await muxy.modal.openWebview({
+        entry: "panel/import.html",
+        width: 560,
+        height: 600,
+        dismissOnOutsideClick: false,
+      });
+    } catch (err) {
+      return alert_error("Can’t open the importer", err);
+    }
+    if (result && typeof result.select === "string") set_active_theme(result.select);
+  }
+
+  async removeIconThemes(imported) {
+    const packs = new Map();
+    for (const meta of imported) {
+      if (!packs.has(meta.pack.id)) packs.set(meta.pack.id, { pack: meta.pack, themes: [] });
+      packs.get(meta.pack.id).themes.push(meta);
+    }
+    const items = [];
+    for (const { pack, themes } of packs.values()) {
+      if (themes.length > 1) {
+        items.push({
+          id: `pack:${pack.id}`,
+          title: `Remove ${pack.displayName} (all ${themes.length} themes)`,
+          subtitle: themes.map((t) => t.label).join(", "),
+        });
+      }
+      for (const t of themes) items.push({ id: `one:${t.id}`, title: `Remove ${t.label}`, subtitle: `${pack.displayName} ${pack.version}` });
+    }
+    const picked = await muxy.modal.open({ placeholder: "Remove an imported icon theme", items }).catch(() => null);
+    if (!picked) return;
+    const ids = picked.id.startsWith("pack:")
+      ? packs.get(picked.id.slice(5)).themes.map((t) => t.id)
+      : [picked.id.slice(4)];
+    const names = imported.filter((m) => ids.includes(m.id)).map((m) => m.label);
+    const ok = await confirm_action({
+      title: ids.length > 1 ? `Remove ${ids.length} icon themes?` : `Remove “${names[0]}”?`,
+      message: `${names.join(", ")} will be deleted from Files. You can import the .vsix again later.`,
+      confirmLabel: "Remove",
+      critical: true,
+    });
+    if (!ok) return;
+    try {
+      await remove_themes(ids);
+      toast(ids.length > 1 ? `Removed ${ids.length} icon themes` : `Removed “${names[0]}”`);
+    } catch (err) {
+      await alert_error("Couldn’t remove the icon theme", err);
+    }
   }
 
   syncActiveDescendant() {
