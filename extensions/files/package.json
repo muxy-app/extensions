@@ -1,6 +1,6 @@
 {
   "name": "files",
-  "version": "2.0.9",
+  "version": "2.1.0",
   "scripts": {
     "dev": "vite",
     "build": "npm run gen-icons && vite build && node scripts/copy-build-assets.mjs",

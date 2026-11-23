@@ -20,6 +20,33 @@ With** as before. The manifest keeps its legacy `patterns: ["*"]`, opener ID,
 and tab type; the new `fileTypes` list is additional metadata that older Muxy
 versions ignore. The editor continues using the same APIs and tab data.
 
+## File icon themes
+
+The palette button in the panel header, or **Files: Select File Icon Theme…**,
+opens a menu of themes:
+
+- **Minimal**: monochrome outline icons.
+- **Material Icon Theme**: the full theme, compiled at build time from the
+  `material-icon-theme` package, with per-file, per-folder, open-folder, and
+  light-mode icons.
+- Imported VS Code file icon themes. **Import VS Code Icon Theme (.vsix)…**
+  takes a `.vsix` dropped from Finder (Muxy's web views have no file chooser)
+  and reads it in the page, with no shell commands or new permissions. Every
+  theme in the package is validated and previewed before it's saved to
+  IndexedDB. Imports never run extension code.
+
+The engine is in `src/shared/icon-themes/`:
+
+| File | What it does |
+| --- | --- |
+| `zip.js` | Reads `.vsix` archives with `DecompressionStream`, with size limits |
+| `compile.js` | Validates a theme and inlines its icons (SVG, raster images, font glyphs); unusable icons and mappings are dropped and reported |
+| `resolve.js` | VS Code's matching rules: file names, path-qualified names such as `.github/workflows`, longest extension, language IDs, folder and open-folder names, and the `light` section |
+| `store.js` | IndexedDB storage, shared by the panel and the importer |
+
+`npm test` covers the engine. Set `ICON_VSIX_DIR` to a folder of `.vsix` files
+to also check real packages.
+
 ## How it's put together
 
 | Path | What it is |
