@@ -61,17 +61,32 @@ async function repoSlug(path) {
 
 const openUrl = (u) => muxy.app.openExternal(u);
 
-/* Linear's GraphQL API, called with the LINEAR_API_KEY from the user's shell profile. `zsh -i` is needed because
- * the key is exported in ~/.zshrc; the query travels over stdin so the approved shell command text never changes. */
-const LINEAR_SHELL = `zsh -ic 'curl -sS --max-time 25 https://api.linear.app/graphql -H "Authorization: $LINEAR_API_KEY" -H "Content-Type: application/json" --data @-'`;
+/* Linear's GraphQL API. The key comes from the extension's own storage (set in Issues → 트래커 설정); the `muxy` CLI has
+ * no command that reads extension storage, so an agent running in a terminal cannot get at it.
+ * Before: the key was read from the user's shell profile and expanded into curl's argv, where any process of the same
+ *         user could read it with `ps` — including an agent the issue text had talked into looking.
+ * Now: the key travels on stdin's first line and goes to curl through `-H @-`, so it is in neither argv nor the
+ *      environment. With no stored key it falls back to the shell profile, unchanged, so existing setups keep working.
+ * Why: the component reading untrusted issue text must not be able to reach the credential.
+ * Affects: every Linear call. The command text stays constant, so Muxy still asks to approve it once. */
+const LINEAR_SHELL = `IN=$(cat); K=$(printf '%s\\n' "$IN" | head -1); Q=$(printf '%s\\n' "$IN" | tail -n +2)
+if [ -n "$K" ]; then
+  printf 'Authorization: %s' "$K" | curl -sS --max-time 25 https://api.linear.app/graphql -H @- -H 'Content-Type: application/json' --data "$Q"
+else
+  printf '%s' "$Q" | zsh -ic 'curl -sS --max-time 25 https://api.linear.app/graphql -H "Authorization: $LINEAR_API_KEY" -H "Content-Type: application/json" --data @-'
+fi`;
+async function trackerKey() {
+  try { return String((await muxy.storage.get("trackerKeys"))?.linear || ""); } catch { return ""; }
+}
 async function linear(query, variables = {}) {
-  const r = await muxy.exec({ shell: LINEAR_SHELL, stdin: JSON.stringify({ query, variables }), timeoutMs: 40000 });
+  const key = await trackerKey();
+  const r = await muxy.exec({ shell: LINEAR_SHELL, stdin: key + "\n" + JSON.stringify({ query, variables }), timeoutMs: 40000 });
   const i = r.stdout.indexOf("{");
   if (i < 0) throw new Error((r.stderr || tr("Linear 응답이 비어 있어요")).trim().slice(0, 300));
   const body = JSON.parse(r.stdout.slice(i));
   if (body.errors && body.errors.length) {
     const msg = body.errors.map((e) => e.message).join("; ");
-    throw new Error(/authenticat|api key|unauthor/i.test(msg) ? tr("Linear 인증에 실패했어요. 셸에 LINEAR_API_KEY가 설정돼 있는지 확인해 주세요.") : msg);
+    throw new Error(/authenticat|api key|unauthor/i.test(msg) ? tr("Linear 인증에 실패했어요. 트래커 설정의 키 또는 셸의 LINEAR_API_KEY를 확인해 주세요.") : msg);
   }
   return body.data;
 }
