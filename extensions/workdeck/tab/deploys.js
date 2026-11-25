@@ -107,6 +107,17 @@ function prPrompt(kind, pr, d, extra) {
   ].join("\n");
 }
 
+/* Before: all reviews first, then all comments, each oldest first.
+ * Now: reviews and comments in one list, newest first. Why: GitHub itself shows them newest first now.
+ * Affects: the "Reviews · comments" part of the PR detail only. */
+function prTimeline(d) {
+  const rows = [
+    ...(d.reviews || []).filter((r) => r.body || r.state !== "COMMENTED").map((r) => ({ at: r.submittedAt, node: el("div", { class: "cmt" }, el("div", { class: "who" }, `${(r.author || {}).login || ""} · ${r.state} · ${ago(r.submittedAt)}`), r.body ? el("div", { class: "body" }, renderMarkdown(r.body)) : null) })),
+    ...(d.comments || []).map((c) => ({ at: c.createdAt, node: el("div", { class: "cmt" }, el("div", { class: "who" }, `${(c.author || {}).login || ""} · ${ago(c.createdAt)}`), el("div", { class: "body" }, renderMarkdown(c.body))) })),
+  ];
+  return rows.sort((x, y) => Date.parse(y.at || 0) - Date.parse(x.at || 0)).map((r) => r.node);
+}
+
 async function showPr(pr, detail, toAgent) {
   detail.replaceChildren(el("div", { class: "loading" }, tr("불러오는 중…")));
   try {
@@ -147,8 +158,7 @@ async function showPr(pr, detail, toAgent) {
       el("div", { class: "checks" }, ...(d.files || []).slice(0, 60).map((f) => el("div", { class: "check" }, el("span", { class: "state ok" }, "+" + f.additions), el("span", { class: "state fail" }, "−" + f.deletions), el("span", {}, f.path)))),
       el("div", { class: "bar" }, diffBtn), diffBox,
       el("div", { class: "sec-title" }, tr("리뷰 · 댓글")),
-      ...(d.reviews || []).filter((r) => r.body || r.state !== "COMMENTED").map((r) => el("div", { class: "cmt" }, el("div", { class: "who" }, `${(r.author || {}).login || ""} · ${r.state} · ${ago(r.submittedAt)}`), r.body ? el("div", { class: "body" }, renderMarkdown(r.body)) : null)),
-      ...(d.comments || []).map((c) => el("div", { class: "cmt" }, el("div", { class: "who" }, `${(c.author || {}).login || ""} · ${ago(c.createdAt)}`), el("div", { class: "body" }, renderMarkdown(c.body)))),
+      ...prTimeline(d),
       el("div", { class: "sec-title" }, tr("에이전트에게 지시")), prAgent,
       el("div", { class: "sec-title" }, tr("리뷰 제출")),
       el("div", { class: "form" }, comment, msg, el("div", { class: "row" }, submit("--comment", tr("댓글만")), submit("--request-changes", tr("변경 요청"), true), submit("--approve", tr("승인")))),

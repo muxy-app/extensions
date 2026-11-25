@@ -1,7 +1,13 @@
 #alerts { padding: 0 14px; }
 .alert { display: flex; gap: 10px; align-items: center; padding: 8px 12px; margin-top: 10px; border: 1px solid #e0a030; border-radius: 8px; background: color-mix(in srgb, #e0a030 12%, transparent); }
 .alert .grow { flex: 1; min-width: 0; }
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 12px; padding: 12px 14px 24px; overflow: auto; align-content: start; }
+/* Four columns is the baseline; narrower windows step down so a card never gets unreadably thin.
+ * Before: auto-fill with a 420px minimum, so the column count drifted with the window width.
+ * Now: four columns, then three / two / one as the width drops. */
+.grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; padding: 12px 14px 24px; overflow: auto; align-content: start; }
+@media (max-width: 1400px) { .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 1040px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
 .acard { display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--muxy-border); border-radius: 10px; padding: 10px 12px; background: var(--muxy-surface); min-width: 0; }
 .acard.waiting { border-color: #e0a030; box-shadow: 0 0 0 1px #e0a03055; }
 .acard.working { border-color: color-mix(in srgb, #3fb950 55%, var(--muxy-border)); }

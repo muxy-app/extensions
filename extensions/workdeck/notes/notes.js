@@ -118,7 +118,16 @@ function renderNote() {
   if (S.view === "settings") return renderSettings();
   const note = S.cur;
   const detail = $("#detail");
-  if (!note) { detail.replaceChildren(el("div", { class: "empty" }, tr("왼쪽에서 노트를 고르거나 새 노트를 만드세요."))); renderHelper(); return; }
+  if (!note) {
+    /* "새 노트" sets S.panel and calls this, but the panel slot is only built further down, past this return.
+     * Before: with no note open the form had nowhere to attach, so the button looked dead.
+     * Now: the empty state carries the same slot. Affects every panel opened with no note selected. */
+    const slot = el("div", { class: "pp-slot", id: "slot" });
+    detail.replaceChildren(el("div", { class: "empty" }, tr("왼쪽에서 노트를 고르거나 새 노트를 만드세요.")), slot);
+    if (S.panel) slot.append(S.panel());
+    renderHelper();
+    return;
+  }
   const head = el("div", { class: "nhead" },
     el("h2", { title: tr("제목을 눌러 이름 바꾸기"), style: "cursor:pointer", onclick: guard(async () => { const n = await muxy.dialog.prompt({ title: tr("노트 제목"), placeholder: note.title }); if (n && n.trim()) { note.title = n.trim(); await persist(note); renderNote(); refreshList(); } }) }, note.title),
     chip(scopeLabel(note.scope)),

@@ -1,8 +1,9 @@
 .mbody { flex: 1; min-height: 0; overflow: auto; padding: 10px 16px 16px; }
 .mbody .form { margin-top: 0; }
 .top .seg { margin-left: auto; }
-.done { text-align: center; padding: 30px 10px; }
-.done .bar { justify-content: center; }
+.done { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; padding: 30px 10px; }
+.done h2 { margin: 0; }
+.done .bar { justify-content: center; margin-top: 8px; }
 
 .modebar { margin-left: 8px; }
 .pplist.tall { max-height: 360px; }
