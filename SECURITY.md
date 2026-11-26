@@ -54,22 +54,22 @@ The minisign secret key exists only as a GitHub Actions secret
 (`MINISIGN_SECRET_KEY`) used by the publish workflow. It is an **unencrypted
 (password-less) key** — the workflow signs with `minisign -W` — so its protection
 is the Actions secret store alone. The matching public key is committed as
-`minisign.pub` and pinned in the app. The upload to muxy.app is authenticated
-with a separate Bearer token, also a GitHub Actions secret (`MUXY_UPLOAD_TOKEN`).
+`minisign.pub` and pinned in the app. Releases and the `index` branch are written
+with the workflow's own `GITHUB_TOKEN` (`contents: write`); there is no other
+publishing credential.
 
 Required safeguards (the key is the entire root of trust):
 
-- **Protected environment.** Scope `MINISIGN_SECRET_KEY` and `MUXY_UPLOAD_TOKEN`
+- **Protected environment.** Scope `MINISIGN_SECRET_KEY`
   to a GitHub Actions environment with required reviewers and **no fork access**,
-  so no PR-triggered workflow can ever read them. Publish runs only on `main`.
+  so no PR-triggered workflow can ever read it. Publish runs only on `main`.
 - **No untrusted interpolation.** The publish workflow never expands
   attacker-controlled values into shell (extension names are passed via env and
-  matched against a strict allowlist); a CI guard refuses to publish if
-  `minisign.pub` is still the placeholder.
+  matched against a strict allowlist); releases are left unsigned while the
+  secret is unset or `minisign.pub` is still the placeholder.
 - **Rotation.** Rotate on a schedule and immediately on any suspicion of
   exposure. The app pins more than one public key: add the new key to the pin
-  set, sign with both for a transition window (muxy.app stores multiple
-  signatures per artifact), then retire the old key.
+  set, sign with both for a transition window, then retire the old key.
 
 ### Compromise, revocation, and exposure window
 

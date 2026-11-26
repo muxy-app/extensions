@@ -117,8 +117,8 @@ This block is used only for the marketplace listing; the app loader ignores it.
 - **PNG, 16:10 or 16:9 aspect ratio**.
 - 1 to 6 screenshots, each ≤ 3 MB.
 
-The icon and screenshots are uploaded to the marketplace alongside your signed
-extension, each with its own SHA-256.
+The icon and screenshots are attached to your extension's GitHub Release
+alongside the zip.
 
 ## 5. Write a good README
 
@@ -132,13 +132,16 @@ Each extension also needs a `README.md` with:
 
 Push your branch and open a PR. Fill in the PR template. CI runs validation; a
 Muxy maintainer reviews for safety and quality, then merges. On merge, your
-extension is packaged, hashed, signed into the index, and listed.
+extension is packed and published as a GitHub Release tagged
+`<name>@<version>`, and listed in `index.json` on the `index` branch, which the
+app reads.
 
 ## Versioning
 
 Published versions are **immutable**. To change an extension after it is merged,
-bump `manifest.version` — the previous version's bytes and hash never change, so
-already-installed users are never surprised.
+bump `manifest.version` — an existing release is never touched, so the previous
+version's bytes and hash never change and already-installed users are never
+surprised.
 
 ## Updating an existing extension
 
