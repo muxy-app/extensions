@@ -18,6 +18,8 @@ test("pickPane prefers the focused pane of the active worktree", () => {
   assert.equal(pickPane(panes, "y").id, 2);
   assert.equal(pickPane(panes, "x").id, 1);
   assert.equal(pickPane([], "x"), null);
+  assert.equal(pickPane(panes, "z"), null);
+  assert.equal(pickPane(panes, null).id, 2);
 });
 
 test("parseWorktrees reads porcelain output", () => {

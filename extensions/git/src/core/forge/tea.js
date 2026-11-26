@@ -90,7 +90,7 @@ export async function checkout(number) {
 
 export async function checkoutWorktree(number, path) {
   const branch = await prepareBranch(number);
-  await worktreeAdd(path, branch);
+  return worktreeAdd(path, branch);
 }
 
 export async function diff(number) {

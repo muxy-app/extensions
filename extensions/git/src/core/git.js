@@ -26,8 +26,20 @@ const git = (...args) => run(["git", "-c", "core.editor=true", ...args]);
 
 export const repoInfo = (opts) => targetRepoInfo(opts);
 
+const defaultBranches = new Map();
+
+async function cachedDefaultBranch() {
+  const root = getRoot();
+  if (!defaultBranches.has(root)) defaultBranches.set(root, await defaultBranchOf(null));
+  return defaultBranches.get(root);
+}
+
 export async function readStatus() {
-  return parsePorcelain(await run(["git", "status", "--porcelain=v1", "-z", "--branch", "--untracked-files=all"]));
+  const [text, defaultBranch] = await Promise.all([
+    run(["git", "status", "--porcelain=v1", "-z", "--branch", "--untracked-files=all"]),
+    cachedDefaultBranch(),
+  ]);
+  return { ...parsePorcelain(text), defaultBranch };
 }
 
 const PENDING_SCRIPT = [
@@ -69,15 +81,14 @@ export async function discard(paths = [], untrackedPaths = []) {
 }
 
 export async function commit(message, all) {
-  await git("commit", ...(all ? ["--all"] : []), "-m", message);
+  if (all) await stage();
+  await git("commit", "-m", message);
   return { hash: (await tryRun(["git", "rev-parse", "HEAD"])).trim() };
 }
 
-export function amend(message, all) {
-  const args = ["commit", "--amend"];
-  if (all) args.push("--all");
-  args.push(...(message ? ["-m", message] : ["--no-edit"]));
-  return git(...args);
+export async function amend(message, all) {
+  if (all) await stage();
+  return git("commit", "--amend", ...(message ? ["-m", message] : ["--no-edit"]));
 }
 
 export async function undoLastCommit() {
@@ -152,8 +163,13 @@ export async function commitPatch(hash, parents) {
 export const rangePatch = (range) => git("diff", "--no-color", "-M", range);
 
 export async function workingPatches() {
-  const [staged, unstaged] = await Promise.all([git("diff", "--no-color", "-M", "--cached"), git("diff", "--no-color", "-M")]);
-  return { staged, unstaged, truncated: false };
+  const diff = async (...args) => {
+    const res = await exec(["git", "diff", "--no-color", "-M", ...args]);
+    if (res.exitCode !== 0) throw new Error((res.stderr || "git diff failed").trim());
+    return res;
+  };
+  const [staged, unstaged] = await Promise.all([diff("--cached"), diff()]);
+  return { staged: staged.stdout, unstaged: unstaged.stdout, truncated: !!(staged.truncated || unstaged.truncated) };
 }
 
 export const remoteUrl = async () => (await tryRun(["git", "remote", "get-url", "origin"])).trim();
@@ -194,8 +210,18 @@ export async function worktreeList(root) {
   }));
 }
 
-const WORKTREE_ADD = 'p="$1"; case "$p" in "~/"*) p="$HOME/${p#"~/"}";; esac; shift; git worktree add "$p" "$@"';
+const EXPAND_PATH = 'p="$1"; case "$p" in "~/"*) p="$HOME/${p#"~/"}";; esac; shift;';
+const WORKTREE_ADD = `${EXPAND_PATH} git worktree add "$p" "$@" >&2 && cd "$p" && pwd`;
+const PR_WORKTREE_ADD = `${EXPAND_PATH} git worktree add --detach "$p" >&2 || exit 1
+if (cd "$p" && "$@" >&2); then cd "$p" && pwd; exit 0; fi
+git worktree remove --force "$p" >&2
+exit 1`;
 
-export const worktreeAdd = (path, ...args) => run(["sh", "-c", WORKTREE_ADD, "sh", path, ...args]);
+export const worktreeAdd = async (path, ...args) => (await run(["sh", "-c", WORKTREE_ADD, "sh", path, ...args])).trim();
+export const worktreeAddWith = async (path, ...checkout) => (await run(["sh", "-c", PR_WORKTREE_ADD, "sh", path, ...checkout])).trim();
 export const worktreeRemove = (path, otherRoot, force) => run(["git", "worktree", "remove", ...(force ? ["--force"] : []), path], { cwd: otherRoot });
-export const followWorktree = (path) => pin(path);
+
+export async function followWorktree(path) {
+  pin(path);
+  await muxy.git.worktree.switchTo({ identifier: path }).catch(() => undefined);
+}

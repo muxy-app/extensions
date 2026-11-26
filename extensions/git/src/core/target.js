@@ -3,6 +3,7 @@ const KEY = "git-custom.target";
 let current = { cwd: "", root: "", gitDir: "" };
 let pinned = null;
 let lastDir = "";
+let probes = 0;
 
 export const getRoot = () => current.root;
 export const getCwd = () => current.cwd;
@@ -10,7 +11,7 @@ export const lastTerminalDir = () => lastDir;
 
 export function pickPane(panes, activeId) {
   const mine = activeId ? panes.filter((pane) => pane.worktreeID === activeId) : panes;
-  return mine.find((pane) => pane.isFocused) ?? mine[0] ?? panes.find((pane) => pane.isFocused) ?? null;
+  return mine.find((pane) => pane.isFocused) ?? mine[0] ?? null;
 }
 
 export async function terminalDir() {
@@ -47,6 +48,7 @@ async function recall() {
 }
 
 export async function repoInfo({ follow = false } = {}) {
+  const seq = ++probes;
   let dir;
   if (follow) {
     dir = await terminalDir();
@@ -58,13 +60,16 @@ export async function repoInfo({ follow = false } = {}) {
   if (follow && pinned && pinned.forDir === dir) dir = pinned.root;
   else if (follow) pinned = null;
   const info = await probe(dir);
-  current = { cwd: dir, root: info?.root ?? "", gitDir: info?.gitDir ?? "" };
-  if (follow) await remember();
+  if (seq === probes) {
+    current = { cwd: dir, root: info?.root ?? "", gitDir: info?.gitDir ?? "" };
+    if (follow) await remember();
+  }
   if (!info) throw new Error("Not a git repository");
   return { ...info, cwd: dir };
 }
 
 export function pin(root) {
   pinned = { forDir: lastDir, root };
-  current = { ...current, root };
+  current = { ...current, cwd: root, root };
+  void remember();
 }

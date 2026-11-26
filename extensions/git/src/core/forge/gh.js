@@ -1,4 +1,4 @@
-import { exec, run, tryRun, worktreeAdd } from "@/core/git";
+import { exec, run, tryRun, worktreeAddWith } from "@/core/git";
 import { fromGh, rollupChecks, timeline } from "@/core/forge/normalize";
 
 const DETAIL_FIELDS = "number,title,body,author,state,isDraft,url,headRefName,baseRefName,createdAt,updatedAt,mergeable,mergeStateStatus,reviewDecision,additions,deletions,changedFiles,comments,reviews,labels,statusCheckRollup";
@@ -57,11 +57,7 @@ export const create = ({ title, body, baseBranch, draft }) =>
   run(["gh", "pr", "create", "--title", title, "--body", body || "", ...(baseBranch ? ["--base", baseBranch] : []), ...(draft ? ["--draft"] : [])]);
 export const checkout = (number) => run(["gh", "pr", "checkout", String(number)]);
 
-export async function checkoutWorktree(number, path) {
-  const branch = JSON.parse(await run(["gh", "pr", "view", String(number), "--json", "headRefName"])).headRefName;
-  await run(["git", "fetch", "origin", `pull/${number}/head`]);
-  await worktreeAdd(path, "-B", branch, "FETCH_HEAD");
-}
+export const checkoutWorktree = (number, path) => worktreeAddWith(path, "gh", "pr", "checkout", String(number));
 
 export const diff = (number) => run(["gh", "pr", "diff", String(number), "--color", "never"]);
 

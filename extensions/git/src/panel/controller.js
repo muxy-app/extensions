@@ -3,7 +3,7 @@ import { isMissingRepo, statusKey } from "@/core/status";
 import { forgeFor } from "@/core/forge";
 import { alertError, errorMessage } from "@/shared/actions";
 import { isInside } from "@/shared/paths";
-import { lastTerminalDir, terminalDir } from "@/core/target";
+import { getRoot, lastTerminalDir, terminalDir } from "@/core/target";
 import { createStore } from "@/panel/store";
 
 const FETCH_INTERVAL_MS = 5 * 60 * 1000;
@@ -62,7 +62,7 @@ export class Controller {
   }
 
   async follow() {
-    if (this.following) return;
+    if (this.following || document.visibilityState === "hidden") return;
     this.following = true;
     try {
       if ((await terminalDir()) !== lastTerminalDir()) await this.load();
@@ -248,7 +248,7 @@ export class Controller {
       return { ok: false, error };
     } finally {
       this.store.set({ busy: Math.max(0, this.state.busy - 1) });
-      if (this.root) {
+      if (this.root && getRoot() === this.root) {
         await this.refreshStatus();
         void this.refreshHead();
       } else await this.load();

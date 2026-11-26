@@ -49,7 +49,7 @@ async function removeWorktree(repo, branch, dirty) {
     });
     if (!ok) return false;
   }
-  git.followWorktree(target.path);
+  await git.followWorktree(target.path);
   await git.worktreeRemove(repo.root, target.path, dirty);
   if (branch) {
     await git.deleteBranch(branch, true).catch(() => undefined);

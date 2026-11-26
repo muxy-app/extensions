@@ -32,7 +32,6 @@
       "worktrees:read",
       "worktrees:write",
       "notifications:write",
-      "files:read",
       "git:read",
       "git:write"
     ],

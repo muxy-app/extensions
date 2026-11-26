@@ -102,10 +102,9 @@ export async function worktreePr(ctl, pr, anchor, onDone = () => {}) {
       void ctl
         .run(`Could not create a worktree for #${pr.number}`, async () => {
           const forge = await api(ctl);
-          await forge.checkoutWorktree(pr.number, path);
+          const created = await forge.checkoutWorktree(pr.number, path);
           await muxy.worktrees.refresh().catch(() => undefined);
-          const created = (await git.worktreeList(ctl.root)).find((entry) => entry.branch === pr.headBranch);
-          if (created) git.followWorktree(created.path);
+          if (created) await git.followWorktree(created);
         })
         .then((result) => result.ok && onDone()),
   });
