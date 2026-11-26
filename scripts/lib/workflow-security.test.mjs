@@ -14,6 +14,10 @@ const aiReviewWorkflow = fs.readFileSync(
   new URL("../../.github/workflows/ai-review.yml", import.meta.url),
   "utf8",
 );
+const publishWorkflow = fs.readFileSync(
+  new URL("../../.github/workflows/publish.yml", import.meta.url),
+  "utf8",
+);
 
 test("privileged workflows never checkout fork pull request refs", () => {
   for (const workflow of [validateWorkflow, securityWorkflow, aiReviewWorkflow]) {
@@ -30,7 +34,7 @@ test("privileged workflows never checkout fork pull request refs", () => {
 });
 
 test("workflow actions use immutable commit SHAs", () => {
-  for (const workflow of [validateWorkflow, securityWorkflow, aiReviewWorkflow]) {
+  for (const workflow of [validateWorkflow, securityWorkflow, aiReviewWorkflow, publishWorkflow]) {
     const actionReferences = [...workflow.matchAll(/uses:\s+actions\/[^@\s]+@([^\s]+)/g)];
     assert.ok(actionReferences.length > 0);
     for (const match of actionReferences) {
@@ -64,6 +68,24 @@ test("privileged jobs do not pass untrusted values through GITHUB_OUTPUT", () =>
   assert.doesNotMatch(privilegedValidateJob, /GITHUB_OUTPUT/);
   assert.doesNotMatch(securityWorkflow, /GITHUB_OUTPUT/);
   assert.doesNotMatch(aiReviewWorkflow, /GITHUB_OUTPUT/);
+});
+
+test("publish: only contents: write, and the token never reaches the extension builds", () => {
+  assert.match(publishWorkflow.split("concurrency:")[0], /^permissions: \{\}$/m);
+  const job = publishWorkflow.split("\njobs:\n")[1];
+  const permissions = job.split("permissions:\n")[1].split("\n    steps:")[0];
+  assert.equal(permissions.trim(), "contents: write");
+  assert.match(job, /persist-credentials: false/);
+  const steps = job.split("\n      - name: ");
+  for (const name of ["Build changed extensions", "Validate changed extensions"]) {
+    const step = steps.find((chunk) => chunk.startsWith(name));
+    assert.ok(step, name);
+    assert.doesNotMatch(step, /TOKEN|secrets\./, name);
+  }
+  const release = steps.find((chunk) => chunk.startsWith("Pack, sign, release, and announce"));
+  assert.ok(release);
+  assert.match(release, /MUXY_UPLOAD_TOKEN: \$\{\{ secrets\.MUXY_UPLOAD_TOKEN \}\}/);
+  assert.equal(publishWorkflow.split("\n").filter((line) => line.includes("MUXY_UPLOAD_TOKEN")).length, 1);
 });
 
 function aiReviewJob(name) {
