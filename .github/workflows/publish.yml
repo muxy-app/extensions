@@ -5,15 +5,18 @@ on:
     branches: [main]
     paths:
       - "extensions/**"
+      - "official.json"
+  # Refresh download counts in the index once a day.
+  schedule:
+    - cron: "17 3 * * *"
   workflow_dispatch:
     inputs:
       extensions:
-        description: "Space-separated extension names to (re)publish. Empty = none."
+        description: "Space-separated extension names to release. Empty = only regenerate the index."
         required: false
         default: ""
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
   group: publish
@@ -21,16 +24,21 @@ concurrency:
 
 jobs:
   publish:
-    name: Pack, sign, and upload changed extensions
+    name: Release changed extensions and update the index
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
+      # The extension builds below run third-party build tooling, so the token
+      # is not persisted in .git/config; only the release and index steps get it.
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "20"
           cache: "npm"
@@ -38,31 +46,17 @@ jobs:
       - name: Install tooling
         run: npm ci
 
-      - name: Check publishing is configured
-        id: configured
-        env:
-          HAS_SIGNING_KEY: ${{ secrets.MINISIGN_SECRET_KEY != '' }}
-        run: |
-          if [ ! -f minisign.pub ] || grep -q "PLACEHOLDER" minisign.pub || grep -q "REPLACE ME" minisign.pub; then
-            echo "::notice::minisign.pub is missing or still the placeholder; skipping publish. Commit the real public key to enable."
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-          elif [ "$HAS_SIGNING_KEY" != "true" ]; then
-            echo "::notice::MINISIGN_SECRET_KEY secret is not set; skipping publish."
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "ready=true" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Determine changed extensions
         id: changed
-        if: steps.configured.outputs.ready == 'true'
+        if: github.event_name != 'schedule'
         env:
+          EVENT_NAME: ${{ github.event_name }}
           DISPATCH_INPUT: ${{ github.event.inputs.extensions }}
           BEFORE_SHA: ${{ github.event.before }}
           AFTER_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          if [ -n "$DISPATCH_INPUT" ]; then
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             raw="$DISPATCH_INPUT"
           else
             before="$BEFORE_SHA"
@@ -108,16 +102,26 @@ jobs:
 
       - name: Install minisign
         if: steps.changed.outputs.names != ''
-        run: sudo apt-get update && sudo apt-get install -y minisign
+        env:
+          HAS_SIGNING_KEY: ${{ secrets.MINISIGN_SECRET_KEY != '' }}
+        run: |
+          if [ "$HAS_SIGNING_KEY" = "true" ]; then
+            sudo apt-get update && sudo apt-get install -y minisign
+          fi
 
-      - name: Pack, sign, upload, and announce
+      - name: Pack, sign, release, and announce
         if: steps.changed.outputs.names != ''
         env:
           NAMES: ${{ steps.changed.outputs.names }}
-          MUXY_UPLOAD_URL: https://muxy.app/api/extensions/upload
-          MUXY_UPLOAD_TOKEN: ${{ secrets.MUXY_UPLOAD_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
           MINISIGN_SECRET_KEY: ${{ secrets.MINISIGN_SECRET_KEY }}
-          # Optional: when set, each successful upload posts a one-line release
-          # note to Discord. Unset = no announcement (publish still succeeds).
+          # Optional: when set, each new release posts a one-line note with the
+          # release link to Discord. Unset = no announcement.
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: node scripts/publish.mjs $NAMES
+
+      - name: Update the index branch
+        if: ${{ !cancelled() }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/index.mjs
