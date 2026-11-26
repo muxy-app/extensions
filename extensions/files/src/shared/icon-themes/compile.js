@@ -11,7 +11,7 @@
 // Format reference: https://code.visualstudio.com/api/extension-guides/file-icon-theme
 
 import { parse as parse_jsonc, printParseErrorCode } from "jsonc-parser";
-import { normalize_zip_path } from "@/shared/icon-themes/zip";
+import { normalize_zip_path } from "./zip.js";
 
 export const THEME_FORMAT = 1;
 

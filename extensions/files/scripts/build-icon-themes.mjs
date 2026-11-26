@@ -1,12 +1,12 @@
 // Compiles the bundled Material Icon Theme (the npm package has the same layout
 // as its .vsix) with the same compiler used for imported themes, so the
 // built-in theme gets every file, folder, and light-mode mapping.
-// Run with the "@/" alias hook: npm run gen-icons.
+// Run with: npm run gen-icons.
 
 import { readFileSync, statSync, writeFileSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { compile_package } from "@/shared/icon-themes/compile";
+import { compile_package } from "../src/shared/icon-themes/compile.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const pkgRoot = resolve(here, "..", "node_modules", "material-icon-theme");
