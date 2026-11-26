@@ -2,12 +2,12 @@
   "name": "files",
   "version": "2.1.0",
   "scripts": {
-    "dev": "vite",
+    "dev": "npm run gen-icons && vite",
     "build": "npm run gen-icons && vite build && node scripts/copy-build-assets.mjs",
     "test": "node --import ./tests/support/alias.mjs --test \"tests/*.test.mjs\"",
     "gen-icons": "node --import ./tests/support/alias.mjs scripts/build-icon-themes.mjs",
     "update-skill": "node scripts/update-skill.mjs",
-    "bench:build": "vite build -c dev/vite.bench.config.js && cp dev/mock-muxy.js dev/bench.js bench-dist/dev/"
+    "bench:build": "npm run gen-icons && vite build -c dev/vite.bench.config.js && cp dev/mock-muxy.js dev/bench.js bench-dist/dev/"
   },
   "private": true,
   "type": "module",
@@ -494,6 +494,22 @@
         "screenshots/screenshot-1.png",
         "screenshots/screenshot-2.png"
       ]
-    }
+    },
+    "settings": [
+      {
+        "key": "openInSplit",
+        "title": "Open files in a split pane",
+        "description": "Open files from the file tree in a new pane next to the active pane instead of a tab in it.",
+        "type": "bool",
+        "defaultValue": false
+      },
+      {
+        "key": "splitBelow",
+        "title": "Split below instead of right",
+        "description": "Only applies when \"Open files in a split pane\" is on. Off opens to the right of the active pane, on opens below it.",
+        "type": "bool",
+        "defaultValue": false
+      }
+    ]
   }
 }
