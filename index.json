@@ -1,4 +1,1200 @@
 {
   "schema": 1,
-  "extensions": []
+  "extensions": [
+    {
+      "name": "ai-session-history",
+      "description": "Browse and resume AI CLI sessions for the active worktree, grouped by provider",
+      "version": "0.3.2",
+      "permissions": [
+        "panels:write",
+        "tabs:write",
+        "commands:exec",
+        "commands:run-script",
+        "projects:read",
+        "worktrees:read",
+        "notifications:write",
+        "storage:read",
+        "storage:write"
+      ],
+      "author": {
+        "name": "Appelgriebsch",
+        "github": "appelgriebsch"
+      },
+      "homepage": null,
+      "repository": "https://github.com/muxy-app/extensions",
+      "categories": [
+        "productivity",
+        "ai"
+      ],
+      "official": false,
+      "downloads": 0,
+      "published_at": "2026-11-26T20:23:52Z",
+      "sha256": "97885d9d252bd24d0d9a93fd65e0f58d42c9afbfe0ed517daf50520dbc5cec4f",
+      "size": 1656662,
+      "download_url": "https://github.com/muxy-app/extensions/releases/download/ai-session-history%400.3.2/ai-session-history-0.3.2.zip",
+      "icon_url": "https://github.com/muxy-app/extensions/releases/download/ai-session-history%400.3.2/icon.svg",
+      "screenshot_urls": [
+        "https://github.com/muxy-app/extensions/releases/download/ai-session-history%400.3.2/screenshot-1.png"
+      ]
+    },
+    {
+      "name": "ai-usage",
+      "description": "AI usage status bar and popover with live collectors for common AI coding providers.",
+      "version": "0.3.5",
+      "permissions": [
+        "commands:exec",
+        "panels:write"
+      ],
+      "author": {
+        "name": "Wonjin",
+        "github": "wjchoi87"
+      },
+      "homepage": null,
+      "repository": null,
+      "categories": [
+        "productivity",
+        "ai"
+      ],
+      "official": false,
+      "downloads": 0,
+      "published_at": "2026-11-26T20:23:56Z",
+      "sha256": "bf1f4ba93d943d939a796d26119d0847c2e9f9148b2fef37e685b30d382500e3",
+      "size": 429709,
+      "download_url": "https://github.com/muxy-app/extensions/releases/download/ai-usage%400.3.5/ai-usage-0.3.5.zip",
+      "icon_url": "https://github.com/muxy-app/extensions/releases/download/ai-usage%400.3.5/icon.svg",
+      "screenshot_urls": [
+        "https://github.com/muxy-app/extensions/releases/download/ai-usage%400.3.5/screenshot-1.png"
+      ]
+    },
+    {
+      "name": "beads",
+      "description": null,
+      "version": "0.2.2",
+      "permissions": [
+        "panels:write",
+        "tabs:write",
+        "commands:exec",
+        "projects:read",
+        "worktrees:read",
+        "files:read",
+        "storage:read",
+        "storage:write"
+      ],
+      "author": {
+        "name": "Moiz Haider",
+        "github": "RanaMoizHaider"
+      },
+      "homepage": null,
+      "repository": null,
+      "categories": [
+        "productivity",
+        "project-management"
+      ],
+      "official": false,
+      "downloads": 0,
+      "published_at": "2026-11-26T20:24:00Z",
+      "sha256": "d09f489b4dba17436768d43d8ad0ad14806fbb3d4b1e2a63671a17a27c63691b",
+      "size": 425624,
+      "download_url": "https://github.com/muxy-app/extensions/releases/download/beads%400.2.2/beads-0.2.2.zip",
+      "icon_url": "https://github.com/muxy-app/extensions/releases/download/beads%400.2.2/icon.svg",
+      "screenshot_urls": [
+        "https://github.com/muxy-app/extensions/releases/download/beads%400.2.2/screenshot-1.png"
+      ]
+    },
+    {
+      "name": "cheatsheets",
+      "description": "tldr pages and man pages, rendered — palette lookup, popover browser, copy-ready examples. Works with tlrc or nothing installed.",
+      "version": "1.0.0",
+      "permissions": [
+        "commands:exec",
+        "panels:write",
+        "tabs:write",
+        "storage:read",
+        "storage:write"
+      ],
+      "author": {
+        "name": "Nick Fay",
+        "github": "n14395"
+      },
+      "homepage": null,
+      "repository": null,
+      "categories": [
+        "documentation",
+        "developer-tools"
+      ],
+      "official": false,
+      "downloads": 0,
+      "published_at": "2026-11-26T20:24:04Z",
+      "sha256": "4ad3442de94d2b96355b01a4cd69a2ea4c8caccf9d09be6ea98607f2fcce1a8b",
+      "size": 1508884,
+      "download_url": "https://github.com/muxy-app/extensions/releases/download/cheatsheets%401.0.0/cheatsheets-1.0.0.zip",
+      "icon_url": "https://github.com/muxy-app/extensions/releases/download/cheatsheets%401.0.0/icon.svg",
+      "screenshot_urls": [
+        "https://github.com/muxy-app/extensions/releases/download/cheatsheets%401.0.0/screenshot-1.png",
+        "https://github.com/muxy-app/extensions/releases/download/cheatsheets%401.0.0/screenshot-2.png",
+        "https://github.com/muxy-app/extensions/releases/download/cheatsheets%401.0.0/screenshot-3.png"
+      ]
+    },
+    {
+      "name": "ci-dashboard",
+      "description": "A unified CI/CD dashboard for the current project — pipelines, jobs, failure excerpts, environments, from GitHub Actions, GitLab CI, or any CCTray build server.",
+      "version": "0.1.1",
+      "permissions": [
+        "commands:exec",
+        "projects:read",
+        "panels:write",
+        "git:read",
+        "files:read",
+        "storage:read",
+        "storage:write"
+      ],
+      "author": {
+        "name": "Eric Marchand",
+        "github": "phimage"
+      },
+      "homepage": null,
+      "repository": "https://github.com/muxy-app/extensions",
+      "categories": [
+        "developer-tools",
+        "productivity"
+      ],
+      "official": false,
+      "downloads": 0,
+      "published_at": "2026-11-26T20:24:08Z",
+      "sha256": "2c61ee171d5a56d27ce471bfc36935ea1901ea8549295a6d34eca89f621ca398",
+      "size": 455064,
+      "download_url": "https://github.com/muxy-app/extensions/releases/download/ci-dashboard%400.1.1/ci-dashboard-0.1.1.zip",
+      "icon_url": "https://github.com/muxy-app/extensions/releases/download/ci-dashboard%400.1.1/icon.svg",
+      "screenshot_urls": [
+        "https://github.com/muxy-app/extensions/releases/download/ci-dashboard%400.1.1/screenshot-1.png",
+        "https://github.com/muxy-app/extensions/releases/download/ci-dashboard%400.1.1/screenshot-2.png",
+        "https://github.com/muxy-app/extensions/releases/download/ci-dashboard%400.1.1/screenshot-3.png"
+      ]
+    },
+    {
+      "name": "commands",
+      "description": "Pinned command launcher — run claude, codex and your own commands in a new terminal from the topbar.",
+      "version": "0.1.1",
+      "permissions": [
+        "tabs:write",
+        "panels:write"
+      ],
+      "author": {
+        "name": "long2ice",
+        "github": "long2ice"
+      },
+      "homepage": null,
+      "repository": "https://github.com/muxy-app/extensions",
+      "categories": [
+        "productivity",
+        "terminal"
+      ],
+      "official": false,
+      "downloads": 0,
+      "published_at": "2026-11-26T20:24:13Z",
+      "sha256": "7189e60757e646da850afd930ed0ceb174841b14bd8994fdaf56314e42f8b320",
+      "size": 214995,
+      "download_url": "https://github.com/muxy-app/extensions/releases/download/commands%400.1.1/commands-0.1.1.zip",
+      "icon_url": "https://github.com/muxy-app/extensions/releases/download/commands%400.1.1/icon.svg",
+      "screenshot_urls": [
+        "https://github.com/muxy-app/extensions/releases/download/commands%400.1.1/screenshot-1.png"
+      ]
+    },
+    {
+      "name": "database",
+      "description": "SQL database client — SQLite, MySQL, MariaDB, PostgreSQL",
+      "version": "0.2.2",
+      "permissions": [
+        "commands:exec",
+        "tabs:read",
+        "tabs:write",
+        "panels:write",
+        "storage:read",
+        "storage:write"
+      ],
+      "author": {
+        "name": "Saeed Vaziry",
+        "github": "saeedvaziry"
+      },
+      "homepage": null,
+      "repository": "https://github.com/muxy-app/extensions",
+      "categories": [
+        "database",
+        "sql"
+      ],
+      "official": true,
+      "downloads": 0,
+      "published_at": "2026-11-26T20:24:16Z",
+      "sha256": "91a427fef5baa46086995d5559e77cd1e31bce9563e6cdd1ac754d04ed8cd2b8",
+      "size": 1103672,
+      "download_url": "https://github.com/muxy-app/extensions/releases/download/database%400.2.2/database-0.2.2.zip",
+      "icon_url": "https://github.com/muxy-app/extensions/releases/download/database%400.2.2/icon.svg",
+      "screenshot_urls": [
+        "https://github.com/muxy-app/extensions/releases/download/database%400.2.2/screenshot-1.png"
+      ]
+    },
+    {
+      "name": "docker-extension",
+      "description": "Manage Docker containers, Compose projects, images, volumes, and networks, and build your project's Dockerfiles",
+      "version": "0.2.0",
+      "permissions": [
+        "commands:exec",
+        "files:read",
+        "files:write",
+        "projects:read",
+        "tabs:write",
+        "panels:write",
+        "storage:read",
+        "storage:write"
+      ],
+      "author": {
+        "name": "metecan",
+        "github": "metecan"
+      },
+      "homepage": null,
+      "repository": "https://github.com/metecan/docker-extension",
+      "categories": [
+        "docker",
+        "containers",
+        "devops",
+        "dockerfile"
+      ],
+      "official": false,
+      "downloads": 0,
+      "published_at": "2026-11-26T20:24:21Z",
+      "sha256": "d135761f8b6b4c8c45f89c87c9ca3185a6de7d3524d59f00860896f3db4c2c45",
+      "size": 1078107,
+      "download_url": "https://github.com/muxy-app/extensions/releases/download/docker-extension%400.2.0/docker-extension-0.2.0.zip",
+      "icon_url": "https://github.com/muxy-app/extensions/releases/download/docker-extension%400.2.0/icon.svg",
+      "screenshot_urls": [
+        "https://github.com/muxy-app/extensions/releases/download/docker-extension%400.2.0/screenshot-1.png",
+        "https://github.com/muxy-app/extensions/releases/download/docker-extension%400.2.0/screenshot-2.png"
+      ]
+    },
+    {
+      "name": "file-tree",
+      "description": "A lightweight file tree panel for the active Muxy worktree.",
+      "version": "0.1.1",
+      "permissions": [
+        "files:read",
+        "tabs:write",
+        "projects:read",
+        "worktrees:read",
+        "panels:write",
+        "panes:read",
+        "panes:write"
+      ],
+      "author": {
+        "name": "Theoz",
+        "github": "Theoz001"
+      },
+      "homepage": "https://github.com/Theoz001/file-tree",
+      "repository": "https://github.com/Theoz001/file-tree",
+      "categories": [
+        "productivity",
+        "files"
+      ],
+      "official": false,
+      "downloads": 0,
+      "published_at": "2026-11-26T20:24:25Z",
+      "sha256": "6a9c6d38504e846c0450ee8a3c5e9477f42e5a9ba140839dc6968c3a16066899",
+      "size": 180087,
+      "download_url": "https://github.com/muxy-app/extensions/releases/download/file-tree%400.1.1/file-tree-0.1.1.zip",
+      "icon_url": "https://github.com/muxy-app/extensions/releases/download/file-tree%400.1.1/icon.svg",
+      "screenshot_urls": [
+        "https://github.com/muxy-app/extensions/releases/download/file-tree%400.1.1/screenshot-1.png"
+      ]
+    },
+    {
+      "name": "files",
+      "description": "File explorer for Muxy",
+      "version": "2.1.0",
+      "permissions": [
+        "files:read",
+        "files:write",
+        "panels:write",
+        "tabs:read",
+        "tabs:write",
+        "commands:exec",
+        "commands:run-script",
+        "git:read"
+      ],
+      "author": {
+        "name": "Saeed Vaziry",
+        "github": "saeedvaziry"
+      },
+      "homepage": null,
+      "repository": "https://github.com/muxy-app/extensions",
+      "categories": [
+        "files",
+        "explorer"
+      ],
+      "official": true,
+      "downloads": 0,
+      "published_at": "2026-11-26T20:24:29Z",
+      "sha256": "f9580702c87eaa4e0d25cba2c37b9d0ac5c71ba1112f868dba2856d797181918",
+      "size": 28108543,
+      "download_url": "https://github.com/muxy-app/extensions/releases/download/files%402.1.0/files-2.1.0.zip",
+      "icon_url": "https://github.com/muxy-app/extensions/releases/download/files%402.1.0/icon.svg",
+      "screenshot_urls": [
+        "https://github.com/muxy-app/extensions/releases/download/files%402.1.0/screenshot-1.png",
+        "https://github.com/muxy-app/extensions/releases/download/files%402.1.0/screenshot-2.png"
+      ]
+    },
+    {
+      "name": "focus-timer",
+      "description": "Pomodoro plus automatic per-project time tracking — your focused time vs. your agents', all local, no accounts.",
+      "version": "1.0.1",
+      "permissions": [
+        "agents:read",
+        "projects:read",
+        "worktrees:read",
+        "notifications:write",
+        "panels:write",
+        "tabs:write",
+        "commands:exec",
+        "storage:read",
+        "storage:write"
+      ],
+      "author": {
+        "name": "Nick Fay",
+        "github": "n14395"
+      },
+      "homepage": null,
+      "repository": null,
+      "categories": [
+        "productivity"
+      ],
+      "official": false,
+      "downloads": 0,
+      "published_at": "2026-11-26T20:24:33Z",
+      "sha256": "748ee1bcfaa3f8dac5f8ad6f6c67a7ac502d6cc83240458db39b993828bd8196",
+      "size": 777605,
+      "download_url": "https://github.com/muxy-app/extensions/releases/download/focus-timer%401.0.1/focus-timer-1.0.1.zip",
+      "icon_url": "https://github.com/muxy-app/extensions/releases/download/focus-timer%401.0.1/icon.svg",
+      "screenshot_urls": [
+        "https://github.com/muxy-app/extensions/releases/download/focus-timer%401.0.1/screenshot-1.png",
+        "https://github.com/muxy-app/extensions/releases/download/focus-timer%401.0.1/screenshot-2.png",
+        "https://github.com/muxy-app/extensions/releases/download/focus-timer%401.0.1/screenshot-3.png"
+      ]
+    },
+    {
+      "name": "git",
+      "description": "Official Git extension for Muxy — GitHub, Forgejo, and Gitea",
+      "version": "2.1.0",
+      "permissions": [
+        "commands:exec",
+        "panes:read",
+        "storage:read",
+        "storage:write",
+        "commands:run-script",
+        "panels:write",
+        "tabs:write",
+        "worktrees:read",
+        "worktrees:write",
+        "notifications:write",
+        "git:read",
+        "git:write"
+      ],
+      "author": {
+        "name": "Saeed Vaziry",
+        "github": "saeedvaziry"
+      },
+      "homepage": null,
+      "repository": "https://github.com/muxy-app/extensions",
+      "categories": [
+        "git",
+        "source-control"
+      ],
+      "official": true,
+      "downloads": 0,
+      "published_at": "2026-11-26T20:24:41Z",
+      "sha256": "9f1323ed2611dc2afe28b2f66d3ef3c42a78a46d992ac91f252d7cb67b61bdc1",
+      "size": 12074452,
+      "download_url": "https://github.com/muxy-app/extensions/releases/download/git%402.1.0/git-2.1.0.zip",
+      "icon_url": "https://github.com/muxy-app/extensions/releases/download/git%402.1.0/icon.svg",
+      "screenshot_urls": [
+        "https://github.com/muxy-app/extensions/releases/download/git%402.1.0/screenshot-1.png",
+        "https://github.com/muxy-app/extensions/releases/download/git%402.1.0/screenshot-2.png"
+      ]
+    },
+    {
+      "name": "git-workspace",
+      "description": "Git for multi-repo workspaces — browse and manage every repository inside a workspace folder",
+      "version": "1.0.0",
+      "permissions": [
+        "commands:exec",
+        "panels:write",
+        "tabs:write",
+        "worktrees:read",
+        "worktrees:write",
+        "notifications:write",
+        "files:read",
+        "git:write"
+      ],
+      "author": {
+        "name": "Aekawan",
+        "github": "Aekawan"
+      },
+      "homepage": null,
+      "repository": "https://github.com/muxy-app/extensions",
+      "categories": [
+        "git",
+        "source-control",
+        "workspace"
+      ],
+      "official": false,
+      "downloads": 0,
+      "published_at": "2026-11-26T20:24:38Z",
+      "sha256": "69b46e746b91ba5750b954c248a10bb388475d2430c8ed567b96539041b57695",
+      "size": 354140,
+      "download_url": "https://github.com/muxy-app/extensions/releases/download/git-workspace%401.0.0/git-workspace-1.0.0.zip",
+      "icon_url": "https://github.com/muxy-app/extensions/releases/download/git-workspace%401.0.0/icon.svg",
+      "screenshot_urls": [
+        "https://github.com/muxy-app/extensions/releases/download/git-workspace%401.0.0/screenshot-1.png"
+      ]
+    },
+    {
+      "name": "github",
+      "description": "Browse and manage GitHub Issues and Pull Requests for the current project without leaving Muxy.",
+      "version": "0.1.2",
+      "permissions": [
+        "commands:exec",
+        "projects:read",
+        "panels:write",
+        "gh:read",
+        "git:read"
+      ],
+      "author": {
+        "name": "ryohei",
+        "github": "mountain1009"
+      },
+      "homepage": null,
+      "repository": "https://github.com/muxy-app/extensions",
+      "categories": [
+        "git",
+        "productivity"
+      ],
+      "official": false,
+      "downloads": 0,
+      "published_at": "2026-11-26T20:24:45Z",
+      "sha256": "59396b21c2779d746867da98c2c50ff6c29bb504d5159dc525aa6b5a6b781f12",
+      "size": 756566,
+      "download_url": "https://github.com/muxy-app/extensions/releases/download/github%400.1.2/github-0.1.2.zip",
+      "icon_url": "https://github.com/muxy-app/extensions/releases/download/github%400.1.2/icon.svg",
+      "screenshot_urls": [
+        "https://github.com/muxy-app/extensions/releases/download/github%400.1.2/screenshot-1.png"
+      ]
+    },
+    {
+      "name": "gitlab",
+      "description": "Browse and manage GitLab issues and merge requests for the current project — on gitlab.com or a self-managed instance.",
+      "version": "0.1.1",
+      "permissions": [
+        "commands:exec",
+        "projects:read",
+        "panels:write"
+      ],
+      "author": {
+        "name": "Eric Marchand",
+        "github": "phimage"
+      },
+      "homepage": null,
+      "repository": "https://github.com/muxy-app/extensions",
+      "categories": [
+        "git",
+        "productivity"
+      ],
+      "official": false,
+      "downloads": 0,
+      "published_at": "2026-11-26T20:24:49Z",
+      "sha256": "bdcd8695711081b61720f5803789d8bfcf6d839e281912e2e0d859722bc803c7",
+      "size": 434014,
+      "download_url": "https://github.com/muxy-app/extensions/releases/download/gitlab%400.1.1/gitlab-0.1.1.zip",
+      "icon_url": "https://github.com/muxy-app/extensions/releases/download/gitlab%400.1.1/icon.svg",
+      "screenshot_urls": [
+        "https://github.com/muxy-app/extensions/releases/download/gitlab%400.1.1/screenshot-1.png",
+        "https://github.com/muxy-app/extensions/releases/download/gitlab%400.1.1/screenshot-2.png",
+        "https://github.com/muxy-app/extensions/releases/download/gitlab%400.1.1/screenshot-3.png"
+      ]
+    },
+    {
+      "name": "gsd-control-tower",
+      "description": "Read GSD next steps, roadmap progress, and live agent activity across Muxy projects.",
+      "version": "0.3.0",
+      "permissions": [
+        "projects:read",
+        "worktrees:read",
+        "agents:read",
+        "files:read",
+        "git:read",
+        "panels:write",
+        "storage:read",
+        "storage:write"
+      ],
+      "author": {
+        "name": "Gabe",
+        "github": "gabeosx"
+      },
+      "homepage": "https://github.com/gabeosx/muxy-gsd-control-tower",
+      "repository": "https://github.com/gabeosx/muxy-gsd-control-tower",
+      "categories": [
+        "developer-tools",
+        "productivity"
+      ],
+      "official": false,
+      "downloads": 0,
+      "published_at": "2026-11-26T20:24:52Z",
+      "sha256": "01d5e72e52a90d23aa304ca62096ac5a4ebc51a61047992996deff606c408d0b",
+      "size": 789521,
+      "download_url": "https://github.com/muxy-app/extensions/releases/download/gsd-control-tower%400.3.0/gsd-control-tower-0.3.0.zip",
+      "icon_url": "https://github.com/muxy-app/extensions/releases/download/gsd-control-tower%400.3.0/icon.svg",
+      "screenshot_urls": [
+        "https://github.com/muxy-app/extensions/releases/download/gsd-control-tower%400.3.0/screenshot-1.png",
+        "https://github.com/muxy-app/extensions/releases/download/gsd-control-tower%400.3.0/screenshot-2.png"
+      ]
+    },
+    {
+      "name": "hermes-agent",
+      "description": "Connects to Hermes with one sign-in for agent work and project boards in Muxy",
+      "version": "0.2.0",
+      "permissions": [
+        "commands:exec",
+        "panels:write",
+        "projects:read",
+        "storage:read",
+        "storage:write",
+        "tabs:write"
+      ],
+      "author": {
+        "name": "Gabe",
+        "github": "gabeosx"
+      },
+      "homepage": null,
+      "repository": "https://github.com/gabeosx/muxy-hermes-extension",
+      "categories": [
+        "developer-tools",
+        "productivity"
+      ],
+      "official": false,
+      "downloads": 0,
+      "published_at": "2026-11-26T20:24:56Z",
+      "sha256": "3f84d30336beb671ee20816dcc968a9770b16a1cbb5ac735d7355073012d667d",
+      "size": 3900529,
+      "download_url": "https://github.com/muxy-app/extensions/releases/download/hermes-agent%400.2.0/hermes-agent-0.2.0.zip",
+      "icon_url": "https://github.com/muxy-app/extensions/releases/download/hermes-agent%400.2.0/icon.svg",
+      "screenshot_urls": [
+        "https://github.com/muxy-app/extensions/releases/download/hermes-agent%400.2.0/screenshot-1.png",
+        "https://github.com/muxy-app/extensions/releases/download/hermes-agent%400.2.0/screenshot-2.png",
+        "https://github.com/muxy-app/extensions/releases/download/hermes-agent%400.2.0/screenshot-3.png",
+        "https://github.com/muxy-app/extensions/releases/download/hermes-agent%400.2.0/screenshot-4.png"
+      ]
+    },
+    {
+      "name": "himalaya",
+      "description": "Browse and read your email from the sidebar, powered by the Himalaya CLI",
+      "version": "0.1.0",
+      "permissions": [
+        "panels:write",
+        "commands:exec"
+      ],
+      "author": {
+        "name": "Eric Marchand",
+        "github": "phimage"
+      },
+      "homepage": null,
+      "repository": "https://github.com/muxy-app/extensions",
+      "categories": [
+        "productivity",
+        "developer-tools"
+      ],
+      "official": false,
+      "downloads": 0,
+      "published_at": "2026-11-26T20:25:00Z",
+      "sha256": "1a2b7571dc037952bfa07ba9fd7650f68a7c1a8ba7aeb35454d83fd94de7fedc",
+      "size": 133990,
+      "download_url": "https://github.com/muxy-app/extensions/releases/download/himalaya%400.1.0/himalaya-0.1.0.zip",
+      "icon_url": "https://github.com/muxy-app/extensions/releases/download/himalaya%400.1.0/icon.svg",
+      "screenshot_urls": [
+        "https://github.com/muxy-app/extensions/releases/download/himalaya%400.1.0/screenshot-1.png"
+      ]
+    },
+    {
+      "name": "language-packs",
+      "description": "Community app language packs for Muxy — one extension, one language folder per contributor",
+      "version": "1.0.7",
+      "permissions": [],
+      "author": {
+        "name": "Wonjin",
+        "github": "wjchoi"
+      },
+      "homepage": null,
+      "repository": null,
+      "categories": [
+        "localization"
+      ],
+      "official": false,
+      "downloads": 0,
+      "published_at": "2026-11-26T20:25:05Z",
+      "sha256": "e220f60b9e03f54467a3e4444d1adf423c5855c38274fd50f72a5226c98560ef",
+      "size": 1106337,
+      "download_url": "https://github.com/muxy-app/extensions/releases/download/language-packs%401.0.7/language-packs-1.0.7.zip",
+      "icon_url": "https://github.com/muxy-app/extensions/releases/download/language-packs%401.0.7/icon.svg",
+      "screenshot_urls": [
+        "https://github.com/muxy-app/extensions/releases/download/language-packs%401.0.7/screenshot-1.png"
+      ]
+    },
+    {
+      "name": "linear",
+      "description": "Browse your Linear issues, view and edit an issue in a tab, and create issues — without leaving Muxy.",
+      "version": "0.8.1",
+      "permissions": [
+        "panels:write",
+        "tabs:write",
+        "commands:exec",
+        "git:read",
+        "projects:read",
+        "worktrees:read",
+        "files:read",
+        "files:write",
+        "notifications:write",
+        "storage:read",
+        "storage:write"
+      ],
+      "author": {
+        "name": "namgyung",
+        "github": "NamgyungKim"
+      },
+      "homepage": "https://github.com/NamgyungKim/muxy-linear-extension",
+      "repository": "https://github.com/NamgyungKim/muxy-linear-extension",
+      "categories": [
+        "productivity",
+        "git"
+      ],
+      "official": false,
+      "downloads": 0,
+      "published_at": "2026-11-26T20:25:10Z",
+      "sha256": "80fd5ff1b0ee082c330462ee5b918d09789f2875188e24fb9567104250ede853",
+      "size": 1956214,
+      "download_url": "https://github.com/muxy-app/extensions/releases/download/linear%400.8.1/linear-0.8.1.zip",
+      "icon_url": "https://github.com/muxy-app/extensions/releases/download/linear%400.8.1/icon.svg",
+      "screenshot_urls": [
+        "https://github.com/muxy-app/extensions/releases/download/linear%400.8.1/screenshot-1.png"
+      ]
+    },
+    {
+      "name": "newapi-usage",
+      "description": "Multi-site NewAPI and Sub2API usage monitor — balance, consumption, and status at a glance",
+      "version": "1.1.0",
+      "permissions": [
+        "commands:exec",
+        "panels:write",
+        "notifications:write",
+        "storage:read",
+        "storage:write"
+      ],
+      "author": {
+        "name": "isfk",
+        "github": "isfk"
+      },
+      "homepage": null,
+      "repository": null,
+      "categories": [
+        "productivity",
+        "ai"
+      ],
+      "official": false,
+      "downloads": 0,
+      "published_at": "2026-11-26T20:25:15Z",
+      "sha256": "5e74cad2d3eba81d6c5b851670c548882bef881c38811c257320e1f8a6e19090",
+      "size": 221804,
+      "download_url": "https://github.com/muxy-app/extensions/releases/download/newapi-usage%401.1.0/newapi-usage-1.1.0.zip",
+      "icon_url": "https://github.com/muxy-app/extensions/releases/download/newapi-usage%401.1.0/icon.svg",
+      "screenshot_urls": [
+        "https://github.com/muxy-app/extensions/releases/download/newapi-usage%401.1.0/screenshot-1.png"
+      ]
+    },
+    {
+      "name": "ollama",
+      "description": "Track Ollama servers, browse models, and launch coding agents with local models",
+      "version": "0.1.1",
+      "permissions": [
+        "commands:exec",
+        "storage:read",
+        "storage:write",
+        "tabs:write",
+        "notifications:write",
+        "panels:write"
+      ],
+      "author": {
+        "name": "Eric Marchand",
+        "github": "phimage"
+      },
+      "homepage": null,
+      "repository": "https://github.com/muxy-app/extensions",
+      "categories": [
+        "developer-tools",
+        "ai"
+      ],
+      "official": false,
+      "downloads": 0,
+      "published_at": "2026-11-26T20:25:18Z",
+      "sha256": "82596ee3982544f7f3e694d80bc5e3e53e2479166328af7ebb0fb21909aaf56f",
+      "size": 211910,
+      "download_url": "https://github.com/muxy-app/extensions/releases/download/ollama%400.1.1/ollama-0.1.1.zip",
+      "icon_url": "https://github.com/muxy-app/extensions/releases/download/ollama%400.1.1/icon.svg",
+      "screenshot_urls": [
+        "https://github.com/muxy-app/extensions/releases/download/ollama%400.1.1/screenshot-1.png"
+      ]
+    },
+    {
+      "name": "plex-dashboard",
+      "description": "Plex Media Server admin sidebar. See what's playing, stop streams with a message, view essential server stats.",
+      "version": "0.1.0",
+      "permissions": [
+        "commands:exec",
+        "panels:write"
+      ],
+      "author": {
+        "name": "Amado Tejada",
+        "github": "amadotejada"
+      },
+      "homepage": null,
+      "repository": null,
+      "categories": [
+        "productivity",
+        "media"
+      ],
+      "official": false,
+      "downloads": 0,
+      "published_at": "2026-11-26T20:25:22Z",
+      "sha256": "0541550df5de305e1e9fa67674a76ad57b20e250b73f39a2b692ee62dcec85ff",
+      "size": 490608,
+      "download_url": "https://github.com/muxy-app/extensions/releases/download/plex-dashboard%400.1.0/plex-dashboard-0.1.0.zip",
+      "icon_url": "https://github.com/muxy-app/extensions/releases/download/plex-dashboard%400.1.0/icon.svg",
+      "screenshot_urls": [
+        "https://github.com/muxy-app/extensions/releases/download/plex-dashboard%400.1.0/screenshot-1.png"
+      ]
+    },
+    {
+      "name": "ports",
+      "description": null,
+      "version": "0.1.0",
+      "permissions": [
+        "panels:write",
+        "commands:exec",
+        "projects:read"
+      ],
+      "author": {
+        "name": "mountain1009",
+        "github": "mountain1009"
+      },
+      "homepage": null,
+      "repository": null,
+      "categories": [
+        "developer-tools",
+        "network"
+      ],
+      "official": false,
+      "downloads": 0,
+      "published_at": "2026-11-26T20:25:26Z",
+      "sha256": "cf4dbb1e9617c08f1f8906e754cd0303bcf8a1705615d4dd407a9ba3968b6c19",
+      "size": 93178,
+      "download_url": "https://github.com/muxy-app/extensions/releases/download/ports%400.1.0/ports-0.1.0.zip",
+      "icon_url": "https://github.com/muxy-app/extensions/releases/download/ports%400.1.0/icon.svg",
+      "screenshot_urls": [
+        "https://github.com/muxy-app/extensions/releases/download/ports%400.1.0/screenshot-1.png"
+      ]
+    },
+    {
+      "name": "redis-extension",
+      "description": "Browse and edit Redis keys, run commands, and watch server stats",
+      "version": "0.1.0",
+      "permissions": [
+        "commands:exec",
+        "files:read",
+        "projects:read",
+        "tabs:write",
+        "panels:write",
+        "storage:read",
+        "storage:write"
+      ],
+      "author": {
+        "name": "metecan",
+        "github": "metecan"
+      },
+      "homepage": null,
+      "repository": null,
+      "categories": [
+        "redis",
+        "database",
+        "cache",
+        "valkey"
+      ],
+      "official": false,
+      "downloads": 0,
+      "published_at": "2026-11-26T20:25:29Z",
+      "sha256": "369f218c7a4767c2bdb83de12af957d43d22c9216ee8a95577ea2d90d900216d",
+      "size": 832284,
+      "download_url": "https://github.com/muxy-app/extensions/releases/download/redis-extension%400.1.0/redis-extension-0.1.0.zip",
+      "icon_url": "https://github.com/muxy-app/extensions/releases/download/redis-extension%400.1.0/icon.svg",
+      "screenshot_urls": [
+        "https://github.com/muxy-app/extensions/releases/download/redis-extension%400.1.0/screenshot-1.png",
+        "https://github.com/muxy-app/extensions/releases/download/redis-extension%400.1.0/screenshot-2.png"
+      ]
+    },
+    {
+      "name": "rest-client-extension",
+      "description": "Send HTTP requests from editor tabs, with a sidebar for open requests, collections, environments, and history",
+      "version": "0.1.0",
+      "permissions": [
+        "commands:exec",
+        "tabs:read",
+        "tabs:write",
+        "panels:write",
+        "storage:read",
+        "storage:write"
+      ],
+      "author": {
+        "name": "metecan",
+        "github": "metecan"
+      },
+      "homepage": null,
+      "repository": "https://github.com/metecan/rest-client-extension",
+      "categories": [
+        "http",
+        "api",
+        "rest",
+        "developer-tools"
+      ],
+      "official": false,
+      "downloads": 0,
+      "published_at": "2026-11-26T20:25:33Z",
+      "sha256": "636882965e5f5134cf28f4420d40d4281d9911ff7c82a3be40c1296a76a9902f",
+      "size": 552995,
+      "download_url": "https://github.com/muxy-app/extensions/releases/download/rest-client-extension%400.1.0/rest-client-extension-0.1.0.zip",
+      "icon_url": "https://github.com/muxy-app/extensions/releases/download/rest-client-extension%400.1.0/icon.svg",
+      "screenshot_urls": [
+        "https://github.com/muxy-app/extensions/releases/download/rest-client-extension%400.1.0/screenshot-1.png",
+        "https://github.com/muxy-app/extensions/releases/download/rest-client-extension%400.1.0/screenshot-2.png"
+      ]
+    },
+    {
+      "name": "review",
+      "description": "An in-app code review tab: file tree, inline git-diff highlighting, and per-line comment threads you can hand off to a coding agent.",
+      "version": "0.3.0",
+      "permissions": [
+        "tabs:read",
+        "tabs:write",
+        "panes:read",
+        "panes:write",
+        "projects:read",
+        "worktrees:read",
+        "commands:exec",
+        "notifications:write"
+      ],
+      "author": {
+        "name": "Mark Huot",
+        "github": "markhuot"
+      },
+      "homepage": null,
+      "repository": null,
+      "categories": [
+        "git",
+        "productivity",
+        "code-review"
+      ],
+      "official": false,
+      "downloads": 0,
+      "published_at": "2026-11-26T20:25:37Z",
+      "sha256": "f163153716fd9cfbd84f897556f846e4b82c268e305a1e459e19b6cc1e59cd71",
+      "size": 2050372,
+      "download_url": "https://github.com/muxy-app/extensions/releases/download/review%400.3.0/review-0.3.0.zip",
+      "icon_url": "https://github.com/muxy-app/extensions/releases/download/review%400.3.0/icon.svg",
+      "screenshot_urls": [
+        "https://github.com/muxy-app/extensions/releases/download/review%400.3.0/screenshot-1.png"
+      ]
+    },
+    {
+      "name": "run-deck",
+      "description": "Monitor service trees and resources, jump to terminals, and safely stop or restart tracked launches. Live checks only while visible.",
+      "version": "0.3.0",
+      "permissions": [
+        "panels:write",
+        "projects:read",
+        "worktrees:read",
+        "tabs:read",
+        "tabs:write",
+        "storage:read",
+        "storage:write",
+        "commands:exec",
+        "files:read",
+        "browser:write"
+      ],
+      "author": {
+        "name": "DarinRowe",
+        "github": "DarinRowe"
+      },
+      "homepage": null,
+      "repository": null,
+      "categories": [
+        "developer-tools",
+        "productivity"
+      ],
+      "official": false,
+      "downloads": 0,
+      "published_at": "2026-11-26T20:25:41Z",
+      "sha256": "adc035bda0b01bac5043d79347c5a5a6126b3a82aa4831ebbd50f24867a7413c",
+      "size": 435426,
+      "download_url": "https://github.com/muxy-app/extensions/releases/download/run-deck%400.3.0/run-deck-0.3.0.zip",
+      "icon_url": "https://github.com/muxy-app/extensions/releases/download/run-deck%400.3.0/icon.svg",
+      "screenshot_urls": [
+        "https://github.com/muxy-app/extensions/releases/download/run-deck%400.3.0/screenshot-1.png",
+        "https://github.com/muxy-app/extensions/releases/download/run-deck%400.3.0/screenshot-2.png"
+      ]
+    },
+    {
+      "name": "simulator-extension",
+      "description": "Run and drive an iOS Simulator in a side panel",
+      "version": "0.1.0",
+      "permissions": [
+        "commands:exec",
+        "panels:write",
+        "storage:read",
+        "storage:write"
+      ],
+      "author": {
+        "name": "metecan",
+        "github": "metecan"
+      },
+      "homepage": null,
+      "repository": null,
+      "categories": [
+        "ios",
+        "simulator",
+        "xcode"
+      ],
+      "official": false,
+      "downloads": 0,
+      "published_at": "2026-11-26T20:25:45Z",
+      "sha256": "725824a6f4c5eee986ab7bb577a9899210b6c2c1fc1e530a8014245614b6728d",
+      "size": 856610,
+      "download_url": "https://github.com/muxy-app/extensions/releases/download/simulator-extension%400.1.0/simulator-extension-0.1.0.zip",
+      "icon_url": "https://github.com/muxy-app/extensions/releases/download/simulator-extension%400.1.0/icon.svg",
+      "screenshot_urls": [
+        "https://github.com/muxy-app/extensions/releases/download/simulator-extension%400.1.0/screenshot-1.png"
+      ]
+    },
+    {
+      "name": "snippets",
+      "description": "Save, group and run terminal command snippets — inspired by Termius.",
+      "version": "0.1.0",
+      "permissions": [
+        "panels:write",
+        "commands:run-script",
+        "storage:read",
+        "storage:write",
+        "panes:read",
+        "panes:write",
+        "tabs:write",
+        "notifications:write"
+      ],
+      "author": {
+        "name": "Ahmad Wijaya",
+        "github": "cibofdevs"
+      },
+      "homepage": null,
+      "repository": "https://github.com/cibofdevs/snippets",
+      "categories": [
+        "productivity",
+        "terminal"
+      ],
+      "official": false,
+      "downloads": 0,
+      "published_at": "2026-11-26T20:25:49Z",
+      "sha256": "52fbbfd64cba1a61807db612f67deb7cc094db6251a8eea14435e7b73092aff1",
+      "size": 247521,
+      "download_url": "https://github.com/muxy-app/extensions/releases/download/snippets%400.1.0/snippets-0.1.0.zip",
+      "icon_url": "https://github.com/muxy-app/extensions/releases/download/snippets%400.1.0/icon.svg",
+      "screenshot_urls": [
+        "https://github.com/muxy-app/extensions/releases/download/snippets%400.1.0/screenshot-1.png",
+        "https://github.com/muxy-app/extensions/releases/download/snippets%400.1.0/screenshot-2.png",
+        "https://github.com/muxy-app/extensions/releases/download/snippets%400.1.0/screenshot-3.png"
+      ]
+    },
+    {
+      "name": "sticky-notes",
+      "description": "Sticky notes on any edge of the window, with checklists and per-project notes",
+      "version": "0.2.3",
+      "permissions": [
+        "panels:write",
+        "projects:read",
+        "storage:read",
+        "storage:write"
+      ],
+      "author": {
+        "name": "Saeed Vaziry",
+        "github": "saeedvaziry"
+      },
+      "homepage": null,
+      "repository": null,
+      "categories": [
+        "productivity"
+      ],
+      "official": false,
+      "downloads": 0,
+      "published_at": "2026-11-26T20:25:53Z",
+      "sha256": "fa6dadc9e14262cbe14b871367b29956152b84382b968e92417c3961ec357eb6",
+      "size": 454464,
+      "download_url": "https://github.com/muxy-app/extensions/releases/download/sticky-notes%400.2.3/sticky-notes-0.2.3.zip",
+      "icon_url": "https://github.com/muxy-app/extensions/releases/download/sticky-notes%400.2.3/icon.svg",
+      "screenshot_urls": [
+        "https://github.com/muxy-app/extensions/releases/download/sticky-notes%400.2.3/screenshot-1.png",
+        "https://github.com/muxy-app/extensions/releases/download/sticky-notes%400.2.3/screenshot-2.png",
+        "https://github.com/muxy-app/extensions/releases/download/sticky-notes%400.2.3/screenshot-3.png"
+      ]
+    },
+    {
+      "name": "system-monitor",
+      "description": "CPU, memory, network, battery and disk in the status bar — with sparklines and top processes in a popover.",
+      "version": "1.0.0",
+      "permissions": [
+        "commands:exec",
+        "panels:write",
+        "notifications:write",
+        "storage:read",
+        "storage:write"
+      ],
+      "author": {
+        "name": "Nick Fay",
+        "github": "n14395"
+      },
+      "homepage": null,
+      "repository": null,
+      "categories": [
+        "developer-tools",
+        "utilities"
+      ],
+      "official": false,
+      "downloads": 0,
+      "published_at": "2026-11-26T20:25:57Z",
+      "sha256": "f0ce79b8c66c2cfec01ff9ab303dc440ca8ed5aa33fb5b73973b472e50004314",
+      "size": 813793,
+      "download_url": "https://github.com/muxy-app/extensions/releases/download/system-monitor%401.0.0/system-monitor-1.0.0.zip",
+      "icon_url": "https://github.com/muxy-app/extensions/releases/download/system-monitor%401.0.0/icon.svg",
+      "screenshot_urls": [
+        "https://github.com/muxy-app/extensions/releases/download/system-monitor%401.0.0/screenshot-1.png",
+        "https://github.com/muxy-app/extensions/releases/download/system-monitor%401.0.0/screenshot-2.png"
+      ]
+    },
+    {
+      "name": "todos",
+      "description": "Per-project todo list — every Muxy project keeps its own tasks.",
+      "version": "1.1.0",
+      "permissions": [
+        "panels:write",
+        "projects:read",
+        "storage:read",
+        "storage:write"
+      ],
+      "author": {
+        "name": "isfk",
+        "github": "isfk"
+      },
+      "homepage": null,
+      "repository": null,
+      "categories": [
+        "productivity"
+      ],
+      "official": false,
+      "downloads": 0,
+      "published_at": "2026-11-26T20:26:01Z",
+      "sha256": "0e4360bc626fd2c9387a539f9ce699dd0bbb847b2a422e64a522dc5d0d4b5652",
+      "size": 123439,
+      "download_url": "https://github.com/muxy-app/extensions/releases/download/todos%401.1.0/todos-1.1.0.zip",
+      "icon_url": "https://github.com/muxy-app/extensions/releases/download/todos%401.1.0/icon.svg",
+      "screenshot_urls": [
+        "https://github.com/muxy-app/extensions/releases/download/todos%401.1.0/screenshot-1.png"
+      ]
+    },
+    {
+      "name": "web-browser",
+      "description": "Web browser tab with a right-side status bar launcher.",
+      "version": "0.1.0",
+      "permissions": [
+        "tabs:write"
+      ],
+      "author": {
+        "name": "Jude",
+        "github": "Hude06"
+      },
+      "homepage": null,
+      "repository": "https://github.com/muxy-app/extensions",
+      "categories": [
+        "productivity",
+        "web"
+      ],
+      "official": false,
+      "downloads": 0,
+      "published_at": "2026-11-26T20:26:05Z",
+      "sha256": "d60cf3280574023e30deff8d6276bfd20e5649cd844b2f44b5bfb4094e5582cd",
+      "size": 34755,
+      "download_url": "https://github.com/muxy-app/extensions/releases/download/web-browser%400.1.0/web-browser-0.1.0.zip",
+      "icon_url": "https://github.com/muxy-app/extensions/releases/download/web-browser%400.1.0/icon.svg",
+      "screenshot_urls": [
+        "https://github.com/muxy-app/extensions/releases/download/web-browser%400.1.0/screenshot-1.png"
+      ]
+    },
+    {
+      "name": "workdeck",
+      "description": "Workdeck: project-group sidebar, issues handed to agents in their own worktrees, deploys, branch cleanup, notes, KakaoTalk-to-issue and an agent control room",
+      "version": "0.2.0",
+      "permissions": [
+        "agents:read",
+        "clipboard:write",
+        "commands:exec",
+        "commands:read",
+        "commands:run",
+        "git:read",
+        "panels:write",
+        "panes:read",
+        "panes:write",
+        "projects:delete",
+        "projects:read",
+        "projects:write",
+        "storage:read",
+        "storage:write",
+        "system:open",
+        "tabs:read",
+        "tabs:write",
+        "ui:write",
+        "worktrees:read",
+        "worktrees:write"
+      ],
+      "author": {
+        "name": "Wonjin",
+        "github": null
+      },
+      "homepage": null,
+      "repository": null,
+      "categories": [
+        "productivity"
+      ],
+      "official": false,
+      "downloads": 0,
+      "published_at": "2026-11-26T20:26:09Z",
+      "sha256": "a9d58fcaa4a2577977a4f2d1092cd527b11dee079f85cf512dffd2eada8f2990",
+      "size": 2425534,
+      "download_url": "https://github.com/muxy-app/extensions/releases/download/workdeck%400.2.0/workdeck-0.2.0.zip",
+      "icon_url": "https://github.com/muxy-app/extensions/releases/download/workdeck%400.2.0/icon.svg",
+      "screenshot_urls": [
+        "https://github.com/muxy-app/extensions/releases/download/workdeck%400.2.0/screenshot-1.png",
+        "https://github.com/muxy-app/extensions/releases/download/workdeck%400.2.0/screenshot-2.png",
+        "https://github.com/muxy-app/extensions/releases/download/workdeck%400.2.0/screenshot-3.png",
+        "https://github.com/muxy-app/extensions/releases/download/workdeck%400.2.0/screenshot-4.png",
+        "https://github.com/muxy-app/extensions/releases/download/workdeck%400.2.0/screenshot-5.png",
+        "https://github.com/muxy-app/extensions/releases/download/workdeck%400.2.0/screenshot-6.png"
+      ]
+    }
+  ]
 }
