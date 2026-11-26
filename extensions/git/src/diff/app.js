@@ -109,7 +109,7 @@ export class DiffApp {
       removeKey(STATE_PREFIX + this.tab);
       return false;
     });
-    const info = await muxy.git.repoInfo().catch(() => null);
+    const info = await git.repoInfo().catch(() => null);
     this.repoRoot = info?.root ?? "";
     if (await this.handoff()) return;
     this.register();

@@ -1,8 +1,8 @@
-// File-type icons in the two themes the tree offers. Lookups return a small
-// cached value (markup or a data URI) so the virtualized tree can swap a
-// recycled row's icon with one property write.
+// The built-in "Minimal" stroke glyphs. Colored themes (the bundled Material
+// theme and imported VS Code icon themes) live in shared/icon-themes/. Lookups
+// return cached markup so the virtualized tree can swap a recycled row's icon
+// with one property write.
 
-import { BY_EXTENSION, BY_FILENAME, DEFAULT_FILE, DEFAULT_FOLDER, ICON_SVG } from "@/shared/material-icons.generated";
 import { file_type } from "@/shared/file-types";
 
 const DOC = { d: "M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" };
@@ -66,28 +66,4 @@ export function stroke_icon(name, kind = "file") {
     strokeMarkup.set(key, markup);
   }
   return markup;
-}
-
-const materialUris = new Map();
-
-function material_name(name) {
-  const lower = name.toLowerCase();
-  if (lower in BY_FILENAME) return BY_FILENAME[lower];
-  for (let dot = lower.indexOf("."); dot !== -1; dot = lower.indexOf(".", dot + 1)) {
-    const ext = lower.slice(dot + 1);
-    if (ext in BY_EXTENSION) return BY_EXTENSION[ext];
-  }
-  return DEFAULT_FILE;
-}
-
-/** Data URI for the colored Material Icon Theme glyph. */
-export function material_icon(name, isDirectory = false) {
-  const icon = isDirectory ? DEFAULT_FOLDER : material_name(name);
-  let uri = materialUris.get(icon);
-  if (uri === undefined) {
-    const svg = ICON_SVG[icon] ?? ICON_SVG[DEFAULT_FILE];
-    uri = svg ? `data:image/svg+xml,${encodeURIComponent(svg)}` : "";
-    materialUris.set(icon, uri);
-  }
-  return uri;
 }

@@ -2,7 +2,7 @@
   "name": "git",
   "private": true,
   "type": "module",
-  "version": "2.0.2",
+  "version": "2.1.0",
   "scripts": {
     "dev": "vite",
     "build": "vite build && node scripts/build-scripts.mjs",
@@ -23,13 +23,15 @@
     "description": "Official Git extension for Muxy — GitHub, Forgejo, and Gitea",
     "permissions": [
       "commands:exec",
+      "panes:read",
+      "storage:read",
+      "storage:write",
       "commands:run-script",
       "panels:write",
       "tabs:write",
       "worktrees:read",
       "worktrees:write",
       "notifications:write",
-      "files:read",
       "git:read",
       "git:write"
     ],

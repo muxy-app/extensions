@@ -69,7 +69,7 @@ export class PrBrowser {
       if (Number.isFinite(index)) this.select(index);
     });
     this.search.focus();
-    const repo = await muxy.git.repoInfo().catch(() => null);
+    const repo = await git.repoInfo().catch(() => null);
     this.ctl.root = repo?.root ?? "";
     this.ctl.state.repo = repo;
     const cached = listCache.get(`${this.ctl.root}\nopen`);
