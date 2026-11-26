@@ -47,10 +47,23 @@ export function normalize_zip_path(path) {
   return out.join("/");
 }
 
-async function inflate_raw(bytes) {
+/** Inflate raw deflate data, giving up once the output passes `limit` bytes. */
+async function inflate_raw(bytes, limit, name) {
   if (typeof DecompressionStream !== "function") throw new ZipError("This app can’t decompress archives (no DecompressionStream).");
-  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
-  return new Uint8Array(await new Response(stream).arrayBuffer());
+  const reader = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw")).getReader();
+  const out = new Uint8Array(limit);
+  let length = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (length + value.byteLength > limit) {
+      await reader.cancel().catch(() => {});
+      throw new ZipError(`The archive is damaged: ${name} has the wrong size.`);
+    }
+    out.set(value, length);
+    length += value.byteLength;
+  }
+  return out.subarray(0, length);
 }
 
 export class ZipArchive {
@@ -165,7 +178,7 @@ export class ZipArchive {
     const raw = this.bytes.subarray(start, end);
     let out;
     if (entry.method === 0) out = raw;
-    else if (entry.method === 8) out = await inflate_raw(raw);
+    else if (entry.method === 8) out = await inflate_raw(raw, entry.size, name);
     else throw new ZipError(`Unsupported compression (method ${entry.method}) for ${name}.`);
     if (out.byteLength !== entry.size) throw new ZipError(`The archive is damaged: ${name} has the wrong size.`);
     return out;

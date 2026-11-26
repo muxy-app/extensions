@@ -257,6 +257,7 @@ function on_drop(event) {
     return;
   }
   void run(async () => {
+    if (file.size > MAX_VSIX_BYTES) throw new ThemeError(`The file is larger than ${format_bytes(MAX_VSIX_BYTES)}.`);
     show_busy(`Reading ${file.name}…`);
     await analyze(new Uint8Array(await file.arrayBuffer()), file.name);
   });

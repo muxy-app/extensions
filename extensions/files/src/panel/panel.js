@@ -533,17 +533,20 @@ export class FilesPanel {
     const token = ++this.iconToken;
     this.iconTheme = id;
     let theme = null;
+    let failed = false;
     try {
       theme = await load_theme(id);
     } catch (err) {
+      failed = true;
       toast(`Couldn’t load the icon theme: ${error_message(err)}`, "error");
     }
     if (token !== this.iconToken) return;
-    if (!theme && id !== STROKE) {
-      // Removed or unreadable (e.g. deleted from another window): fall back.
+    if (!theme && !failed && id !== STROKE) {
+      // Removed (e.g. deleted from another window): fall back.
       set_active_theme(STROKE);
       return;
     }
+    // On a load error keep the stored choice and show minimal icons for now.
     this.iconResolver = theme ? new IconResolver(theme, this.colorScheme()) : null;
     this.scroller.classList.toggle("hide-twisties", Boolean(theme?.hidesExplorerArrows));
     this.refreshIcons();
