@@ -79,22 +79,3 @@ export function watch_key(match, callback, { prefix = false } = {}) {
     window.removeEventListener(LOCAL_EVENT, onLocal);
   };
 }
-
-// ---- Shared preferences ----------------------------------------------------
-
-const ICON_THEME_KEY = "muxy.files.icon-theme";
-export const ICON_THEMES = ["stroke", "material"];
-
-export function load_icon_theme() {
-  const raw = read_string(ICON_THEME_KEY);
-  return ICON_THEMES.includes(raw) ? raw : "stroke";
-}
-
-export function save_icon_theme(theme) {
-  write_string(ICON_THEME_KEY, ICON_THEMES.includes(theme) ? theme : "stroke");
-  announce(ICON_THEME_KEY);
-}
-
-export function watch_icon_theme(callback) {
-  return watch_key(ICON_THEME_KEY, () => callback(load_icon_theme()));
-}
