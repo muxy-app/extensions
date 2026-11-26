@@ -7,10 +7,8 @@ const UNTRACKED_MAX_BYTES = 1024 * 1024;
 
 async function readUntracked(path) {
   try {
-    const file = await muxy.files.read(path);
-    const content = typeof file === "string" ? file : file?.content ?? "";
-    const size = typeof file === "object" ? Number(file?.size) || content.length : content.length;
-    if (size > UNTRACKED_MAX_BYTES || looksBinary(content)) return binaryPatch(path);
+    const content = await git.run(["head", "-c", String(UNTRACKED_MAX_BYTES + 1), "--", path]);
+    if (content.length > UNTRACKED_MAX_BYTES || looksBinary(content)) return binaryPatch(path);
     return untrackedPatch(path, content);
   } catch {
     return binaryPatch(path);
@@ -31,7 +29,7 @@ async function mapLimit(items, limit, fn) {
 }
 
 async function working() {
-  const [patches, status] = await Promise.all([git.workingPatches(), git.readStatus({ fresh: true })]);
+  const [patches, status] = await Promise.all([git.workingPatches(), git.readStatus()]);
   const untracked = status.unstaged.filter((entry) => entry.code === "U").map((entry) => entry.path);
   const extra = await mapLimit(untracked.slice(0, UNTRACKED_LIMIT), 12, readUntracked);
   const notes = [];

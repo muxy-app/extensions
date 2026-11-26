@@ -6,7 +6,7 @@ import { cachedBranches, forgetBranch, loadBranches } from "@/panel/branches";
 const DIRTY_SWITCH = /overwritten by checkout|commit your changes or stash them|would be overwritten/i;
 
 async function branchProblem(name) {
-  const res = await muxy.exec(["git", "check-ref-format", "--branch", name]).catch(() => null);
+  const res = await git.exec(["git", "check-ref-format", "--branch", name]).catch(() => null);
   return res?.exitCode === 0 ? "" : "Not a valid branch name";
 }
 
