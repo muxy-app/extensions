@@ -338,3 +338,19 @@
   margin: var(--s2) var(--s4);
   background: var(--muxy-border);
 }
+
+/* Font-glyph icon themes (e.g. Seti-style packs). */
+.row-glyph {
+  display: inline-block;
+  width: var(--icon);
+  height: var(--icon);
+  font-size: var(--icon);
+  line-height: var(--icon);
+  text-align: center;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Themes with `hidesExplorerArrows` draw open/closed state in the folder icon. */
+.hide-twisties .row-twisty {
+  visibility: hidden;
+}
