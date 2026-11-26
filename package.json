@@ -12,6 +12,7 @@
     "validate": "node scripts/validate.mjs",
     "pack": "node scripts/pack.mjs",
     "publish": "node scripts/publish.mjs",
+    "index": "node scripts/index.mjs",
     "test": "node --test scripts/lib/*.test.mjs shared/ui/*.test.mjs"
   },
   "dependencies": {
