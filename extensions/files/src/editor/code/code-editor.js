@@ -75,6 +75,27 @@ function lineSelectionStyle() {
   });
 }
 
+// Reuse CodeMirror's rectangular selection once an Option-click becomes a drag.
+const [startRectangle] = EditorState.create({ extensions: rectangularSelection() }).facet(EditorView.mouseSelectionStyle);
+const optionSelection = EditorView.mouseSelectionStyle.of((view, start) => {
+  const rectangle = startRectangle(view, start);
+  if (!rectangle || start.detail !== 1 || start.shiftKey || start.metaKey || start.ctrlKey) return rectangle;
+
+  const { pos, assoc } = view.posAndSideAtCoords({ x: start.clientX, y: start.clientY }, false);
+  let clicked = view.state.selection.addRange(EditorSelection.cursor(pos, assoc));
+  let dragging = false;
+  return {
+    get(event, extend, multiple) {
+      if (Math.hypot(event.clientX - start.clientX, event.clientY - start.clientY) >= 4) dragging = true;
+      return dragging ? rectangle.get(event, extend, multiple) : clicked;
+    },
+    update(update) {
+      if (update.docChanged) clicked = clicked.map(update.changes);
+      return rectangle.update(update);
+    },
+  };
+});
+
 /** CRLF files keep CRLF on save; anything else is split on any break, joined with \n. */
 function line_separator(value) {
   let crlf = 0;
@@ -258,7 +279,7 @@ export class CodeEditor {
       highlightSpecialChars(),
       highlightActiveLine(),
       highlightActiveLineGutter(),
-      rectangularSelection(),
+      optionSelection,
       EditorState.allowMultipleSelections.of(true),
       bracketMatching(),
       closeBrackets(),

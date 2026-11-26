@@ -16,7 +16,7 @@ import {
   strip_slash,
 } from "@/shared/paths";
 import { material_icon, stroke_icon } from "@/shared/icons";
-import { ACTIVE_KEY, announce_move, keep_editor, open_file, project_root } from "@/shared/editors";
+import { ACTIVE_KEY, announce_move, keep_editor, open_file, open_file_beside, project_root } from "@/shared/editors";
 import { alert_error, confirm_action, copy_text, error_message, open_externally, reveal_in_finder, toast } from "@/shared/actions";
 import {
   load_icon_theme,
@@ -657,9 +657,25 @@ export class FilesPanel {
 
   async openFile(path) {
     try {
-      await open_file(path);
+      const get = async (key) => {
+        try {
+          return Boolean(await muxy.settings?.get?.(key));
+        } catch {
+          return false;
+        }
+      };
+      if (await get("openInSplit")) await open_file_beside(path, (await get("splitBelow")) ? "down" : "right");
+      else await open_file(path);
     } catch (err) {
       toast(error_message(err), "error", "Open file");
+    }
+  }
+
+  async openFileBeside(path, edge) {
+    try {
+      await open_file_beside(path, edge);
+    } catch (err) {
+      toast(error_message(err), "error", "Open in split pane");
     }
   }
 
@@ -905,7 +921,7 @@ export class FilesPanel {
     const dir = entry.dir ? entry.path : parent_of(entry.path);
     open_menu(
       [
-        ...(entry.dir ? [] : [{ label: "Open", run: () => void this.openFile(entry.path) }, { label: "Open with Default App", run: () => open_externally(entry.path) }, "-"]),
+        ...(entry.dir ? [] : [{ label: "Open", run: () => void this.openFile(entry.path) }, { label: "Open in Vertical Split (Right)", run: () => void this.openFileBeside(entry.path, "right") }, { label: "Open in Horizontal Split (Below)", run: () => void this.openFileBeside(entry.path, "down") }, { label: "Open with Default App", run: () => open_externally(entry.path) }, "-"]),
         { label: "New File…", run: () => void this.startCreate(dir, "file") },
         { label: "New Folder…", run: () => void this.startCreate(dir, "folder") },
         "-",

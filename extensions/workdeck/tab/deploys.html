@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>배포 관리</title>
+  <link rel="stylesheet" href="tab.css">
+</head>
+<body>
+  <div class="top">
+    <h1 id="title">배포 관리</h1>
+    <span id="summary" class="meta"></span>
+    <button class="btn" id="refresh" title="새로고침">새로고침</button>
+    <button class="btn" id="agents" title="에이전트 추가·수정·삭제">에이전트 관리</button>
+  </div>
+  <div class="tabsbar" id="tabs">
+    <button data-tab="prs" class="on">PR 리뷰</button>
+    <button data-tab="runs">Actions 진행</button>
+    <button data-tab="workflows">워크플로우</button>
+    <button data-tab="releases">릴리스</button>
+  </div>
+  <div id="view" class="view"></div>
+  <script src="../i18n.js"></script>
+  <script src="lib.js"></script>
+  <script src="agents.js"></script>
+  <script src="runview.js"></script>
+  <script src="deploys.js"></script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+#alerts { padding: 0 14px; }
+.alert { display: flex; gap: 10px; align-items: center; padding: 8px 12px; margin-top: 10px; border: 1px solid #e0a030; border-radius: 8px; background: color-mix(in srgb, #e0a030 12%, transparent); }
+.alert .grow { flex: 1; min-width: 0; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 12px; padding: 12px 14px 24px; overflow: auto; align-content: start; }
+.acard { display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--muxy-border); border-radius: 10px; padding: 10px 12px; background: var(--muxy-surface); min-width: 0; }
+.acard.waiting { border-color: #e0a030; box-shadow: 0 0 0 1px #e0a03055; }
+.acard.working { border-color: color-mix(in srgb, #3fb950 55%, var(--muxy-border)); }
+.acard.idle { opacity: .85; }
+.ahead { display: flex; gap: 8px; align-items: center; min-width: 0; }
+.ahead .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ahead .grow { flex: 1; min-width: 0; }
+.prov { flex: none; padding: 1px 8px; border-radius: 10px; font-size: 11px; background: var(--muxy-accent-soft); color: var(--muxy-accent); }
+.st { flex: none; padding: 1px 8px; border-radius: 10px; font-size: 11px; border: 1px solid var(--muxy-border); }
+.st.working { color: #3fb950; border-color: #3fb950; }
+.st.waiting { color: #e0a030; border-color: #e0a030; animation: pulse 1.4s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .45; } }
+.screen { margin: 0; padding: 8px 10px; max-height: 260px; min-height: 90px; overflow: auto; background: var(--muxy-background); border: 1px solid var(--muxy-border); border-radius: 8px; font: 11.5px/1.45 ui-monospace, Menlo, monospace; white-space: pre-wrap; word-break: break-all; }
+.reply { display: flex; gap: 6px; }
+.reply input { flex: 1; min-width: 0; }
+.keys { display: flex; gap: 6px; flex-wrap: wrap; }
+.btn.go { background: #3fb950; color: #04210b; border-color: #3fb950; }
+.btn.no { color: #ff6b61; border-color: #ff6b61; }
+.empty.big { grid-column: 1 / -1; padding: 40px 0; text-align: center; }
+
+.acard .btn.mini { opacity: 1; }
+.screen { white-space: pre-wrap; word-break: break-word; }
+
+.screen.rendered { white-space: normal; font: 12.5px/1.5 -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; display: flex; flex-direction: column; gap: 6px; max-height: 320px; }
+.screen.rendered .md p, .screen.rendered .md { margin: 0; }
+.bk { min-width: 0; overflow-wrap: anywhere; }
+.bk.ai, .bk.user { display: flex; gap: 8px; align-items: flex-start; }
+.bk .dot { flex: none; color: var(--muxy-accent); width: 12px; }
+.bk.ai .md { flex: 1; min-width: 0; white-space: pre-wrap; }
+.bk.user { padding: 4px 8px; border-radius: 6px; background: var(--muxy-accent-soft); }
+.bk.user .dot { color: var(--muxy-accent); }
+.bk.user > div { white-space: pre-wrap; min-width: 0; }
+.bk.tool { color: var(--muxy-foreground-muted); font: 11.5px/1.4 ui-monospace, Menlo, monospace; white-space: pre-wrap; padding-left: 20px; border-left: 2px solid var(--muxy-border); }
+.bk.opts { display: flex; flex-direction: column; gap: 3px; padding: 6px; border: 1px solid #e0a030; border-radius: 8px; }
+.bk.opts .opt { padding: 4px 8px; border-radius: 6px; }
+.bk.opts .opt.sel { background: color-mix(in srgb, #e0a030 22%, transparent); font-weight: 600; }
+.bk.foot, .bk.status { color: var(--muxy-foreground-muted); font-size: 11px; }
+.bk.text { white-space: pre-wrap; }
+
+.screenwrap { position: relative; }
+.toasts { position: absolute; left: 6px; right: 6px; bottom: 6px; display: flex; flex-direction: column; gap: 4px; pointer-events: none; }
+.toast { display: flex; gap: 8px; align-items: center; padding: 6px 10px; border: 1px solid #e0a030; border-radius: 8px; background: var(--muxy-surface-solid); box-shadow: 0 4px 14px #0008; pointer-events: auto; }
+.toast .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bell { flex: none; font-size: 11px; color: #e0a030; }
+#alerts { position: fixed; right: 16px; top: 52px; width: 360px; z-index: 5; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+
+.abadge { flex: none; display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 4px; box-sizing: border-box; border-radius: 6px; color: #fff; font: 700 11px/1 -apple-system, BlinkMacSystemFont, sans-serif; }
+.ahead .prov { background: none; padding: 0; color: var(--muxy-foreground-muted); }
+
+.atitle { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

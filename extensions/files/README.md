@@ -70,6 +70,26 @@ time you format. Formatting preserves explicit Markdown hard breaks, leaves
 embedded languages unformatted, and follows the editor's auto-save setting.
 Undo (`⌘Z` / `Ctrl+Z`) restores the content from before formatting in one step.
 
+In the editor, **Option-click** (**Alt-click** on other platforms) to add a cursor
+at each location you want to edit. Typing edits all cursors at once. **Option-drag**
+selects a rectangle across lines.
+
+## Opening files in a split pane
+
+Two settings under **Settings → Extensions → Files** choose where a file
+opens when you open it from the file tree (click, `Return`, or `Space`):
+
+| Setting | Default | Effect |
+| --- | --- | --- |
+| **Open files in a split pane** | off | Off opens the file as a tab in the active pane. On opens it in a new pane next to the active pane. |
+| **Split below instead of right** | off | Only used when the first setting is on. Off splits to the **right** of the active pane, on splits **below** it. |
+
+Changes apply to the next file you open; no reload is needed. In split mode a
+file that is already open still gets a new pane, and the tab-reuse behavior
+described under [Tabs](#tabs) doesn't apply. The right-click menu keeps its
+**Open in Vertical Split (Right)** and **Open in Horizontal Split (Below)**
+items, which always split regardless of these settings.
+
 ## Keyboard (file tree)
 
 Focus lands in the tree when the panel opens (or click any row), then:

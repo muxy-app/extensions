@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>빠른 메모</title>
+  <link rel="stylesheet" href="../tab/tab.css">
+  <link rel="stylesheet" href="quick.css">
+</head>
+<body>
+  <div class="qwrap">
+    <div class="qhead"><b>빠른 메모</b><span class="grow"></span><button class="btn" id="all">전체 노트 보기</button><button class="btn" id="close">닫기</button></div>
+    <div class="qscopes" id="scopes"></div>
+    <textarea id="text" placeholder="메모 입력 · Enter 저장 / Shift+Enter 줄바꿈"></textarea>
+    <div class="qrow"><button class="btn" id="save">저장</button><span class="grow"></span><button class="btn primary" id="issue">저장 후 이슈로 등록</button></div>
+    <div class="qhint" id="hint">Enter 저장 · Shift+Enter 줄바꿈 · Esc 닫기</div>
+    <div class="err" id="err" hidden></div>
+  </div>
+  <script src="../i18n.js"></script>
+  <script src="../tab/lib.js"></script>
+  <script src="store.js"></script>
+  <script src="quick.js"></script>
+</body>
+</html>

@@ -1,0 +1,84 @@
+/* Wiring and boot. */
+$("#add-folder").addEventListener("click", () => addFolder());
+$("#add-group").addEventListener("click", () => createGroup());
+$("#more").addEventListener("click", (e) => { e.stopPropagation(); moreMenu(anchor(e.currentTarget)); });
+$("#ext").addEventListener("click", (e) => { e.stopPropagation(); extensionsMenu(anchor(e.currentTarget, true)); });
+$("#settings").addEventListener("click", () => muxy.ui.openSettings("general"));
+document.querySelectorAll(".slot[data-icon]").forEach((n) => n.replaceWith(icon(n.dataset.icon, "window")));
+
+const qInput = $("#q");
+const qClear = $("#q-clear");
+function setQuery(v) {
+  data.query = v;
+  qInput.value = v;
+  qClear.hidden = !v;
+  render();
+}
+qInput.addEventListener("input", () => setQuery(qInput.value));
+qInput.addEventListener("keydown", (e) => { if (e.key === "Escape") { setQuery(""); e.stopPropagation(); } });
+qClear.addEventListener("click", () => { setQuery(""); qInput.focus(); });
+
+$("#q-open").addEventListener("click", () => quickSwitch());
+
+/* Icon-rail mode when the page is narrow (the built-in sidebar's collapsed style is "icons"). */
+const COMPACT_MAX_WIDTH = 120;
+let wasCompact = false;
+new ResizeObserver(() => {
+  const compact = document.body.getBoundingClientRect().width <= COMPACT_MAX_WIDTH;
+  document.body.classList.toggle("compact", compact);
+  if (compact !== wasCompact) { wasCompact = compact; hideMenu(); render(); }
+}).observe(document.body);
+
+initSplitters();
+document.addEventListener("click", hideMenu);
+window.addEventListener("blur", hideMenu);
+
+// Auto-scroll while dragging near the top or bottom edge. Capture phase: row handlers stop propagation.
+$("#list").addEventListener("dragover", (e) => {
+  if (!drag.kind) return;
+  const list = $("#list");
+  const r = list.getBoundingClientRect();
+  if (e.clientY < r.top + 56) list.scrollTop -= 18;
+  else if (e.clientY > r.bottom - 56) list.scrollTop += 18;
+}, true);
+
+muxy.events.subscribe("projects.changed", () => { schedule("projects", refreshProjects); schedule("members", refreshMembers, 600); });
+/* When the active project / worktree / tab changes, scroll the list so the active row is not hidden off-screen. */
+function revealActive() {
+  // wait for the coalesced render that follows the data refresh
+  setTimeout(() => {
+    const list = $("#list");
+    if (!list || isCompact()) return;
+    const target = list.querySelector(".tab.active") || list.querySelector(".tab.wt.active") || list.querySelector(".row.active");
+    if (!target) return;
+    const t = target.getBoundingClientRect(), l = list.getBoundingClientRect();
+    if (t.top < l.top || t.bottom > l.bottom) target.scrollIntoView({ block: "nearest" });
+  }, 60);
+}
+
+const onSwitch = (e) => schedule("active", async () => { await refreshActive([e && e.projectID].filter(Boolean)); await refreshTabs(); revealActive(); }, 100);
+muxy.events.subscribe("project.switched", onSwitch);
+muxy.events.subscribe("worktree.switched", onSwitch);
+muxy.events.subscribe("worktree.headChanged", () => schedule("branches", async () => { await refreshBranches(); render(); }));
+// no worktree-removed event exists: a removed worktree closes its tabs, and the focus / interval checks catch the rest
+muxy.events.subscribe("tab.closed", () => schedule("worktrees", syncWorktrees, 1200));
+window.addEventListener("focus", () => schedule("worktrees", syncWorktrees, 300));
+setInterval(() => { if (document.visibilityState === "visible") schedule("worktrees", syncWorktrees); }, 15000);
+muxy.events.subscribe("agent.status", () => schedule("agents", refreshAgents, 150));
+for (const ev of ["tab.created", "tab.closed", "tab.updated"]) muxy.events.subscribe(ev, () => schedule("tabs", refreshTabs, 300));
+muxy.events.subscribe("tab.focused", () => schedule("tabs", async () => { await refreshTabs(); revealActive(); }, 300));
+muxy.events.subscribe("tab.updated", () => schedule("agents", refreshAgents, 800));
+muxy.events.subscribe("ui.changed", () => schedule("ui", async () => { await refreshUI(); refreshTabs(); }));
+
+(async () => {
+  try { await loadState(); } catch (err) { console.error("load state", err); }
+  await refreshUI();
+  await refreshProjects();
+  await refreshMembers();
+  refreshServers();
+  refreshSidebars();
+  refreshAgents();
+  refreshTabs().then(revealActive);
+  refreshXita();
+  setInterval(() => { if (document.visibilityState === "visible") refreshXita(); }, 6000);
+})();

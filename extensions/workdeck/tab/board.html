@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>에이전트 관제</title>
+  <link rel="stylesheet" href="tab.css">
+  <link rel="stylesheet" href="board.css">
+</head>
+<body>
+  <div class="top">
+    <h1>에이전트 관제</h1>
+    <span id="counts" class="meta"></span>
+    <div class="seg" id="filter">
+      <button data-f="all" class="on">전체</button>
+      <button data-f="waiting">입력 대기</button>
+      <button data-f="working">작업 중</button>
+      <button data-f="idle">대기</button>
+    </div>
+    <button class="btn" id="refresh">새로고침</button>
+  </div>
+  <div id="alerts"></div>
+  <div id="grid" class="grid"></div>
+  <script src="../i18n.js"></script>
+  <script src="lib.js"></script>
+  <script src="../sidebar/shared.js"></script>
+  <script src="screen.js"></script>
+  <script src="board.js"></script>
+</body>
+</html>
