@@ -82,7 +82,10 @@ test("publish: only contents: write, and the token never reaches the extension b
     assert.ok(step, name);
     assert.doesNotMatch(step, /TOKEN|secrets\./, name);
   }
-  assert.doesNotMatch(publishWorkflow, /MUXY_UPLOAD|muxy\.app\/api/);
+  const release = steps.find((chunk) => chunk.startsWith("Pack, sign, release, and announce"));
+  assert.ok(release);
+  assert.match(release, /MUXY_UPLOAD_TOKEN: \$\{\{ secrets\.MUXY_UPLOAD_TOKEN \}\}/);
+  assert.equal(publishWorkflow.split("\n").filter((line) => line.includes("MUXY_UPLOAD_TOKEN")).length, 1);
 });
 
 function aiReviewJob(name) {

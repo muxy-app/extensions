@@ -15,6 +15,11 @@ on:
         description: "Space-separated extension names to release. Empty = only regenerate the index."
         required: false
         default: ""
+      muxy_app:
+        description: "Also upload these extensions to muxy.app"
+        type: boolean
+        required: false
+        default: true
 
 permissions: {}
 
@@ -114,6 +119,9 @@ jobs:
         env:
           NAMES: ${{ steps.changed.outputs.names }}
           GH_TOKEN: ${{ github.token }}
+          MUXY_UPLOAD_URL: https://muxy.app/api/extensions/upload
+          MUXY_UPLOAD_TOKEN: ${{ secrets.MUXY_UPLOAD_TOKEN }}
+          MUXY_APP_UPLOAD: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.muxy_app != 'false' }}
           MINISIGN_SECRET_KEY: ${{ secrets.MINISIGN_SECRET_KEY }}
           # Optional: when set, each new release posts a one-line note with the
           # release link to Discord. Unset = no announcement.

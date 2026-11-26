@@ -133,8 +133,8 @@ Each extension also needs a `README.md` with:
 Push your branch and open a PR. Fill in the PR template. CI runs validation; a
 Muxy maintainer reviews for safety and quality, then merges. On merge, your
 extension is packed and published as a GitHub Release tagged
-`<name>@<version>`, and listed in `index.json` on the `index` branch, which the
-app reads.
+`<name>@<version>`, uploaded to muxy.app for the website listing, and listed in
+`index.json` on the `index` branch, which the app reads.
 
 ## Versioning
 

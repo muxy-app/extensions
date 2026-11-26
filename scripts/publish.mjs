@@ -14,6 +14,7 @@ import {
 import { gitAuthEnv } from "./lib/index-branch.mjs";
 import { METADATA_ASSET, releaseTag, zipAssetName } from "./lib/marketplace-index.mjs";
 import { packExtension } from "./pack.mjs";
+import { muxyAppUploadEnabled, uploadToMuxyApp } from "./lib/muxy-app-upload.mjs";
 
 const REPOSITORY = process.env.GITHUB_REPOSITORY || "muxy-app/extensions";
 const TARGET_SHA = process.env.GITHUB_SHA;
@@ -147,7 +148,7 @@ function stageRelease(dir, name, packed, assets, metadata, sign) {
   return files;
 }
 
-async function publishExtension(name, sign) {
+async function publishExtension(name, sign, upload) {
   const packed = packExtension(name);
   const tag = releaseTag(name, packed.version);
   const assets = listingAssets(name);
@@ -157,10 +158,12 @@ async function publishExtension(name, sign) {
     console.log(
       `would release ${tag} (${packed.size} bytes, sha256=${packed.sha256}) ` +
         `+ ${assets.icon ? "icon" : "no icon"} + ${assets.screenshots.length} screenshot(s)` +
-        `${sign ? ", signed" : ""}`,
+        `${sign ? ", signed" : ""}${upload ? ", and upload it to muxy.app" : ""}`,
     );
     return;
   }
+
+  if (upload) await uploadToMuxyApp(name, packed);
 
   if (tagExists(tag)) {
     console.log(`::notice::${tag} is already released; skipping ${name}`);
@@ -209,13 +212,15 @@ async function main() {
 
   const sign = signingEnabled();
   if (!sign) console.log("Signing is not configured; releases will not be signed.");
+  const upload = muxyAppUploadEnabled(sign);
+  if (!upload) console.log("::notice::muxy.app upload is off or not configured; publishing to GitHub only.");
 
   for (const name of names) {
     if (!fs.existsSync(packageJSONPath(extensionDir(name)))) {
       console.log(`skip ${name} (removed)`);
       continue;
     }
-    await publishExtension(name, sign);
+    await publishExtension(name, sign, upload);
   }
 }
 
