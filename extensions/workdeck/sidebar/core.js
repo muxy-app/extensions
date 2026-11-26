@@ -9,9 +9,9 @@ const PALETTE = [
 /* Persisted in extension storage: UI-only memory. Groups themselves are Muxy workspaces.
  * kinds: projectID -> { kind: "repo" | "submodule", root } recorded when a folder is added through the scan,
  * where root is the folder that was picked (used to draw a folder row above its repositories). */
-let state = { collapsed: {}, kinds: {}, expanded: {}, sizes: {}, showIdle: false, serverTabs: {}, managerTabs: {} };
+let state = { collapsed: {}, kinds: {}, expanded: {}, sizes: {}, showIdle: false, serverTabs: {}, managerTabs: {}, lastWt: {} };
 /* Live data pulled from Muxy. members: workspaceID -> project IDs, read from Muxy's desktop-state.json. */
-let data = { projects: [], branches: {}, worktrees: {}, agents: [], muxyAgents: [], xita: [], agentTitles: {}, projectTabs: {}, workspaces: [], members: {}, membersOK: false, home: null, servers: [], serverStatus: {}, sidebars: null, query: "" };
+let data = { projects: [], branches: {}, worktrees: {}, agents: [], muxyAgents: [], xita: null, xitaChildren: [], agentTitles: {}, focus: null, panes: [], issueRuns: new Map(), paneScreen: new Map(), agentAlias: {}, subHidden: {}, projectTabs: {}, workspaces: [], members: {}, membersOK: false, home: null, servers: [], serverStatus: {}, sidebars: null, query: "" };
 
 const $ = (sel) => document.querySelector(sel);
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -37,7 +37,37 @@ async function save() {
 
 async function loadState() {
   const s = await muxy.storage.get("state");
-  if (s) state = { collapsed: s.collapsed || {}, kinds: s.kinds || {}, expanded: s.expanded || {}, sizes: s.sizes || {}, showIdle: !!s.showIdle, serverTabs: s.serverTabs || {}, managerTabs: s.managerTabs || {} };
+  if (s) state = { collapsed: s.collapsed || {}, kinds: s.kinds || {}, expanded: s.expanded || {}, sizes: s.sizes || {}, showIdle: !!s.showIdle, serverTabs: s.serverTabs || {}, managerTabs: s.managerTabs || {}, lastWt: s.lastWt || {} };
+  data.agentAlias = (await safe(() => muxy.storage.get("agentAlias"), {})) || {};
+  data.subHidden = (await safe(() => muxy.storage.get("subHidden"), {})) || {};
+}
+
+/* Tidies a finished subagent out of the list. Its log stays on disk; only the row goes.
+ * Before: a subagent row stayed until its log was an hour old, finished or not, and clicking it only moved to the parent's
+ *         tab — which is where the user already was, so nothing appeared to happen.
+ * Now: a finished one drops out five minutes after its last write, and this dismisses it at once.
+ * Why: the owner asked for finished subagents to be cleaned up.
+ * Affects: subagent rows only. */
+async function hideSubagent(a) {
+  const saved = { ...((await safe(() => muxy.storage.get("subHidden"), {})) || {}) };
+  saved[a.childID] = Date.now();
+  await muxy.storage.set("subHidden", saved);
+  data.subHidden = saved;
+  mergeAgents(); render();
+}
+
+/* The owner's own name for an agent row, kept by session (or subagent id) so it survives a pane change.
+ * Before: a row could only show what the agent named its tab, or the issue it was given; there was no way to rename it.
+ * Now: right-click a row to name it, or to clear the name and go back to the automatic label.
+ * Why: the owner asked to name agent sessions himself.
+ * Affects: the row label only. The agent's tab title is untouched. */
+async function setAgentAlias(a, name) {
+  const key = a.sub ? "sub:" + a.childID : a.sess || a.paneID;
+  const saved = { ...((await safe(() => muxy.storage.get("agentAlias"), {})) || {}) };
+  if (name) saved[key] = name; else delete saved[key];
+  await muxy.storage.set("agentAlias", saved);
+  data.agentAlias = saved;
+  mergeAgents(); render();
 }
 
 /* ---------- loading ---------- */
@@ -153,36 +183,141 @@ async function refreshBranches() {
   data.branches = Object.fromEntries(entries);
 }
 
-/* Each running agent is labelled with the title of the terminal tab it runs in, found via the tab's panes. */
+/* Each running agent is labelled with the title of the terminal tab it runs in, found via the tab's panes.
+ * Before: the tab titles replaced the whole map, so the XITA labels mergeAgents had just written were dropped, and the
+ *         pane list was read without waiting, so XITA rows were paired with panes from the previous refresh.
+ * Now: the pane list is read first and the XITA merge runs again after the tab titles, keeping both kinds of label.
+ * Why: XITA rows showed the raw folder name or nothing, and pane pairing lagged one refresh behind the focus.
+ * Affects: the Agents section's row labels and which XITA row is marked as focused. */
 async function refreshAgents() {
   data.muxyAgents = await safe(() => muxy.agents.list(), []);
+  await attachIssueRuns();
+  await refreshFocus();
   mergeAgents();
   const projectIDs = [...new Set(data.agents.map((a) => a.projectID))];
   const entries = await pool(projectIDs, async (pid) => safe(() => muxy.tabs.list({ project: pid }), []));
   const titles = {};
   for (const tabs of entries) for (const t of tabs) for (const pane of t.paneIDs || []) titles[pane] = t.customTitle || t.title;
   data.agentTitles = titles;
+  mergeAgents(); // XITA has no tab title of its own: put its label back on top
   render();
 }
 
-/* Muxy's agents plus XITA processes found by scanXita(); everything else reads data.agents. */
+/* Agents the issue manager started run in a worktree folder outside every project, so Muxy files them under Home. The run
+ * records (tab id, project, branch) say where they really belong: the agent whose pane sits in the run's tab goes back to
+ * the project and shows the branch.
+ * Before: only the record's values were read, so the issue number in its key was lost and the row kept the agent's own
+ *         tab title, which is the first line of whatever prompt the agent was given.
+ * Now: the records are kept as tab id → { num, title, branch } in data.issueRuns, and the agent gets the issue itself.
+ * Why: the row should say which issue is being worked on, not the opening words of the prompt.
+ * Affects: rows of agents started from the Issues tab; other agents keep their tab title. */
+async function attachIssueRuns() {
+  const saved = (await safe(() => muxy.storage.get("issueRuns"), null)) || {};
+  const runs = new Map();
+  for (const [k, r] of Object.entries(saved)) {
+    runs.set(r.tabId, { num: k.slice(k.indexOf("#") + 1), title: r.title, branch: r.branch, projectPath: r.projectPath, dir: r.dir });
+  }
+  data.issueRuns = runs;
+  for (const r of runs.values()) {
+    const proj = data.projects.find((x) => r.projectPath && norm(x.path) === norm(r.projectPath)) || (issueWorktreeOwner(r.dir, data.projects) || {}).project;
+    if (!proj) continue;
+    const tabs = await safe(() => muxy.tabs.list({ project: proj.id }), []);
+    const tab = tabs.find((t) => t.id === r.tabId);
+    if (!tab) continue;
+    for (const a of data.muxyAgents) if ((tab.paneIDs || []).includes(a.paneID)) { a.projectID = proj.id; a.worktreeID = proj.id; a.where = r.branch; a.issueRun = r; }
+  }
+}
+
+/* Muxy's agents plus XITA processes found by scanXita(); everything else reads data.agents.
+ * Before: a row was labelled with the terminal tab's title, which is whatever first line the agent was handed, and XITA
+ *         rows always showed "XITA · <folder>".
+ * Now: an issue run's own number and title win, then the number and title parsed out of the issue prompt, then the tab
+ *      title, and only a XITA row with none of those falls back to its folder.
+ * Why: the section should say what is being worked on. The tab title belongs to the agent and it may be the opening words
+ *      of a prompt, or a slash command typed last.
+ * Affects: row labels in the Agents section. The agent's own title stays in the row's hover tooltip. */
 function mergeAgents() {
-  const xita = xitaAsAgents(data.xita || [], data.projects, data.worktrees);
+  const xita = xitaAsAgents(data.xita, data.projects, data.worktrees, data.panes || [], data.paneScreen);
   data.agents = [...(data.muxyAgents || []), ...xita];
-  for (const a of xita) data.agentTitles[a.paneID] = "XITA · " + base(a.cwd);
+  // subagents have no process or pane of their own: hang them under their parent's row
+  const kids = data.xitaChildren || [];
+  if (kids.length) {
+    const withKids = [];
+    for (const a of data.agents) {
+      withKids.push(a);
+      if (!a.sess) continue;
+      for (const c of kids.filter((k) => k.parent === a.sess).sort((x, y) => y.mtime - x.mtime)) {
+        // a finished subagent is tidied away five minutes after its last write, or right away when dismissed
+        if (data.subHidden[c.child]) continue;
+        if (c.done && Date.now() - c.mtime * 1000 > 300000) continue;
+        withKids.push({ paneID: "sub:" + c.child, sub: true, childID: c.child, parentSess: c.parent, parentPane: a.paneID, providerID: "xita", status: c.state, done: c.done, external: true, cwd: a.cwd, projectID: a.projectID, worktreeID: a.worktreeID, where: a.where, title: c.description, kind: c.kind });
+      }
+    }
+    data.agents = withKids;
+  }
+  const tabOf = new Map((data.panes || []).map((p) => [p.id, p.tabID]));
+  for (const a of data.agents) {
+    const alias = data.agentAlias[a.sub ? "sub:" + a.childID : a.sess || a.paneID];
+    if (alias) { data.agentTitles[a.paneID] = alias; continue; }
+    if (a.sub) { data.agentTitles[a.paneID] = a.title || tr("하위 작업"); continue; }
+    const run = a.issueRun || (data.issueRuns || new Map()).get(tabOf.get(a.paneID));
+    const issue = run ? [run.num, run.title] : [a.issueNum, a.issueTitle];
+    const label = issue.filter(Boolean).join(" ");
+    if (label) { data.agentTitles[a.paneID] = label; continue; }
+    if (a.external && (!a.paneMatched || !data.agentTitles[a.paneID])) data.agentTitles[a.paneID] = a.title || "XITA · " + base(a.cwd);
+  }
+}
+
+/* Reads the status line of every pane in a folder where a XITA process runs, and keeps the session id it prints.
+ * This is what turns a pane into a XITA row (see xitaAsAgents), so it runs before the rows are built.
+ * Before: only folders with an unpaired row were read, and the answer was a correction applied after the title match.
+ * Now: every such pane is read, at most once every 10 s, and the rows are built from the answer.
+ * Why: `/new` gives a process a second session and a tab title can be anything, so only the status line identifies it.
+ * Affects: XITA rows. Reading a terminal asks once per extension; until allowed, rows fall back to one per process. */
+async function pairXitaByScreen() {
+  const procs = (data.xita && data.xita.procs) || [];
+  if (!procs.length) return;
+  const folders = new Set(procs.map((p) => norm(p.cwd)));
+  const cand = (data.panes || []).filter((p) => folders.has(norm(p.workingDirectory || "")));
+  const now = Date.now();
+  let changed = false;
+  for (const p of cand) {
+    const seen = data.paneScreen.get(p.id);
+    if (seen && now - seen.at < 10000) continue;
+    const text = await safe(() => muxy.panes.readScreen(p.id, 12), null, true);
+    if (!text) continue;
+    const ids = String(text).match(/\b[0-9a-f]{11}-[0-9a-f]{6}\b/g) || [];
+    const before = seen ? seen.ids.join(",") : null;
+    data.paneScreen.set(p.id, { at: now, ids });
+    if (before !== ids.join(",")) changed = true;
+  }
+  if (changed) { mergeAgents(); render(); }
 }
 
 /* XITA does not emit Muxy events, so this runs on a timer (see main.js). Silent when the scan is not allowed yet. */
 async function refreshXita() {
   const found = await safe(() => scanXita(), null, true);
   if (found === null) return;
-  const key = JSON.stringify(found);
+  const kids = await safe(() => scanXitaChildren(), [], true);
+  const key = JSON.stringify(found) + "|" + JSON.stringify(kids);
   if (key === data.xitaKey) return;
-  data.xitaKey = key; data.xita = found;
+  data.xitaKey = key; data.xita = found; data.xitaChildren = kids;
   mergeAgents(); render();
+  pairXitaByScreen();
+}
+
+/* The terminal pane Muxy has focused right now (id and folder); the agent list marks the agent that lives in it. */
+async function refreshFocus() {
+  const panes = await safe(() => muxy.panes.list(), null, true);
+  if (!panes) return;
+  data.panes = panes; // XITA rows are built from these panes' status lines (see pairXitaByScreen)
+  const f = panes.find((x) => x.isFocused);
+  const focus = f ? { paneID: f.id, cwd: f.workingDirectory || "", title: f.title || "" } : null;
+  if (JSON.stringify(focus) !== JSON.stringify(data.focus)) { data.focus = focus; mergeAgents(); render(); pairXitaByScreen(); }
 }
 
 async function refreshTabs() {
+  refreshFocus();
   // tabs are only needed for projects whose row is open
   const open = data.projects.filter(isOpen);
   const entries = await pool(open, async (p) => [p.id, await safe(() => muxy.tabs.list({ project: p.id }), [])]);

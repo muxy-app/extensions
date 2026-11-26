@@ -1,6 +1,6 @@
 /* Folder add flow: scan a folder for git repositories and submodules, then register the chosen ones. */
 const SCAN_DEPTH = 5;
-const PRUNE = ["node_modules", ".venv", "Pods", "vendor", ".next", "dist", "build", "target"];
+const PRUNE = ["node_modules", ".venv", "Pods", "vendor", ".next", "dist", "build", "target", ".build", "DerivedData", ".gradle", ".dart_tool", ".terraform", "__pycache__"];
 
 /* ---------- add folder ---------- */
 
@@ -28,7 +28,13 @@ async function scanRepos(root) {
       found.push({ path, kind: "submodule" });
     }
   }
-  return found.sort((a, b) => a.path.localeCompare(b.path));
+  // Before: every folder with a .git was offered. Now: a repository inside a folder that an enclosing repo git-ignores is
+  // skipped. Why: those are dependency checkouts (SwiftPM .build/checkouts, vendored clones), not projects.
+  const kept = await pool(found, async (f) => {
+    const parent = f.path.replace(/\/[^/]+$/, "");
+    try { const r = await muxy.exec(["git", "-C", parent, "check-ignore", "-q", f.path], { timeoutMs: 10000 }); return r.exitCode === 0 ? null : f; } catch { return f; }
+  });
+  return kept.filter(Boolean).sort((a, b) => a.path.localeCompare(b.path));
 }
 
 /* Folder add = Muxy's built-in "Open Project…" window (header button and every workspace's "＋" alike).
@@ -65,6 +71,20 @@ async function adoptAdded(added, groupID) {
     // the picked folder itself is already a project; only its contents are worth offering
     if (found.some((f) => norm(f.path) !== norm(p.path))) { openAddDialog(norm(p.path), found, groupID || UNGROUPED); break; }
   }
+}
+
+/* Right-click "저장소 다시 읽기": scans the project's folder again and offers the repositories or submodules that are not
+ * registered yet, into the same group as the project. */
+async function rescanProject(p) {
+  const root = norm(p.path);
+  const found = await safe(() => scanRepos(root), []);
+  const known = new Set(data.projects.map((x) => norm(x.path)));
+  if (!found.some((f) => !known.has(f.path))) {
+    muxy.dialog.alert({ title: tr("새로 찾은 저장소가 없어요"), message: tr("{0} 아래의 저장소는 모두 이미 추가돼 있어요.", root) });
+    return;
+  }
+  const g = groupOf(p.id);
+  openAddDialog(root, found, g ? g.id : UNGROUPED);
 }
 
 function openAddDialog(root, found, presetGroupID) {

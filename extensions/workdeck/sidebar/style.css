@@ -335,3 +335,6 @@ body.compact .icon-btn .ico svg { width: 13px; height: 13px; }
 .ico.blink.waiting { color: #ff9f0a; animation-duration: .8s; }
 @keyframes iconblink { 0%, 100% { opacity: 1; } 50% { opacity: .2; } }
 .ico.exttab { color: #4c9aff; opacity: .9; }
+
+#fulltip { position: fixed; z-index: 200; max-width: min(320px, calc(100vw - 8px)); padding: 5px 8px; border-radius: 6px; font-size: 11px; line-height: 1.4; white-space: pre-wrap; word-break: break-word; pointer-events: none; color: var(--muxy-foreground); background: var(--muxy-surface-solid, #222); border: 1px solid var(--muxy-border); box-shadow: 0 4px 14px rgba(0,0,0,.35); }
+#fulltip[hidden] { display: none; }
