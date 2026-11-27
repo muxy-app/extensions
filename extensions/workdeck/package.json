@@ -1,6 +1,6 @@
 {
   "name": "workdeck",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "author": "Wonjin",
   "license": "MIT",
   "scripts": {
@@ -32,6 +32,7 @@
     ],
     "events": [
       "agent.status",
+      "pane.focused",
       "project.switched",
       "projects.changed",
       "tab.closed",

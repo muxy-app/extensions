@@ -2,7 +2,7 @@
  * memo as it happens). Storage lives in store.js; opened from the sidebar menus (with a scope) or the quick-note
  * modal ("all notes"). */
 const SC = ctx.scope || null; // the scope this tab was opened for; null shows every note
-const S = { mode: "helper", hdraft: "", notes: [], filter: SC ? SC.kind : "all", cur: null, known: new Set(), editId: null, delId: null, draft: "", projects: [], workspaces: [], view: "note", panel: null };
+const S = { mode: "helper", hdraft: "", notes: [], filter: SC ? (SC.kind === "ws" ? "all" : SC.kind) : "all", cur: null, known: new Set(), editId: null, delId: null, draft: "", projects: [], workspaces: [], members: {}, view: "note", panel: null };
 let H = null; // the running helper session: { note, entry, agent, sid, screen, miss, busy, dirty, lastRaw }
 /* Before: the helper's session id and heartbeat files were /tmp/workdeck-helper-session and /tmp/workdeck-hb-<session>.
  * Now: both live in ~/.local/share/workdeck/run (the private folder agent launches already use), the session id read back
@@ -53,7 +53,16 @@ async function persist(note) {
 }
 
 /* ---------- list ---------- */
+/* Which notes the list shows.
+ * Before: a workspace-scoped tab showed only notes attached to the workspace itself.
+ * Now: in a ws tab, "전체" also includes notes of every member project; "워크스페이스" keeps the ws-only view.
+ * Why: the owner asked to see all notes of the workspace's projects in the all view.
+ * Affects: ws-scoped tabs only; proj tabs and the unscoped all/global/ws/proj filters are unchanged. */
 function visible() {
+  if (SC && SC.kind === "ws") {
+    const members = S.members[SC.id] || [];
+    return S.notes.filter((n) => sameScope(n.scope, SC) || (S.filter === "all" && n.scope.kind === "proj" && members.includes(n.scope.id)));
+  }
   return S.notes.filter((n) => (SC ? sameScope(n.scope, SC) : S.filter === "all" || n.scope.kind === S.filter));
 }
 function renderList() {
@@ -64,8 +73,20 @@ function renderList() {
       el("div", { class: "meta" }, chip(scopeLabel(n.scope)), el("span", {}, tr("메모 {0}개", n.count)), el("span", {}, ago(new Date(n.mtime).toISOString()))))))
     : el("div", { class: "empty" }, tr("노트가 없어요.")));
 }
+/* Workspace membership for the ws "전체" view, read from Muxy's state file. The command text is identical to the
+ * sidebar's refreshMembers (sidebar/core.js) so the same remembered exec approval applies — keep the two in sync. */
+async function readMembers() {
+  try {
+    const r = await muxy.exec({ shell: 'f="$HOME/Library/Application Support/Muxy 2/desktop-state.json"; [ -f "$f" ] || f="$HOME/Library/Application Support/Muxy/desktop-state.json"; plutil -extract workspaces json -o - "$f"; echo; plutil -extract window.focus_history json -o - "$f" 2>/dev/null || echo "[]"; echo; echo "$HOME"' });
+    if (r.exitCode !== 0) return {};
+    const lines = r.stdout.trimEnd().split("\n").filter((l) => l.trim() !== "");
+    lines.pop(); lines.pop(); // $HOME and focus_history; only the workspaces line is needed here
+    return Object.fromEntries(JSON.parse(lines.join("\n")).map((w) => [w.id, w.projects || []]));
+  } catch (e) { return {}; }
+}
 async function refreshList() {
   S.notes = await NS.list();
+  if (SC && SC.kind === "ws") S.members = await readMembers();
   renderList();
 }
 
@@ -428,7 +449,13 @@ try {
 /* ---------- boot ---------- */
 const myTitle = SC ? `${tr("노트")} · ${SC.name || tr("전역")}` : tr("노트");
 $("#title").textContent = SC ? myTitle : tr("노트");
-$("#scopes").hidden = !!SC;
+/* A ws tab offers 전체 (ws + member projects) / 워크스페이스 (ws only); a proj tab has no sub-scopes. */
+if (SC && SC.kind === "ws") {
+  $("#scopes").replaceChildren(el("button", { "data-s": "all", class: "on" }, tr("전체")), el("button", { "data-s": "ws" }, tr("워크스페이스")));
+  $("#scopes").hidden = false;
+} else {
+  $("#scopes").hidden = !!SC;
+}
 $("#scopes").addEventListener("click", (e) => {
   const b = e.target.closest("button");
   if (!b) return;
@@ -441,6 +468,13 @@ $("#scopes").addEventListener("click", (e) => {
 });
 $("#new").addEventListener("click", () => { S.view = "note"; S.panel = newNoteForm; renderNote(); });
 $("#settings").addEventListener("click", () => { if (S.view === "settings") { S.view = "note"; renderNote(); } else renderSettings(); });
+/* Explicit reload: re-read the list (and membership), then the open note from disk — never over a draft or a running helper. */
+$("#refresh").addEventListener("click", guard(async () => {
+  await refreshList();
+  if (H || S.draft || S.editId || S.view !== "note" || !S.cur) return;
+  const note = await NS.load(S.cur.file).catch(() => null);
+  if (note) { S.cur = note; S.known = new Set(note.entries.map((x) => x.id)); renderNote(); }
+}));
 window.addEventListener("focus", guard(async () => {
   if (H || S.editId || S.view === "settings") return;
   await refreshList();

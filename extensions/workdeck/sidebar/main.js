@@ -2,6 +2,7 @@
 $("#add-folder").addEventListener("click", () => addFolder());
 $("#add-group").addEventListener("click", () => createGroup());
 $("#more").addEventListener("click", (e) => { e.stopPropagation(); moreMenu(anchor(e.currentTarget)); });
+$("#notes").addEventListener("click", () => openNotesFor(null));
 $("#ext").addEventListener("click", (e) => { e.stopPropagation(); extensionsMenu(anchor(e.currentTarget, true)); });
 $("#settings").addEventListener("click", () => muxy.ui.openSettings("general"));
 document.querySelectorAll(".slot[data-icon]").forEach((n) => n.replaceWith(icon(n.dataset.icon, "window")));
@@ -56,7 +57,7 @@ function revealActive() {
   }, 60);
 }
 
-const onSwitch = (e) => schedule("active", async () => { await refreshActive([e && e.projectID].filter(Boolean)); await refreshTabs(); revealActive(); }, 100);
+const onSwitch = (e) => schedule("active", async () => { await refreshActive([e && e.projectID].filter(Boolean)); await refreshTabs(); revealActive(); schedule("xita", refreshXita, 0); }, 100);
 muxy.events.subscribe("project.switched", onSwitch);
 muxy.events.subscribe("worktree.switched", onSwitch);
 muxy.events.subscribe("worktree.headChanged", () => schedule("branches", async () => { await refreshBranches(); render(); }));
@@ -67,14 +68,20 @@ setInterval(() => { if (document.visibilityState === "visible") schedule("worktr
 muxy.events.subscribe("agent.status", () => schedule("agents", refreshAgents, 150));
 for (const ev of ["tab.created", "tab.closed", "tab.updated"]) muxy.events.subscribe(ev, () => schedule("tabs", refreshTabs, 300));
 muxy.events.subscribe("tab.focused", () => schedule("tabs", async () => { await refreshTabs(); revealActive(); }, 300));
+// pane focus is what Muxy records in focus_history — re-read it so the recent-activity workspace order follows
+muxy.events.subscribe("pane.focused", () => { schedule("members", refreshMembers, 600); schedule("tabs", refreshTabs, 300); });
 muxy.events.subscribe("tab.updated", () => schedule("agents", refreshAgents, 800));
 muxy.events.subscribe("ui.changed", () => schedule("ui", async () => { await refreshUI(); refreshTabs(); }));
 
 (async () => {
   try { await loadState(); } catch (err) { console.error("load state", err); }
-  await refreshUI();
-  await refreshProjects();
-  await refreshMembers();
+  // One step that fails must not keep the later ones from running: right after an extension reload Muxy is busy and
+  // a single call can come back with "no response", which used to leave the sidebar without projects or timers.
+  // step answers whether the call succeeded; the steps themselves return nothing.
+  const step = async (fn) => { try { await fn(); return true; } catch (e) { console.warn(String((e && e.message) || e)); return false; } };
+  await step(refreshUI);
+  if (!(await step(refreshProjects))) schedule("projects", refreshProjects, 5000);
+  await step(refreshMembers);
   refreshServers();
   refreshSidebars();
   refreshAgents();

@@ -87,17 +87,36 @@ for d in "$HOME"/.xita/sessions/*/; do
   esac
   printf 'S|%s|%s|%s|%s|%s|%s|%s\\n' "$(basename "$p")" "$cwd" "$state" "$m" "$title" "$inum" "$ititle"
 done`;
-async function scanXita() {
-  const r = await muxy.exec({ shell: XITA_SCAN, timeoutMs: 20000 });
-  if (r.exitCode !== 0) return null;
+function parseXitaScan(stdout) {
   const clean = (s) => String(s || "").replace(/\\[nrt]/g, " ").replace(/\s+/g, " ").trim();
   const procs = [], sessions = [];
-  for (const line of r.stdout.split("\n")) {
+  for (const line of String(stdout || "").split("\n")) {
     const f = line.split("|");
     if (f[0] === "P" && f[1] && f[2]) procs.push({ pid: f[1], cwd: f[2], session: f[3] || null });
     else if (f[0] === "S" && f[1] && f[2]) sessions.push({ sess: f[1], cwd: f[2], state: f[3] === "working" ? "working" : "idle", mtime: Number(f[4]) || 0, title: clipText(clean(f[5]), 80), issueNum: clean(f[6]), issueTitle: clipText(clean(f[7]), 80) });
   }
   return { procs, sessions };
+}
+/* Runs wherever `muxy.exec` runs: on the server of the project Muxy is showing (this Mac, or a remote connection
+ * while one of its projects is selected). */
+async function scanXita() {
+  const r = await muxy.exec({ shell: XITA_SCAN, timeoutMs: 20000 });
+  if (r.exitCode !== 0) return null;
+  return parseXitaScan(r.stdout);
+}
+/* The same scan on one named server.
+ * Before: the scan could only run where `muxy.exec` runs, so with a remote server selected this Mac was not scanned.
+ * Now: `muxy exec <project> --json -- /bin/sh -c <script>` — without --host for this Mac, with --host for a remote
+ *      connection — addresses one server whatever is selected.
+ * Why: the local agents must not disappear when a remote server is selected, and a remote server must be readable on
+ *      demand rather than by polling.
+ * Affects: where the scan runs; the script and its output are unchanged. Each address is one command text, so Muxy
+ *          asks for approval once per address. Returns null when the run fails. */
+async function scanXitaOn(server, projectID) {
+  if (!projectID) return null;
+  const r = await muxyCLI([...(server ? ["--host", server.ssh] : []), "exec", projectID, "--json", "--timeout-ms", "20000", "--", "/bin/sh", "-c", XITA_SCAN]);
+  if (r.exitCode !== 0) return null;
+  try { const res = JSON.parse(r.stdout); return res.exit_code === 0 ? parseXitaScan(res.stdout) : null; } catch { return null; }
 }
 
 /* Issue runs work in ~/.local/share/workdeck/worktrees/<repo folder>-<hash>/<branch> (0.2.0 test builds: without the
@@ -140,7 +159,7 @@ function xitaAsAgents(scan, projects, worktrees, panes, paneScreen) {
   const row = (o, cwd, s, paneID, matched, pr) => ({
     where: o.where, projectID: o.p.id, worktreeID: o.w ? o.w.id : o.p.id, paneID, paneMatched: matched, pid: pr ? pr.pid : null,
     session: pr ? pr.session : null, // the Muxy terminal session, used by the control room
-    providerID: "xita", status: s ? s.state : "idle", external: true, cwd, sess: s ? s.sess : null,
+    providerID: "xita", status: s ? s.state : "idle", external: true, cwd, sess: s ? s.sess : null, mtime: s ? s.mtime : 0,
     title: s ? s.title : "", issueNum: s ? s.issueNum : "", issueTitle: s ? s.issueTitle : "",
   });
   const out = [];

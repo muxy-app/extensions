@@ -9,9 +9,9 @@ const PALETTE = [
 /* Persisted in extension storage: UI-only memory. Groups themselves are Muxy workspaces.
  * kinds: projectID -> { kind: "repo" | "submodule", root } recorded when a folder is added through the scan,
  * where root is the folder that was picked (used to draw a folder row above its repositories). */
-let state = { collapsed: {}, kinds: {}, expanded: {}, sizes: {}, showIdle: false, serverTabs: {}, managerTabs: {}, lastWt: {} };
+let state = { collapsed: {}, kinds: {}, expanded: {}, sizes: {}, showIdle: false, serverTabs: {}, managerTabs: {}, lastWt: {}, wsSort: "recent" };
 /* Live data pulled from Muxy. members: workspaceID -> project IDs, read from Muxy's desktop-state.json. */
-let data = { projects: [], branches: {}, worktrees: {}, agents: [], muxyAgents: [], xita: null, xitaChildren: [], agentTitles: {}, focus: null, panes: [], issueRuns: new Map(), paneScreen: new Map(), agentAlias: {}, subHidden: {}, projectTabs: {}, workspaces: [], members: {}, membersOK: false, home: null, servers: [], serverStatus: {}, sidebars: null, query: "" };
+let data = { projects: [], branches: {}, worktrees: {}, agents: [], muxyAgents: [], xita: null, xitaChildren: [], agentTitles: {}, focus: null, panes: [], issueRuns: new Map(), paneScreen: new Map(), agentAlias: {}, subHidden: {}, projectTabs: {}, workspaces: [], members: {}, membersOK: false, focusHistory: [], projectMeta: {}, remoteAgents: [], remoteCache: {}, home: null, servers: [], serverStatus: {}, sidebars: null, query: "" };
 
 const $ = (sel) => document.querySelector(sel);
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -37,9 +37,10 @@ async function save() {
 
 async function loadState() {
   const s = await muxy.storage.get("state");
-  if (s) state = { collapsed: s.collapsed || {}, kinds: s.kinds || {}, expanded: s.expanded || {}, sizes: s.sizes || {}, showIdle: !!s.showIdle, serverTabs: s.serverTabs || {}, managerTabs: s.managerTabs || {}, lastWt: s.lastWt || {} };
+  if (s) state = { collapsed: s.collapsed || {}, kinds: s.kinds || {}, expanded: s.expanded || {}, sizes: s.sizes || {}, showIdle: !!s.showIdle, serverTabs: s.serverTabs || {}, managerTabs: s.managerTabs || {}, lastWt: s.lastWt || {}, wsSort: s.wsSort || "recent" };
   data.agentAlias = (await safe(() => muxy.storage.get("agentAlias"), {})) || {};
   data.subHidden = (await safe(() => muxy.storage.get("subHidden"), {})) || {};
+  data.remoteCache = (await safe(() => muxy.storage.get("remoteAgents"), {})) || {}; // last read of each remote connection's agents
 }
 
 /* Tidies a finished subagent out of the list. Its log stays on disk; only the row goes.
@@ -103,20 +104,25 @@ async function loadProjects() {
   render();
   await Promise.all([refreshWorktrees(), refreshBranches()]);
   render();
+  syncRemoteSoon();
 }
 
 /* Workspace membership is not exposed by the extension API, so it is read (read-only) from Muxy's own
- * state file. Writes always go through projects.attach/detach and workspaces.*. */
+ * state file. Writes always go through projects.attach/detach and workspaces.*.
+ * Before: only workspace membership and $HOME were read; the sidebar always showed Muxy's list order.
+ * Now: window.focus_history (pane ids, oldest first) is extracted in the same call into data.focusHistory.
+ * Why: the owner asked for workspaces sorted by recent activity, and focus history is Muxy's own activity record.
+ * Affects: read-only — one more plutil extraction in the same exec; a missing or unreadable history falls back to []. */
 async function refreshMembers() {
   try {
     const r = await muxy.exec({
-      shell: 'f="$HOME/Library/Application Support/Muxy 2/desktop-state.json"; [ -f "$f" ] || f="$HOME/Library/Application Support/Muxy/desktop-state.json"; plutil -extract workspaces json -o - "$f"; echo; echo "$HOME"',
+      shell: 'f="$HOME/Library/Application Support/Muxy 2/desktop-state.json"; [ -f "$f" ] || f="$HOME/Library/Application Support/Muxy/desktop-state.json"; plutil -extract workspaces json -o - "$f"; echo; plutil -extract window.focus_history json -o - "$f" 2>/dev/null || echo "[]"; echo; echo "$HOME"',
     });
     if (r.exitCode !== 0) throw new Error(r.stderr || `exit ${r.exitCode}`);
-    const out = r.stdout.trimEnd();
-    const cut = out.lastIndexOf("\n");
-    data.home = out.slice(cut + 1).trim() || null; // last line is $HOME, used to find the Home project
-    data.members = Object.fromEntries(JSON.parse(out.slice(0, cut)).map((w) => [w.id, w.projects || []]));
+    const lines = r.stdout.trimEnd().split("\n").filter((l) => l.trim() !== "");
+    data.home = (lines.pop() || "").trim() || null; // last line is $HOME, used to find the Home project
+    try { data.focusHistory = JSON.parse(lines.pop() || "[]"); } catch (e) { data.focusHistory = []; }
+    data.members = Object.fromEntries(JSON.parse(lines.join("\n")).map((w) => [w.id, w.projects || []]));
     data.membersOK = true;
   } catch (e) {
     console.warn("workspace members unreadable: " + String((e && e.message) || e));
@@ -125,11 +131,43 @@ async function refreshMembers() {
   render();
   await refreshWorktrees();
   render();
+  syncRemoteSoon();
 }
 
 /* Registered Muxy worktrees, kept only to know which one is active and to offer "Worktree 전환…". */
 async function refreshWorktrees() {
   const targets = data.projects.filter((p) => p.worktreesEnabled);
+  const entries = await pool(targets, async (p) => [p.id, await safe(() => muxy.worktrees.list(p.id), [])]);
+  data.worktrees = Object.fromEntries(entries);
+  await pruneMissingWorktrees(targets);
+}
+
+/* Drops worktree registrations whose folder no longer exists.
+ * Before: a worktree removed outside Muxy (`git worktree remove` + folder delete) stayed in the sidebar forever —
+ *         Muxy keeps the record, worktrees.refresh() does not prune it, and no refresh re-checked the path.
+ * Now: each worktree refresh probes every secondary worktree with git.currentBranch; when Muxy itself answers
+ *      "Project directory is missing", the record goes through projects.delete and the lists are re-read.
+ * Why: the owner asked for worktrees with a missing path to drop out automatically on reload (workbit KYL-873 ghost).
+ * Affects: secondary worktree rows only — never the project's own folder, never the active worktree, and never on
+ *          any other error (offline server, timeout). One delete attempt per worktree per session, so a denied
+ *          permission prompt is not asked again every 15 seconds. */
+const pruneTried = new Set();
+async function pruneMissingWorktrees(targets) {
+  const suspects = [];
+  for (const p of targets) for (const w of data.worktrees[p.id] || []) {
+    if (!w.isActive && norm(w.path) !== norm(p.path) && !pruneTried.has(w.id)) suspects.push(w);
+  }
+  if (!suspects.length) return;
+  let removed = false;
+  await pool(suspects, async (w) => {
+    try { await muxy.git.currentBranch({ project: w.id }); }
+    catch (e) {
+      if (!/directory is missing/i.test(String((e && e.message) || e))) return;
+      pruneTried.add(w.id);
+      if (await safe(async () => { await muxy.projects.delete(w.id); return true; }, false)) removed = true;
+    }
+  });
+  if (!removed) return;
   const entries = await pool(targets, async (p) => [p.id, await safe(() => muxy.worktrees.list(p.id), [])]);
   data.worktrees = Object.fromEntries(entries);
 }
@@ -171,10 +209,23 @@ const isCurrent = (p) => p.isActive || (data.worktrees[p.id] || []).some((w) => 
 /* Open = its tab list is visible. Clicking a project row only toggles this; the current project starts open. */
 const isOpen = (p) => state.expanded[p.id] ?? isCurrent(p);
 
-/* The user's Home project is pinned above every group. */
+/* Which server a project belongs to, and whether it is that server's Home. Muxy creates a Home project on every
+ * server it connects to, so a remote one can have the very same folder path as this Mac's Home. */
+const serverOf = (p) => ((data.projectMeta || {})[p.id] || {}).server;
+const serverOfProject = (p) => (data.servers || []).find((s) => s.id === serverOf(p));
+const isRemote = (p) => !!serverOfProject(p);
+const isHomeProject = (p) => !!((data.projectMeta || {})[p.id] || {}).home;
+
+/* The user's Home project is pinned above every group.
+ * Before: any project whose folder is $HOME was taken for Home, so the Home project of a remote server run by an
+ *         account with the same user name was pinned up there too and lost its "그룹 이동" menu.
+ * Now: only a local project can be Home; a remote server's Home is an ordinary row.
+ * Why: the owner's remote server projects (same /Users/<name> path) showed up as a second Home at the top.
+ * Affects: the pinned Home slot and the menus of remote Home projects only. */
 function isHome(p) {
+  if (isRemote(p)) return false;
   if (data.home) return norm(p.path) === norm(data.home);
-  const homes = data.projects.filter((x) => x.name === "Home");
+  const homes = data.projects.filter((x) => x.name === "Home" && !isRemote(x));
   return homes.length > 0 && homes[0].id === p.id;
 }
 
@@ -191,6 +242,7 @@ async function refreshBranches() {
  * Affects: the Agents section's row labels and which XITA row is marked as focused. */
 async function refreshAgents() {
   data.muxyAgents = await safe(() => muxy.agents.list(), []);
+  rememberRemoteMuxy();
   await attachIssueRuns();
   await refreshFocus();
   mergeAgents();
@@ -240,8 +292,11 @@ async function attachIssueRuns() {
  *      of a prompt, or a slash command typed last.
  * Affects: row labels in the Agents section. The agent's own title stays in the row's hover tooltip. */
 function mergeAgents() {
-  const xita = xitaAsAgents(data.xita, data.projects, data.worktrees, data.panes || [], data.paneScreen);
-  data.agents = [...(data.muxyAgents || []), ...xita];
+  // local XITA only: a remote server often has the very same folder paths, and its agents come from its own cache
+  const xita = xitaAsAgents(data.xita, data.projects.filter((x) => !isRemote(x)), data.worktrees, data.panes || [], data.paneScreen);
+  const muxyLocal = (data.muxyAgents || []).filter((a) => { const p = data.projects.find((x) => x.id === a.projectID); return !(p && serverOfProject(p)); });
+  data.remoteAgents = cachedRemoteAgents();
+  data.agents = [...muxyLocal, ...(data.remoteAgents || []), ...xita];
   // subagents have no process or pane of their own: hang them under their parent's row
   const kids = data.xitaChildren || [];
   if (kids.length) {
@@ -262,6 +317,7 @@ function mergeAgents() {
   for (const a of data.agents) {
     const alias = data.agentAlias[a.sub ? "sub:" + a.childID : a.sess || a.paneID];
     if (alias) { data.agentTitles[a.paneID] = alias; continue; }
+    if (a.remote) { data.agentTitles[a.paneID] = a.title || "agent"; continue; } // a cached remote row carries its own title
     if (a.sub) { data.agentTitles[a.paneID] = a.title || tr("하위 작업"); continue; }
     const run = a.issueRun || (data.issueRuns || new Map()).get(tabOf.get(a.paneID));
     const issue = run ? [run.num, run.title] : [a.issueNum, a.issueTitle];
@@ -311,17 +367,47 @@ async function relayIssueOutboxes() {
   if (posted) { await attachIssueRuns(); render(); }
 }
 
-/* XITA does not emit Muxy events, so this runs on a timer (see main.js). Silent when the scan is not allowed yet. */
+/* One tick of the XITA scan; XITA emits no Muxy events, so it runs on a timer (see main.js). Silent until the scan is allowed.
+ * Before: one scan per tick, wherever `muxy.exec` runs — the server of the project Muxy is showing. With a remote
+ *         server selected that read the remote server instead of this Mac, so the Agents section flipped between the
+ *         local agents and one remote server's agents and never showed both.
+ * Now: this Mac is always read (pinned to the local server while a remote one is selected). The remote connection
+ *      being viewed is read through a connection that already exists — Muxy's own while one of its projects is
+ *      selected (that is where `scanXita()` lands), or one short `muxy --host` run while its terminal tab is the
+ *      active tab, at most every 30 seconds; the result is cached (see the remote agents block above).
+ * Why: the owner wants local and remote agents in the section together, without background polling.
+ * Affects: the Agents section. A failed read keeps the previous data. */
+let xitaBusy = false;
 async function refreshXita() {
   relayIssueOutboxes();
-  const found = await safe(() => scanXita(), null, true);
-  if (found === null) return;
-  const kids = await safe(() => scanXitaChildren(), [], true);
-  const key = JSON.stringify(found) + "|" + JSON.stringify(kids);
-  if (key === data.xitaKey) return;
-  data.xitaKey = key; data.xita = found; data.xitaChildren = kids;
-  mergeAgents(); render();
-  pairXitaByScreen();
+  if (xitaBusy) return;
+  xitaBusy = true;
+  try {
+    const viewed = viewedServer();
+    const native = viewed && viewed.how === "native" ? viewed.server : null;
+    const localProject = data.projects.find((p) => !isRemote(p));
+    // scanXita() lands on the server Muxy is showing: that is the remote read while a remote server is selected
+    const [ctx, local] = await Promise.all([
+      safe(() => scanXita(), null, true),
+      native ? safe(() => scanXitaOn(null, localProject && localProject.id), null, true) : Promise.resolve(undefined),
+    ]);
+    if (native && ctx) rememberXita(native, ctx, Date.now());
+    else if (viewed && viewed.how === "tui" && Date.now() - cacheOf(viewed.server).at >= 30000) {
+      // the terminal connection tab: its own ssh is busy in the terminal, so one short separate run, at most every 30 s
+      const scan = await safe(() => scanXitaOn(viewed.server, remoteExecProject(viewed.server)), null, true);
+      if (scan) rememberXita(viewed.server, scan, Date.now());
+    }
+    const found = native ? local : ctx;
+    if (!found) return;
+    const kids = await safe(() => scanXitaChildren(), [], true);
+    const key = JSON.stringify(found) + "|" + JSON.stringify(kids);
+    if (key === data.xitaKey) return;
+    data.xitaKey = key; data.xita = found; data.xitaChildren = kids;
+    mergeAgents(); render();
+    pairXitaByScreen();
+  } finally {
+    xitaBusy = false;
+  }
 }
 
 /* The terminal pane Muxy has focused right now (id and folder); the agent list marks the agent that lives in it. */
@@ -353,17 +439,150 @@ async function refreshSidebars() {
 }
 
 /* Remote servers are listed in Muxy's settings; `muxy config get servers --json` reads them. */
+/* Configured remote servers, listed in Muxy's settings; `muxy config get servers --json` reads them.
+ * Before: read once at start-up and on "서버 목록 다시 읽기". A failed read (Muxy busy just after an extension reload
+ *         answered "no response" / "servers: is not a setting") left data.servers empty for the whole session, which
+ *         silently removed every remote feature: the connection groups, the cached remote agents, the Remote section.
+ * Now: a failed read is retried with backoff (5 s, doubling, at most 60 s apart) until it succeeds.
+ * Why: the owner saw the remote agents vanish right after a reload.
+ * Affects: data.servers only; nothing else reads the server list. */
+let serversFailures = 0;
 async function refreshServers() {
   try {
     const r = await muxyCLI(["config", "get", "servers", "--json"], { timeoutMs: 15000 });
     if (r.exitCode !== 0) throw new Error(r.stderr || `exit ${r.exitCode}`);
     data.servers = JSON.parse(r.stdout || "[]");
+    serversFailures = 0;
   } catch (e) {
     console.warn("remote servers unreadable: " + String((e && e.message) || e));
     data.servers = [];
+    schedule("servers", refreshServers, Math.min(60000, 5000 * 2 ** serversFailures++));
+    return;
   }
   render();
+  await syncRemote();
 }
+
+/* Agents of the remote connections.
+ * Before: a 30-second poll ran `activity list` over SSH on every configured server. It opened a connection to each
+ *         machine all the time, and it only ever saw agents Muxy itself knows (Claude, Codex, …) — never XITA.
+ * Now: nothing polls. The last read of each connection is cached here (extension storage "remoteAgents", so the
+ *      groups survive a reload) and stays on screen with its age. It is refreshed only while that connection is being
+ *      viewed (see viewedServer), through a connection that already exists: Muxy's own while one of its projects is
+ *      selected, or one short `muxy --host` run while its terminal connection tab is the active tab. The group header's
+ *      menu can force one read.
+ * Why: the owner wants local and remote agents in one section, and no background connecting to every server.
+ * Affects: the Agents section and the blink marks on remote project rows. Rows of a connection that is not being
+ *          viewed may be out of date; the header shows when they were read. */
+const cacheOf = (s) => (data.remoteCache[s.id] = data.remoteCache[s.id] || { at: 0, xita: [], muxy: [] });
+const saveRemoteCache = () => safe(() => muxy.storage.set("remoteAgents", data.remoteCache), undefined, true);
+function cachedRemoteAgents() {
+  const out = [];
+  for (const s of data.servers) {
+    const c = data.remoteCache[s.id];
+    if (!c) continue;
+    for (const kind of ["muxy", "xita"]) for (const r of c[kind] || []) out.push({ ...r, remote: true, server: s });
+  }
+  return out;
+}
+/* The connection Muxy is showing right now, and how. "native": the current project is one of its projects, so Muxy
+ * holds the connection and `muxy.exec` runs there. "tui": its terminal connection tab is the active tab; that tab has
+ * its own ssh, and `muxy.exec` still runs on this Mac. */
+function viewedServer() {
+  const cur = data.projects.find(isCurrent);
+  const native = cur ? serverOfProject(cur) : null;
+  if (native) return { server: native, how: "native" };
+  for (const s of data.servers) {
+    const id = state.serverTabs[s.id];
+    if (id && (data.projectTabs[cur && cur.id] || []).some((t) => t.id === id && t.isActive)) return { server: s, how: "tui" };
+  }
+  return null;
+}
+const remoteExecProject = (s) => { const p = data.projects.find((x) => serverOfProject(x) === s); return p ? p.id : null; };
+
+/* One read of a connection's XITA agents becomes its cached rows. */
+function rememberXita(s, scan, now) {
+  const rows = xitaAsAgents(scan, data.projects.filter((x) => serverOfProject(x) === s), {}, [], null)
+    .map((r) => ({ ...r, paneID: "srv:" + s.id + ":" + r.paneID, remote: true, serverId: s.id, title: r.title || "XITA · " + base(r.cwd) }));
+  const c = cacheOf(s);
+  const changed = JSON.stringify(c.xita) !== JSON.stringify(rows);
+  const due = now - (c.at || 0) >= 30000; // the age label works in minutes, so the timestamp need not be written every tick
+  c.at = now;
+  if (!changed && !due) return;
+  c.xita = rows;
+  saveRemoteCache();
+  if (changed) { mergeAgents(); render(); }
+}
+/* The agents Muxy itself knows on the connection it is showing (from muxy.agents.list), kept with that connection's
+ * cache so they stay listed after the selection moves back to this Mac. */
+function rememberRemoteMuxy() {
+  const viewed = viewedServer();
+  if (!viewed || viewed.how !== "native") return;
+  const s = viewed.server;
+  const rows = data.muxyAgents
+    .map((a) => ({ a, p: data.projects.find((x) => x.id === a.projectID) }))
+    .filter(({ p }) => p && serverOfProject(p) === s)
+    .map(({ a, p }) => ({ paneID: "srv:" + s.id + ":" + a.paneID, providerID: a.providerID, status: a.status, projectID: a.projectID, remote: true, serverId: s.id, title: `${(AGENT_BRAND[a.providerID] || [])[2] || a.providerID || "agent"} · ${p.name}` }));
+  const c = cacheOf(s);
+  if (JSON.stringify(c.muxy) === JSON.stringify(rows)) return;
+  c.muxy = rows;
+  saveRemoteCache();
+}
+/* One forced read of a connection's XITA agents (the group header's menu): the only case that opens an ssh
+ * connection without the connection being viewed. */
+async function rescanRemoteServer(s) {
+  if (!remoteExecProject(s)) throw new Error(tr("이 서버의 프로젝트를 아직 읽지 못했어요 · 잠시 뒤 다시 시도해 주세요"));
+  const scan = await scanXitaOn(s, remoteExecProject(s));
+  if (!scan) throw new Error(tr("원격 서버의 에이전트를 읽지 못했어요"));
+  rememberXita(s, scan, Date.now());
+}
+
+/* Which server each project belongs to is not in the extension API (ProjectInfo has no server field), so it is read
+ * (read-only) from Muxy's own state file like the workspace membership above: id, server_id and the home flag of every
+ * project. The command text never changes, so Muxy asks for approval once. */
+const PROJECT_META_SHELL = `f="$HOME/Library/Application Support/Muxy 2/desktop-state.json"; [ -f "$f" ] || f="$HOME/Library/Application Support/Muxy/desktop-state.json"; /usr/bin/python3 -c 'import json, sys
+for p in json.load(open(sys.argv[1])).get("projects", []):
+    if p.get("parent_id"):
+        continue
+    print(p.get("id", ""), p.get("server_id") or "-", "1" if p.get("home") else "0", sep=chr(9))' "$f"`;
+let remoteBusy = false;
+let remoteMetaKey = null;
+let remoteMetaFailAt = 0;
+
+/* Reads the project → server map when the project list changed.
+ * Before: every project was treated as local. The projects of a remote server were drawn in 미분류 next to the local
+ *         ones, and a remote Home whose folder path equals this Mac's was pinned on top as a second Home.
+ * Now: each project knows its server, so the sidebar draws them under their connection (remoteGroups in view.js) and
+ *      only a local project can be Home. Nothing is changed in Muxy: it refuses to attach an SSH project to a
+ *      workspace ("home and SSH workspace projects cannot be attached to a workspace"), so the group is visual only.
+ * Why: the owner asked for remote projects to be grouped under their connection name automatically.
+ * Affects: how and where remote projects are drawn; local projects and Muxy workspaces are untouched.
+ *          A refused or failed read is not retried for five minutes, so nobody is asked on every focus change. */
+async function syncRemote() {
+  if (remoteBusy) return;
+  remoteBusy = true;
+  let redraw = false;
+  try {
+    const key = data.projects.map((p) => p.id).join(",");
+    if (key !== remoteMetaKey && Date.now() - remoteMetaFailAt >= 300000) {
+      const r = await safe(() => muxy.exec({ shell: PROJECT_META_SHELL, timeoutMs: 15000 }), null, true);
+      if (!r || r.exitCode !== 0) { remoteMetaFailAt = Date.now(); return; }
+      const meta = {};
+      for (const line of String(r.stdout || "").split("\n")) {
+        const cols = line.trim().split("\t");
+        if (cols.length >= 3 && cols[0]) meta[cols[0]] = { server: cols[1] !== "-" ? cols[1] : null, home: cols[2] === "1" };
+      }
+      remoteMetaKey = key;
+      if (JSON.stringify(meta) !== JSON.stringify(data.projectMeta)) { data.projectMeta = meta; redraw = true; }
+    }
+  } finally {
+    remoteBusy = false;
+  }
+  if (redraw) render();
+}
+
+/* The same read started in the background, where a pending approval must not hold up the list: nothing is awaited. */
+const syncRemoteSoon = () => syncRemote().catch((e) => console.warn("remote projects not synced: " + String((e && e.message) || e)));
 
 /* Remote connections. Everything here opens an SSH connection, so it only runs on a user action. */
 async function remoteCLI(s, args, timeoutMs = 25000) {
@@ -384,9 +603,16 @@ async function checkServer(s) {
  * would: a local terminal tab running the muxy terminal UI against that server. Without a folder that is the
  * server's UI itself; with a folder it also starts a NEW terminal there (so only an explicit ＋ passes one). */
 const shellQuote = (v) => `'${String(v).replace(/'/g, `'\\''`)}'`;
+/* Before: the connection tab was titled after the program that runs in it ("muxy").
+ * Now: the connection tab carries the connection's name (TabRequest has no title field, so it is renamed right after
+ *      it opens; the rename is cosmetic, so a failure leaves the tab as it is).
+ * Why: the owner could not tell connections apart by their tab titles.
+ * Affects: the tab opened for a connection without a project folder; terminals opened in a server project keep theirs. */
 async function openServerTerminal(s, folder) {
   const cmd = [MUXY_BINS[0], "--host", s.ssh, ...(folder ? [folder] : [])].map(shellQuote).join(" ");
-  return muxy.tabs.open({ kind: "terminal", command: cmd });
+  const id = await muxy.tabs.open({ kind: "terminal", command: cmd });
+  if (!folder) await safe(() => muxy.tabs.rename(id, s.name), undefined, true);
+  return id;
 }
 
 /* A tab by id, searched in the current project first (where it was opened), then in the others. */
@@ -504,6 +730,18 @@ function layoutRows(members) {
 function projectsIn(wsID) {
   const ids = new Set(data.members[wsID] || []);
   return data.projects.filter((p) => ids.has(p.id) && !isHome(p));
+}
+
+/* Recent-activity score of a group (a workspace or a remote connection's projects): the newest position in Muxy's
+ * focus history (oldest first) among the panes of its member projects; -1 when none of them appears in the history. */
+function groupActivity(members) {
+  const ids = new Set(members.map((p) => p.id));
+  let best = -1;
+  (data.focusHistory || []).forEach((paneID, i) => {
+    const pane = data.panes.find((x) => x.id === paneID);
+    if (pane && ids.has(pane.projectID)) best = i;
+  });
+  return best;
 }
 
 /* Moves a project into a workspace (UNGROUPED = none). With refID it is also placed before/after that
