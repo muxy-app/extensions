@@ -27,7 +27,7 @@
         "ai"
       ],
       "official": false,
-      "downloads": 0,
+      "downloads": 1,
       "published_at": "2026-11-26T20:23:52Z",
       "sha256": "97885d9d252bd24d0d9a93fd65e0f58d42c9afbfe0ed517daf50520dbc5cec4f",
       "size": 1656662,
@@ -56,7 +56,7 @@
         "ai"
       ],
       "official": false,
-      "downloads": 0,
+      "downloads": 1,
       "published_at": "2026-11-26T20:23:56Z",
       "sha256": "bf1f4ba93d943d939a796d26119d0847c2e9f9148b2fef37e685b30d382500e3",
       "size": 429709,
@@ -91,7 +91,7 @@
         "project-management"
       ],
       "official": false,
-      "downloads": 0,
+      "downloads": 4,
       "published_at": "2026-11-26T20:24:00Z",
       "sha256": "d09f489b4dba17436768d43d8ad0ad14806fbb3d4b1e2a63671a17a27c63691b",
       "size": 425624,
@@ -123,7 +123,7 @@
         "developer-tools"
       ],
       "official": false,
-      "downloads": 0,
+      "downloads": 1,
       "published_at": "2026-11-26T20:24:04Z",
       "sha256": "4ad3442de94d2b96355b01a4cd69a2ea4c8caccf9d09be6ea98607f2fcce1a8b",
       "size": 1508884,
@@ -159,7 +159,7 @@
         "productivity"
       ],
       "official": false,
-      "downloads": 0,
+      "downloads": 1,
       "published_at": "2026-11-26T20:24:08Z",
       "sha256": "2c61ee171d5a56d27ce471bfc36935ea1901ea8549295a6d34eca89f621ca398",
       "size": 455064,
@@ -190,7 +190,7 @@
         "terminal"
       ],
       "official": false,
-      "downloads": 0,
+      "downloads": 1,
       "published_at": "2026-11-26T20:24:13Z",
       "sha256": "7189e60757e646da850afd930ed0ceb174841b14bd8994fdaf56314e42f8b320",
       "size": 214995,
@@ -223,7 +223,7 @@
         "sql"
       ],
       "official": true,
-      "downloads": 0,
+      "downloads": 1,
       "published_at": "2026-11-26T20:24:16Z",
       "sha256": "91a427fef5baa46086995d5559e77cd1e31bce9563e6cdd1ac754d04ed8cd2b8",
       "size": 1103672,
@@ -260,7 +260,7 @@
         "dockerfile"
       ],
       "official": false,
-      "downloads": 0,
+      "downloads": 1,
       "published_at": "2026-11-26T20:24:21Z",
       "sha256": "d135761f8b6b4c8c45f89c87c9ca3185a6de7d3524d59f00860896f3db4c2c45",
       "size": 1078107,
@@ -295,7 +295,7 @@
         "files"
       ],
       "official": false,
-      "downloads": 0,
+      "downloads": 1,
       "published_at": "2026-11-26T20:24:25Z",
       "sha256": "6a9c6d38504e846c0450ee8a3c5e9477f42e5a9ba140839dc6968c3a16066899",
       "size": 180087,
@@ -330,7 +330,7 @@
         "explorer"
       ],
       "official": true,
-      "downloads": 0,
+      "downloads": 2,
       "published_at": "2026-11-26T20:24:29Z",
       "sha256": "f9580702c87eaa4e0d25cba2c37b9d0ac5c71ba1112f868dba2856d797181918",
       "size": 28108543,
@@ -366,7 +366,7 @@
         "productivity"
       ],
       "official": false,
-      "downloads": 0,
+      "downloads": 1,
       "published_at": "2026-11-26T20:24:33Z",
       "sha256": "748ee1bcfaa3f8dac5f8ad6f6c67a7ac502d6cc83240458db39b993828bd8196",
       "size": 777605,
@@ -407,7 +407,7 @@
         "source-control"
       ],
       "official": true,
-      "downloads": 0,
+      "downloads": 3,
       "published_at": "2026-11-26T20:24:41Z",
       "sha256": "9f1323ed2611dc2afe28b2f66d3ef3c42a78a46d992ac91f252d7cb67b61bdc1",
       "size": 12074452,
@@ -444,7 +444,7 @@
         "workspace"
       ],
       "official": false,
-      "downloads": 0,
+      "downloads": 1,
       "published_at": "2026-11-26T20:24:38Z",
       "sha256": "69b46e746b91ba5750b954c248a10bb388475d2430c8ed567b96539041b57695",
       "size": 354140,
@@ -476,7 +476,7 @@
         "productivity"
       ],
       "official": false,
-      "downloads": 0,
+      "downloads": 1,
       "published_at": "2026-11-26T20:24:45Z",
       "sha256": "59396b21c2779d746867da98c2c50ff6c29bb504d5159dc525aa6b5a6b781f12",
       "size": 756566,
@@ -506,7 +506,7 @@
         "productivity"
       ],
       "official": false,
-      "downloads": 0,
+      "downloads": 1,
       "published_at": "2026-11-26T20:24:49Z",
       "sha256": "bdcd8695711081b61720f5803789d8bfcf6d839e281912e2e0d859722bc803c7",
       "size": 434014,
@@ -543,7 +543,7 @@
         "productivity"
       ],
       "official": false,
-      "downloads": 0,
+      "downloads": 1,
       "published_at": "2026-11-26T20:24:52Z",
       "sha256": "01d5e72e52a90d23aa304ca62096ac5a4ebc51a61047992996deff606c408d0b",
       "size": 789521,
@@ -577,7 +577,7 @@
         "productivity"
       ],
       "official": false,
-      "downloads": 0,
+      "downloads": 1,
       "published_at": "2026-11-26T20:24:56Z",
       "sha256": "3f84d30336beb671ee20816dcc968a9770b16a1cbb5ac735d7355073012d667d",
       "size": 3900529,
@@ -609,7 +609,7 @@
         "developer-tools"
       ],
       "official": false,
-      "downloads": 0,
+      "downloads": 1,
       "published_at": "2026-11-26T20:25:00Z",
       "sha256": "1a2b7571dc037952bfa07ba9fd7650f68a7c1a8ba7aeb35454d83fd94de7fedc",
       "size": 133990,
@@ -634,7 +634,7 @@
         "localization"
       ],
       "official": false,
-      "downloads": 0,
+      "downloads": 2,
       "published_at": "2026-11-26T20:25:05Z",
       "sha256": "e220f60b9e03f54467a3e4444d1adf423c5855c38274fd50f72a5226c98560ef",
       "size": 1106337,
@@ -672,7 +672,7 @@
         "git"
       ],
       "official": false,
-      "downloads": 0,
+      "downloads": 1,
       "published_at": "2026-11-26T20:25:10Z",
       "sha256": "80fd5ff1b0ee082c330462ee5b918d09789f2875188e24fb9567104250ede853",
       "size": 1956214,
@@ -704,7 +704,7 @@
         "ai"
       ],
       "official": false,
-      "downloads": 0,
+      "downloads": 1,
       "published_at": "2026-11-26T20:25:15Z",
       "sha256": "5e74cad2d3eba81d6c5b851670c548882bef881c38811c257320e1f8a6e19090",
       "size": 221804,
@@ -737,7 +737,7 @@
         "ai"
       ],
       "official": false,
-      "downloads": 0,
+      "downloads": 1,
       "published_at": "2026-11-26T20:25:18Z",
       "sha256": "82596ee3982544f7f3e694d80bc5e3e53e2479166328af7ebb0fb21909aaf56f",
       "size": 211910,
@@ -766,7 +766,7 @@
         "media"
       ],
       "official": false,
-      "downloads": 0,
+      "downloads": 1,
       "published_at": "2026-11-26T20:25:22Z",
       "sha256": "0541550df5de305e1e9fa67674a76ad57b20e250b73f39a2b692ee62dcec85ff",
       "size": 490608,
@@ -796,7 +796,7 @@
         "network"
       ],
       "official": false,
-      "downloads": 0,
+      "downloads": 1,
       "published_at": "2026-11-26T20:25:26Z",
       "sha256": "cf4dbb1e9617c08f1f8906e754cd0303bcf8a1705615d4dd407a9ba3968b6c19",
       "size": 93178,
@@ -832,7 +832,7 @@
         "valkey"
       ],
       "official": false,
-      "downloads": 0,
+      "downloads": 1,
       "published_at": "2026-11-26T20:25:29Z",
       "sha256": "369f218c7a4767c2bdb83de12af957d43d22c9216ee8a95577ea2d90d900216d",
       "size": 832284,
@@ -868,7 +868,7 @@
         "developer-tools"
       ],
       "official": false,
-      "downloads": 0,
+      "downloads": 1,
       "published_at": "2026-11-26T20:25:33Z",
       "sha256": "636882965e5f5134cf28f4420d40d4281d9911ff7c82a3be40c1296a76a9902f",
       "size": 552995,
@@ -905,7 +905,7 @@
         "code-review"
       ],
       "official": false,
-      "downloads": 0,
+      "downloads": 1,
       "published_at": "2026-11-26T20:25:37Z",
       "sha256": "f163153716fd9cfbd84f897556f846e4b82c268e305a1e459e19b6cc1e59cd71",
       "size": 2050372,
@@ -942,7 +942,7 @@
         "productivity"
       ],
       "official": false,
-      "downloads": 0,
+      "downloads": 1,
       "published_at": "2026-11-26T20:25:41Z",
       "sha256": "adc035bda0b01bac5043d79347c5a5a6126b3a82aa4831ebbd50f24867a7413c",
       "size": 435426,
@@ -975,7 +975,7 @@
         "xcode"
       ],
       "official": false,
-      "downloads": 0,
+      "downloads": 1,
       "published_at": "2026-11-26T20:25:45Z",
       "sha256": "725824a6f4c5eee986ab7bb577a9899210b6c2c1fc1e530a8014245614b6728d",
       "size": 856610,
@@ -1010,7 +1010,7 @@
         "terminal"
       ],
       "official": false,
-      "downloads": 0,
+      "downloads": 1,
       "published_at": "2026-11-26T20:25:49Z",
       "sha256": "52fbbfd64cba1a61807db612f67deb7cc094db6251a8eea14435e7b73092aff1",
       "size": 247521,
@@ -1042,7 +1042,7 @@
         "productivity"
       ],
       "official": false,
-      "downloads": 0,
+      "downloads": 1,
       "published_at": "2026-11-26T20:25:53Z",
       "sha256": "fa6dadc9e14262cbe14b871367b29956152b84382b968e92417c3961ec357eb6",
       "size": 454464,
@@ -1076,7 +1076,7 @@
         "utilities"
       ],
       "official": false,
-      "downloads": 0,
+      "downloads": 1,
       "published_at": "2026-11-26T20:25:57Z",
       "sha256": "f0ce79b8c66c2cfec01ff9ab303dc440ca8ed5aa33fb5b73973b472e50004314",
       "size": 813793,
@@ -1107,7 +1107,7 @@
         "productivity"
       ],
       "official": false,
-      "downloads": 0,
+      "downloads": 1,
       "published_at": "2026-11-26T20:26:01Z",
       "sha256": "0e4360bc626fd2c9387a539f9ce699dd0bbb847b2a422e64a522dc5d0d4b5652",
       "size": 123439,
@@ -1135,7 +1135,7 @@
         "web"
       ],
       "official": false,
-      "downloads": 0,
+      "downloads": 1,
       "published_at": "2026-11-26T20:26:05Z",
       "sha256": "d60cf3280574023e30deff8d6276bfd20e5649cd844b2f44b5bfb4094e5582cd",
       "size": 34755,
@@ -1181,7 +1181,7 @@
         "productivity"
       ],
       "official": false,
-      "downloads": 0,
+      "downloads": 1,
       "published_at": "2026-11-26T20:26:09Z",
       "sha256": "a9d58fcaa4a2577977a4f2d1092cd527b11dee079f85cf512dffd2eada8f2990",
       "size": 2425534,
