@@ -21,7 +21,7 @@ const NS = (() => {
     write: PRE + 'F="$R/$NOTES_FILE"; mkdir -p "$(dirname "$F")" && cat > "$F.tmp" && mv "$F.tmp" "$F"',
     read: PRE + 'cat "$R/$NOTES_FILE"',
     list: PRE + 'find "$R" -maxdepth 3 -name "*.md" -type f -not -path "*/.threads/*" 2>/dev/null | while IFS= read -r f; do printf "%s\\t%s\\t%s\\t%s\\n" "${f#"$R"/}" "$(stat -f %m "$f")" "$(grep -c "^## [0-9]" "$f")" "$(head -c 700 "$f" | tr "\\n" "\\001")"; done',
-    thread: PRE + '[ -n "$HB_FILE" ] && touch "$HB_FILE"; cat "$R/.threads/$NOTES_FILE"',
+    thread: PRE + '[ -n "$HB_SID" ] && touch "$HOME/.local/share/workdeck/run/hb-$HB_SID"; cat "$R/.threads/$NOTES_FILE"',
     abs: PRE + 'echo "$R/$NOTES_FILE"',
     trash: PRE + 'mkdir -p "$HOME/.Trash" && mv "$R/$NOTES_FILE" "$HOME/.Trash/"',
   };
@@ -125,6 +125,6 @@ const NS = (() => {
   async function abs(file) { const r = await sh(SH.abs, { NOTES_FILE: file }); return r.stdout.trim(); }
   async function writeThread(id, text) { return sh(SH.write, { NOTES_FILE: `.threads/${id}.md` }, text); }
   /* Reading the agent's summary doubles as the heartbeat the agent's watchdog looks for (see startHelper in notes.js). */
-  async function readThread(id, hbFile) { const r = await sh(SH.thread, { NOTES_FILE: `${id}.md`, HB_FILE: hbFile || "" }); return r.exitCode === 0 ? r.stdout : null; }
+  async function readThread(id, hbSid) { const r = await sh(SH.thread, { NOTES_FILE: `${id}.md`, HB_SID: hbSid || "" }); return r.exitCode === 0 ? r.stdout : null; }
   return { root, setRoot: (v) => store.set("notes.root", v), serialize, parse, read, load, save, create, entry, quickAdd, list, trash, abs, writeThread, readThread, scopeKey, scopeDir, stampOf, newId, SH };
 })();

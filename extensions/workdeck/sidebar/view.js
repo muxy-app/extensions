@@ -1,6 +1,7 @@
 /* Rendering, drag & drop and menus for the Workdeck sidebar. */
 const drag = { kind: null, id: null, pending: false, hoverID: null, hoverTimer: null };
 const SORTS = [["manual", tr("수동")], ["name", tr("이름순")], ["nameDescending", tr("이름 역순")], ["recentlyActive", tr("최근 활동순")], ["dateAdded", tr("추가한 날짜순")]];
+const WS_SORTS = [["recent", tr("최근 활동순")], ["name", tr("이름순")], ["manual", tr("기본 순서")]];
 const HOME_GROUP = "__home__";
 const INDENT = 6; // px per nesting level
 /* Collapsed (icon rail) mode: set by main.js from the page width. Text is hidden, so names live in tooltips,
@@ -142,8 +143,38 @@ function content() {
   return groupedLayout();
 }
 
-/* Every Muxy workspace is a group; projects in none of them go to 미분류. While searching, only matching
- * projects are listed (a workspace whose name matches keeps all of its projects) and folded groups stay open. */
+/* Group order in the sidebar.
+ * Before: workspaces always rendered in Muxy's list order; there was no workspace sort.
+ * Now: state.wsSort picks the order — "recent" (default): the most recently focused group on top,
+ *      ones with no focus history keep their relative order at the bottom; "name": alphabetical;
+ *      "manual": Muxy's list order (remote connections after the workspaces, in server order).
+ *      미분류 stays last in every mode.
+ * Why: the owner asked for a recent-activity workspace sort as the default.
+ * Affects: group order only; project order inside a group still follows Muxy's project sort. */
+function sortedGroups() {
+  const mode = state.wsSort || "recent";
+  const list = [...data.workspaces.map((w) => ({ id: w.id, name: w.name, ws: w, members: projectsIn(w.id) })), ...remoteGroups()];
+  if (mode === "name") list.sort((a, b) => a.name.localeCompare(b.name));
+  else if (mode === "recent") list.sort((a, b) => groupActivity(b.members) - groupActivity(a.members));
+  return list;
+}
+
+/* Remote connections as groups.
+ * Before: the projects of a remote server were listed in 미분류 next to the local ones, with nothing to tell them apart.
+ * Now: every configured server that has projects here gets a group named after the connection, holding that server's
+ *      projects (its Home included, which used to be pinned on top as a second Home). The group exists in this
+ *      sidebar only: Muxy refuses to attach an SSH project to a workspace, so nothing is created or moved in Muxy.
+ * Why: the owner asked for remote projects to be grouped under their connection name automatically.
+ * Affects: where remote projects are drawn. Their rows cannot be dragged into another group and offer no "그룹 이동",
+ *          because Muxy would refuse the move. Local workspaces are untouched. */
+function remoteGroups() {
+  return data.servers
+    .map((srv) => ({ id: "srv:" + srv.id, name: srv.name, server: srv, members: data.projects.filter((p) => serverOf(p) === srv.id && !isHome(p)) }))
+    .filter((g) => g.members.length);
+}
+
+/* Every Muxy workspace is a group, then each remote connection; projects in none of them go to 미분류. While searching,
+ * only matching projects are listed (a group whose name matches keeps all of its projects) and folded groups stay open. */
 function groupedLayout() {
   const out = [];
   const q = normQuery();
@@ -154,14 +185,13 @@ function groupedLayout() {
       el("button", { class: "notice-btn", onclick: () => refreshMembers() }, tr("다시 읽기"))
     ));
   }
-  for (const w of data.workspaces) {
-    const all = projectsIn(w.id);
-    const members = q && !w.name.toLowerCase().includes(q) ? all.filter(matchesQuery) : all;
+  for (const g of sortedGroups()) {
+    const members = q && !g.name.toLowerCase().includes(q) ? g.members.filter(matchesQuery) : g.members;
     if (q && !members.length) continue;
-    out.push(groupBox(w.id, w.name, members, w));
+    out.push(groupBox(g.id, g.name, members, g.ws, g.server));
   }
-  const loose = data.projects.filter((p) => !groupOf(p.id) && !isHome(p) && matchesQuery(p));
-  if (loose.length || (!q && data.workspaces.length === 0)) out.push(groupBox(UNGROUPED, tr("미분류"), loose));
+  const loose = data.projects.filter((p) => !groupOf(p.id) && !isHome(p) && !isRemote(p) && matchesQuery(p));
+  if (loose.length || (!q && data.workspaces.length === 0 && !remoteGroups().length)) out.push(groupBox(UNGROUPED, tr("미분류"), loose));
   if (q && !out.length) out.push(el("div", { class: "empty" }, tr("\"{0}\"에 맞는 프로젝트가 없어요.", data.query.trim())));
   out.push(newZone());
   return out;
@@ -169,27 +199,45 @@ function groupedLayout() {
 
 /* ---------- groups ---------- */
 
-function groupBox(id, name, members, ws) {
+/* Context menu of a connection: the same items on its Remote row and on its group header. */
+const serverMenuItems = (srv) => [
+  { label: tr("연결 열기"), run: () => openServerConnection(srv) },
+  { label: tr("새 터미널 열기"), run: () => createServerSession(srv) },
+  { label: tr("연결 확인"), run: () => checkServer(srv) },
+];
+
+/* One group. `ws` is its Muxy workspace; `server` is set instead for a remote connection's group (remoteGroups).
+ * Before: a remote connection's group looked exactly like a local workspace's.
+ * Now: it carries a globe icon before its name and the name is tinted blue (CSS .group-head.remote), so the two
+ *      kinds can be told apart at a glance; the icon also stays in the icon rail.
+ * Why: the owner asked for remote groups to stand out from workspaces by icon or colour.
+ * Affects: the group header of remote connections only. */
+function groupBox(id, name, members, ws, server) {
   const collapsed = !!state.collapsed[id] && !normQuery();
-  const real = id !== UNGROUPED;
+  const virtual = !!server;
+  const real = id !== UNGROUPED && !virtual;
+  const status = server ? data.serverStatus[server.id] : null;
   const head = el(
     "div",
     {
-      class: "group-head",
+      class: "group-head" + (virtual ? " remote" : ""),
       "data-key": "g:" + id,
-      title: name,
+      title: server ? `${name}\n${server.ssh}` : name,
       onclick: () => { state.collapsed[id] = !state.collapsed[id]; save(); render(); },
-      oncontextmenu: (e) => { e.preventDefault(); if (real) groupMenu(e, id); },
+      oncontextmenu: (e) => { e.preventDefault(); if (real) groupMenu(e, id); else if (virtual) showMenu(e, serverMenuItems(server)); },
     },
+    server ? icon("globe", "globe") : null,
     el("span", { class: "group-name", "data-initials": initials(name) }, name),
+    // a remote connection's group shows whether that server answers in place of a workspace's "current" mark
+    server ? el("span", { class: "srv " + (status || "unknown"), title: status ? SERVER_LABEL[status] : undefined }) : null,
     ws && ws.isActive ? el("span", { class: "ws-active", title: tr("현재 워크스페이스") }) : null,
     el("span", { class: "count" }, String(members.length)),
-    // hover "＋": add a repository straight into this workspace (Muxy's own folder picker)
-    el("button", {
+    // hover "＋": add a repository straight into this group (Muxy's own folder picker); a remote group takes none
+    !virtual ? el("button", {
       class: "grp-plus",
       title: real ? tr("\"{0}\"에 저장소 추가", name) : tr("저장소 추가"),
       onclick: (e) => { e.stopPropagation(); addFolder(id); },
-    }, "＋"),
+    }, "＋") : null,
     chevron(!collapsed, null, "grp")
   );
   const rows = el(
@@ -198,6 +246,8 @@ function groupBox(id, name, members, ws) {
     real && members.length === 0 && !normQuery() ? el("div", { class: "hint" }, tr("프로젝트를 여기로 드래그하거나 폴더를 추가하세요")) : null
   );
   const box = el("div", { class: "group" + (collapsed ? " collapsed" : ""), "data-group": id }, head, rows);
+  // a remote group takes no drops: Muxy refuses to move any project into it
+  if (virtual) return box;
 
   box.addEventListener("dragover", (e) => {
     if (drag.kind !== "project") return;
@@ -375,22 +425,32 @@ async function newTabIn(p) {
   if (before > 0 || now === 0) await muxy.tabs.new();
 }
 
+/* One project row.
+ * Before: a remote server's project row looked exactly like a local one once its group was unfolded.
+ * Now: a remote row carries a small globe mark next to its project icon, its name is tinted a lighter blue than the
+ *      group header, and its tooltip names the server. The mark is hidden in the icon rail, where each row shows a
+ *      single icon.
+ * Why: the owner could not tell remote projects from local ones inside an expanded group.
+ * Affects: rows of projects that belong to a configured remote server only. */
 function projectBlock(p, depth, groupID) {
   const open = isOpen(p);
   const current = isCurrent(p);
   const branch = data.branches[p.id];
   const isRepo = (data.worktrees[p.id] || []).length > 0 || !!branch;
+  const server = serverOfProject(p);
 
   const row = el(
     "div",
     {
-      class: "row" + (current ? " active" : ""),
+      class: "row" + (current ? " active" : "") + (server ? " remote" : ""),
       "data-key": "p:" + p.id,
-      title: `${p.name}\n${p.path}`,
+      title: server ? `${p.name}\n${p.path}\n${server.name} · ${server.ssh}` : `${p.name}\n${p.path}`,
       onclick: () => (isCompact() ? muxy.projects.switchTo(p.id) : toggleProject(p)),
       oncontextmenu: (e) => { e.preventDefault(); projectMenu(e, p); },
     },
     blinkIcon(projectIcon(p, isRepo), agentStatus((a) => a.projectID === p.id)),
+    // left of the name: the hover "＋" is absolutely positioned over the right end of the row and would cover a mark there
+    server ? remoteGlobe(server) : null,
     el("div", { class: "text" }, el("div", { class: "name" }, p.name)),
     (kindMeta(p.id) || {}).kind === "submodule" ? el("span", { class: "badge" }, "submodule") : null,
     plusButton(() => newTabIn(p)),
@@ -461,6 +521,7 @@ async function newTabInWorktree(p, w) {
 
 function projectDnD(row, p, groupID) {
   if (groupID === HOME_GROUP) return; // Home stays pinned on top
+  if (isRemote(p)) return; // Muxy refuses to move a remote server's project into a workspace
   row.draggable = true;
   row.addEventListener("dragstart", (e) => startDrag(e, "project", p.id));
   row.addEventListener("dragend", endDrag);
@@ -581,8 +642,9 @@ function projectMenu(e, p) {
     { label: tr(" 브랜치 청소 (병합된 브랜치)…"), run: () => openManager(p, "cleanup") },
     { label: tr(" 노트…"), run: () => openManager(p, "notes", { scope: { kind: "proj", id: p.id, name: p.name } }) },
     "-",
-    isHome(p) ? null : { label: tr("그룹 이동…"), run: () => pickGroupFor(p) },
-    isHome(p) ? null : { label: tr("저장소 다시 읽기"), run: () => rescanProject(p) }, // never a scan of the whole home folder
+    // never a scan of the whole home folder; Muxy refuses to move a remote server's project and its folder is not on this Mac
+    isHome(p) || isRemote(p) ? null : { label: tr("그룹 이동…"), run: () => pickGroupFor(p) },
+    isHome(p) || isRemote(p) ? null : { label: tr("저장소 다시 읽기"), run: () => rescanProject(p) },
     "-",
     { label: tr("이름 변경"), run: () => renameProject(p) },
     { label: tr("색상 변경…"), run: () => changeColor(p) },
@@ -592,7 +654,8 @@ function projectMenu(e, p) {
     { label: tr("Finder에서 보기"), run: () => muxy.projects.reveal(p.id) },
     { label: tr("경로 복사"), run: () => muxy.clipboard.writeText(p.path) },
     "-",
-    { label: tr("프로젝트 제거"), danger: true, run: () => removeProject(p) },
+    // Muxy refuses to delete a server's Home project ("the home project cannot be deleted"), so it is not offered
+    isHomeProject(p) ? { label: tr("프로젝트 제거 — Home은 Muxy가 지우지 않아요"), disabled: true } : { label: tr("프로젝트 제거"), danger: true, run: () => removeProject(p) },
   ].filter(Boolean).filter((it, i, a) => !(it === "-" && (a[i - 1] === "-" || i === 0))));
 }
 
@@ -649,11 +712,16 @@ async function removeProject(p) {
 
 /* ---------- header / footer ---------- */
 
-/* ⋯ menu: a 정렬 section (project order) and a 사이드바 section listing every sidebar that can be active. */
+/* ⋯ menu: a 정렬 section (project order), a 워크스페이스 정렬 section (group order) and a 사이드바 section
+ * listing every sidebar that can be active. */
 function moreMenu(e) {
   const build = () => {
     const sb = data.sidebars;
     const sorts = SORTS.map(([id, title]) => ({ label: "\u2003" + title, run: async () => { await muxy.projects.sort(id); refreshProjects(); } }));
+    const wsSorts = WS_SORTS.map(([id, title]) => ({
+      label: ((state.wsSort || "recent") === id ? "✓\u2002" : "\u2003") + title,
+      run: async () => { state.wsSort = id; await save(); render(); },
+    }));
     const sidebars = !sb
       ? [{ label: tr(" 불러오는 중…"), disabled: true }]
       : sb.items.map((i) => ({
@@ -666,7 +734,7 @@ function moreMenu(e) {
       label: (code === cur ? "✓\u2002" : "\u2003") + name,
       run: () => { setLang(code); location.reload(); },
     }));
-    return [{ header: tr("정렬") }, ...sorts, "-", { header: tr("사이드바") }, ...sidebars, "-", { header: tr("언어") }, ...langs];
+    return [{ header: tr("정렬") }, ...sorts, "-", { header: tr("워크스페이스 정렬") }, ...wsSorts, "-", { header: tr("사이드바") }, ...sidebars, "-", { header: tr("언어") }, ...langs];
   };
   showMenu(e, build());
   // the list is cached; refresh it in the background and redraw the menu if it is still open
@@ -728,6 +796,7 @@ function isFocusedAgent(a) {
  * Why: the owner clicked a subagent row and nothing happened.
  * Affects: clicks on Agents rows. A row with no pane yet only switches project. */
 async function focusAgentRow(a) {
+  if (a.remote) { await openServerConnection(a.server); return; } // a remote agent has no pane here: open its connection
   if (a.sub) { await openSubagentTab(a); return; }
   const pane = (data.panes || []).find((p) => p.id === a.paneID);
   if (!pane) { await muxy.projects.switchTo(a.projectID); return; }
@@ -767,6 +836,8 @@ async function killAgentRow(a) {
 
 /* Right-click an agent row: name it yourself, clear that name, jump to the tab, or end the terminal. */
 function agentMenu(e, a) {
+  // a remote agent lives on another machine: nothing here can rename, move or end it
+  if (a.remote) { showMenu(e, [{ label: tr("연결 열기"), run: () => openServerConnection(a.server).catch(failAlert(tr("연결을 열지 못했어요"))) }]); return; }
   const named = !!data.agentAlias[a.sub ? "sub:" + a.childID : a.sess || a.paneID];
   showMenu(e, [
     { label: tr("이름 변경"), run: async () => {
@@ -797,8 +868,9 @@ function agentRow(a, showIdle) {
   const kidsKey = "sub:" + a.sess;
   const kidsClosed = !!state.collapsed[kidsKey];
   return el(
-    "div", { class: "row agent-row" + (a.sub ? " wt" : "") + (a.status === "idle" ? " idle" : "") + (selected ? " active" : ""), title: [title, own, p && p.name, where, `${name} · ${statusWord}`].filter(Boolean).join("\n"), onclick: () => focusAgentRow(a).catch(failAlert(tr("에이전트 탭으로 이동하지 못했어요"))), oncontextmenu: (e) => { e.preventDefault(); agentMenu(e, a); } },
+    "div", { class: "row agent-row" + (a.sub ? " wt" : "") + (a.status === "idle" ? " idle" : "") + (selected ? " active" : "") + (a.remote ? " remote" : "") + (isStaleRemote(a) ? " stale" : ""), title: [title, own, p && p.name, where, a.remote ? tr("원격 서버 · {0}", a.server.name) : null, `${name} · ${statusWord}`].filter(Boolean).join("\n"), onclick: () => focusAgentRow(a).catch(failAlert(tr("에이전트 탭으로 이동하지 못했어요"))), oncontextmenu: (e) => { e.preventDefault(); agentMenu(e, a); } },
     agentBadge(a.providerID),
+    a.remote ? remoteGlobe(a.server) : null,
     el("div", { class: "text" },
       el("div", { class: "name", "data-soft": "agent:" + a.paneID }, title || (p ? p.name : "?")),
       el("div", { class: "sub" }, [a.sub ? tr("하위 작업") + (a.kind ? " · " + a.kind : "") : null, p && p.name, where].filter(Boolean).join(" · "))),
@@ -830,26 +902,25 @@ function sectionHead(key, title, count, iconName, iconKind, extra) {
   );
 }
 
-/* Running / waiting agents, grouped by state; click jumps to the agent's pane. The eye button also lists idle ones.
- * Before: one flat list ordered by state, so with several agents it was hard to see which ones needed an answer.
- * Now: agents are grouped under a collapsible header per state (waiting, working, idle), each with its count. The headers
- *      only appear when more than one state is on screen; a single state stays a plain list.
- * Why: the request was to see the agents grouped by state inside the section.
- * Affects: the Agents section only. Folded groups are remembered in state.collapsed like folder groups. */
-function agentsSection() {
+/* How recently an agent did anything: the last write of its session file; 0 when unknown. */
+const agentActivity = (a) => (a.mtime ? a.mtime * 1000 : 0);
+
+/* The small globe that marks a row of a remote connection; its tooltip names the connection. */
+function remoteGlobe(server) {
+  const m = icon("globe", "globe");
+  m.classList.add("remote-mark");
+  m.title = tr("원격 서버 · {0}", server.name);
+  return m;
+}
+
+/* The rows of one list, grouped by state: a state header only when the list has more than one state.
+ * Before: rows kept the order they were found in.
+ * Now: inside a state the most recently active come first (agentActivity); ties keep the found order.
+ * Why: the owner asked for the agents to be ordered by recent activity.
+ * Affects: the Agents section only; subagent rows still follow their parent's row. */
+function pushAgentStates(list, rows) {
   const order = [["waiting", tr("입력 대기")], ["working", tr("작업 중")], ["idle", tr("대기")]];
-  const all = data.agents.filter((a) => !a.sub); // subagents follow their parent's row, not a group of their own
-  if (!data.agents.length) return null;
-  const visible = state.showIdle ? all : all.filter((a) => a.status !== "idle");
-  const toggle = el("button", {
-    class: "sec-btn" + (state.showIdle ? " on" : ""),
-    title: state.showIdle ? tr("대기 중인 agent 숨기기") : tr("대기 중인 agent도 보기"),
-    onclick: (e) => { e.stopPropagation(); state.showIdle = !state.showIdle; save(); render(); },
-  });
-  toggle.append(icon(state.showIdle ? "eye" : "eyeoff", "window"));
-  const groups = order.map(([status, label]) => ({ status, label, list: visible.filter((a) => a.status === status) })).filter((g) => g.list.length);
-  const rows = [];
-  if (!visible.length) rows.push(el("div", { class: "hint" }, tr("작업 중인 agent가 없어요 · 눈 아이콘으로 대기 중인 agent 보기")));
+  const groups = order.map(([status, label]) => ({ status, label, list: list.filter((a) => a.status === status).sort((x, y) => agentActivity(y) - agentActivity(x)) })).filter((g) => g.list.length);
   for (const g of groups) {
     if (groups.length > 1) rows.push(agentGroupHead(g));
     if (groups.length < 2 || !state.collapsed["ag:" + g.status]) {
@@ -862,9 +933,55 @@ function agentsSection() {
       }
     }
   }
+}
+
+/* "방금 전" / "N분 전" / "N시간 전" for a timestamp. */
+function ageLabel(at) {
+  const m = Math.max(0, Math.floor((Date.now() - at) / 60000));
+  return m < 1 ? tr("방금 전") : m < 60 ? tr("{0}분 전", m) : tr("{0}시간 전", Math.floor(m / 60));
+}
+/* A remote row whose connection has not been read for two minutes: still shown, a little dimmed. */
+const isStaleRemote = (a) => !!a.remote && Date.now() - (((data.remoteCache[a.server.id] || {}).at) || 0) > 120000;
+/* The connections whose cached agents are on screen. */
+const cachedRemoteServers = () => data.servers.filter((s) => { const c = data.remoteCache[s.id]; return !!c && ((c.xita || []).length > 0 || (c.muxy || []).length > 0); });
+
+/* Menu of the section header's globe button: per connection with cached agents, when it was last read, one forced
+ * read, and its connection. */
+function remoteAgentsMenu(e) {
+  showMenu(e, cachedRemoteServers().flatMap((s) => [
+    { header: `${s.name} · ${ageLabel((data.remoteCache[s.id] || {}).at || 0)}` },
+    { label: tr("지금 다시 읽기"), run: () => rescanRemoteServer(s).catch(failAlert(tr("읽지 못했어요"))) },
+    { label: tr("연결 열기"), run: () => openServerConnection(s).catch(failAlert(tr("연결을 열지 못했어요"))) },
+  ]));
+}
+
+/* Running / waiting agents; click jumps to the agent's pane. The eye button also lists idle ones.
+ * Before: agents of a remote connection were split into groups of their own ("로컬" / "원격 · <connection>") above the
+ *         state groups.
+ * Now: one set of state groups for every agent, local and remote alike. A remote row is marked instead — a globe
+ *      before its name, the name in the remote colour, the connection in its tooltip — and is dimmed when its last
+ *      read is old. The globe button in the section header lists the connections with cached agents.
+ * Why: the owner found the separate groups did not tell remote from local at a glance and asked for state groups
+ *      with a mark on the row.
+ * Affects: the Agents section only. Folded state groups are remembered in state.collapsed like folder groups. */
+function agentsSection() {
+  const all = data.agents.filter((a) => !a.sub); // subagents follow their parent's row, not a group of their own
+  if (!data.agents.length) return null;
+  const visible = state.showIdle ? all : all.filter((a) => a.status !== "idle");
+  const toggle = el("button", {
+    class: "sec-btn" + (state.showIdle ? " on" : ""),
+    title: state.showIdle ? tr("대기 중인 agent 숨기기") : tr("대기 중인 agent도 보기"),
+    onclick: (e) => { e.stopPropagation(); state.showIdle = !state.showIdle; save(); render(); },
+  });
+  toggle.append(icon(state.showIdle ? "eye" : "eyeoff", "window"));
+  const rows = [];
+  if (!visible.length) rows.push(el("div", { class: "hint" }, tr("작업 중인 agent가 없어요 · 눈 아이콘으로 대기 중인 agent 보기")));
+  pushAgentStates(visible, rows);
+  const remote = cachedRemoteServers().length ? el("button", { class: "sec-btn", title: tr("원격 에이전트 · 마지막 확인 시각과 다시 읽기"), onclick: (e) => { e.stopPropagation(); remoteAgentsMenu(anchor(e.currentTarget)); } }) : null;
+  if (remote) remote.append(icon("globe", "globe"));
   const board = el("button", { class: "sec-btn", title: tr("관제 대시보드 크게 보기 (새 탭)"), onclick: (e) => { e.stopPropagation(); openBoard().catch(failAlert(tr("대시보드를 열지 못했어요"))); } });
   board.append(icon("expand", "window"));
-  return { title: "Agents", count: visible.length, iconName: "bot", iconKind: "sec-agent", rows, extra: el("span", { class: "sec-actions" }, board, toggle) };
+  return { title: "Agents", count: visible.length, iconName: "bot", iconKind: "sec-agent", rows, extra: el("span", { class: "sec-actions" }, remote, board, toggle) };
 }
 
 /* Header of one state group, shaped like the sidebar's folder groups. */
@@ -895,19 +1012,27 @@ function remoteSection() {
 
 const failAlert = (title) => (err) => muxy.dialog.alert({ title, message: String((err && err.message) || err) });
 
+/* Whether this connection's tab is the one Muxy is showing.
+ * Before: a Remote row looked the same whether its connection tab was closed, open in the background or active.
+ * Now: the row is highlighted while the tab remembered for that connection is the active tab (or holds the focused pane).
+ * Why: the owner had a connection's tab in front and the Remote section gave no sign of it.
+ * Affects: the highlight of Remote rows only. */
+function serverTabActive(srv) {
+  const known = state.serverTabs[srv.id];
+  if (!known) return false;
+  if ((data.panes || []).some((p) => p.isFocused && p.tabID === known)) return true;
+  return Object.values(data.projectTabs).some((tabs) => tabs.some((t) => t.id === known && t.isActive));
+}
+
 function serverRow(srv) {
   const st = data.serverStatus[srv.id];
   return el(
     "div",
     {
-      class: "row server-row",
+      class: "row server-row" + (serverTabActive(srv) ? " active" : ""),
       title: tr("{0}\n클릭: 연결 열기 (이미 열려 있으면 그 탭으로 이동)", srv.ssh),
       onclick: () => openServerConnection(srv).catch(failAlert(tr("연결을 열지 못했어요"))),
-      oncontextmenu: (e) => { e.preventDefault(); showMenu(e, [
-        { label: tr("연결 열기"), run: () => openServerConnection(srv) },
-        { label: tr("새 터미널 열기"), run: () => createServerSession(srv) },
-        { label: tr("연결 확인"), run: () => checkServer(srv) },
-      ]); },
+      oncontextmenu: (e) => { e.preventDefault(); showMenu(e, serverMenuItems(srv)); },
     },
     icon("server", "window"),
     el("div", { class: "text" }, el("div", { class: "name" }, srv.name), el("div", { class: "sub" }, st ? `${srv.ssh} · ${SERVER_LABEL[st]}` : srv.ssh)),
@@ -916,12 +1041,19 @@ function serverRow(srv) {
   );
 }
 
-/* Fills one bottom section; its height is the user's saved size when they dragged the splitter above it. */
+/* Fills one bottom section; its height is the user's saved size when they dragged the splitter above it.
+ * Before: the body was replaced on every rebuild, and a body that had been scrolled down jumped back to its top as
+ *         soon as anything on the sidebar changed (a working agent's session file changes every few seconds).
+ * Now: the scroll offset of the previous body is carried over to the new one, like the project list keeps its anchor.
+ * Why: the owner was reading the Agents section and it kept jumping back up.
+ * Affects: the Agents and Remote sections' scroll position only. */
 function fillSection(name, desc) {
   const host = $("#sec-" + name);
   const split = $("#split-" + name);
   const key = "sec:" + name;
   if (!desc) { host.hidden = true; split.hidden = true; host.replaceChildren(); return; }
+  const prev = host.querySelector(".sec-body");
+  const top = prev ? prev.scrollTop : 0;
   const collapsed = !!state.collapsed[key];
   const body = el("div", { class: "sec-body" }, desc.rows);
   const h = state.sizes[name];
@@ -930,12 +1062,13 @@ function fillSection(name, desc) {
   host.hidden = false;
   split.hidden = collapsed;
   host.replaceChildren(sectionHead(key, desc.title, desc.count, desc.iconName, desc.iconKind, desc.extra), body);
+  body.scrollTop = top;
 }
 
 function renderSections() {
   const wsKey = "sec:workspaces";
   $("#sec-workspaces").classList.toggle("collapsed", !!state.collapsed[wsKey]);
-  $("#head-workspaces").replaceChildren(sectionHead(wsKey, "Workspaces", data.workspaces.length, "layers", "sec-ws"));
+  $("#head-workspaces").replaceChildren(sectionHead(wsKey, "Workspaces", data.workspaces.length + remoteGroups().length, "layers", "sec-ws"));
   fillSection("agents", agentsSection());
   fillSection("remote", remoteSection());
 }
@@ -1021,7 +1154,7 @@ async function compactMenu(items) {
 
 /* Search in the icon rail: a Muxy picker over every project that jumps to the chosen one. */
 async function quickSwitch() {
-  const items = data.projects.map((p) => ({ id: p.id, title: p.name, subtitle: isHome(p) ? "Home" : (groupOf(p.id) || {}).name || tr("미분류") }));
+  const items = data.projects.map((p) => ({ id: p.id, title: p.name, subtitle: isHome(p) ? "Home" : (groupOf(p.id) || serverOfProject(p) || {}).name || tr("미분류") }));
   const picked = await pick(tr("프로젝트로 이동"), items);
   if (picked) await muxy.projects.switchTo(picked.id);
 }
@@ -1072,13 +1205,17 @@ async function openManager(p, tabType, extra = {}) {
   await save();
 }
 
-/* Notes for a workspace: it has no project of its own, so the tab opens where the user is and is reused next time. */
+/* Notes for a workspace: it has no project of its own, so the tab opens where the user is and is reused next time.
+ * Before: only a scoped (ws/proj) notes tab could be opened from the sidebar.
+ * Now: a null scope opens the all-notes tab (key notes:all), reused the same way.
+ * Why: the owner asked for a header notes button that opens the all view.
+ * Affects: tab opening/reuse only; scoped tabs behave exactly as before. */
 async function openNotesFor(scope) {
-  const key = `notes:${scope.kind}:${scope.id}`;
+  const key = scope ? `notes:${scope.kind}:${scope.id}` : "notes:all";
   const known = state.managerTabs[key];
   const here = known ? await safe(() => muxy.tabs.list(), []) : [];
   if (known && here.some((t) => t.id === known)) { await muxy.tabs.switchTo(known); return; }
-  const id = await muxy.tabs.open({ kind: "extensionWebView", extension: { id: muxy.extensionID, tabType: "notes", data: { scope } } });
+  const id = await muxy.tabs.open({ kind: "extensionWebView", extension: { id: muxy.extensionID, tabType: "notes", data: scope ? { scope } : {} } });
   await muxy.tabs.switchTo(id);
   state.managerTabs[key] = id;
   await save();

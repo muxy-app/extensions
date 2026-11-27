@@ -2,16 +2,22 @@
  * memo as it happens). Storage lives in store.js; opened from the sidebar menus (with a scope) or the quick-note
  * modal ("all notes"). */
 const SC = ctx.scope || null; // the scope this tab was opened for; null shows every note
-const S = { mode: "helper", hdraft: "", notes: [], filter: SC ? SC.kind : "all", cur: null, known: new Set(), editId: null, delId: null, draft: "", projects: [], workspaces: [], view: "note", panel: null };
+const S = { mode: "helper", hdraft: "", notes: [], filter: SC ? (SC.kind === "ws" ? "all" : SC.kind) : "all", cur: null, known: new Set(), editId: null, delId: null, draft: "", projects: [], workspaces: [], members: {}, view: "note", panel: null };
 let H = null; // the running helper session: { note, entry, agent, sid, screen, miss, busy, dirty, lastRaw }
-const HELPER_SID_FILE = "/tmp/workdeck-helper-session";
+/* Before: the helper's session id and heartbeat files were /tmp/workdeck-helper-session and /tmp/workdeck-hb-<session>.
+ * Now: both live in ~/.local/share/workdeck/run (the private folder agent launches already use), the session id read back
+ * is accepted only as [A-Za-z0-9._-], and it reaches shell commands through the environment, not the command text.
+ * Why: /tmp is shared by every account, so another user could have pre-created the file and supplied the "session id".
+ * Affects: the writing helper only. */
+const HELPER_SID_FILE = '"$HOME/.local/share/workdeck/run/helper-session"';
+const SID_OK = /^[A-Za-z0-9._-]+$/;
 const POLL_MS = 3000;
-/* Safety net against stray agents: the notes page refreshes /tmp/workdeck-hb-<session> every few seconds while the helper
- * runs. This watchdog starts with the agent (in a detached subshell, so the terminal prints no job line) and, once that
+/* Safety net against stray agents: the notes page refreshes the heartbeat file run/hb-<session> every few seconds while
+ * the helper runs. This watchdog starts with the agent (in a detached subshell, so the terminal prints no job line) and, once that
  * file has not been touched for 3 minutes (the tab was closed, the page crashed, the extension reloaded), ends the
  * agent's session. It also stops by itself when its shell is gone. */
 const MUXY_BIN = "/Applications/Muxy.app/Contents/MacOS/muxy";
-const HELPER_WATCHDOG = `{ HB=/tmp/workdeck-hb-$MUXY_SESSION_ID; touch "$HB"; ( ( while sleep 15; do kill -0 $$ 2>/dev/null || exit; [ -n "$(find "$HB" -mmin -3 2>/dev/null)" ] || { ${MUXY_BIN} session end "$MUXY_SESSION_ID" --yes >/dev/null 2>&1; rm -f "$HB"; pkill -TERM -P $$ 2>/dev/null; exit; }; done ) & ); } &&`;
+const HELPER_WATCHDOG = `{ HB="$HOME/.local/share/workdeck/run/hb-$MUXY_SESSION_ID"; touch "$HB"; ( ( while sleep 15; do kill -0 $$ 2>/dev/null || exit; [ -n "$(find "$HB" -mmin -3 2>/dev/null)" ] || { ${MUXY_BIN} session end "$MUXY_SESSION_ID" --yes >/dev/null 2>&1; rm -f "$HB"; pkill -TERM -P $$ 2>/dev/null; exit; }; done ) & ); } &&`;
 
 const IC = {
   chat: '<path d="M3 3.5h10v7H8.5L5.5 13v-2.5H3Z"/>',
@@ -47,7 +53,16 @@ async function persist(note) {
 }
 
 /* ---------- list ---------- */
+/* Which notes the list shows.
+ * Before: a workspace-scoped tab showed only notes attached to the workspace itself.
+ * Now: in a ws tab, "전체" also includes notes of every member project; "워크스페이스" keeps the ws-only view.
+ * Why: the owner asked to see all notes of the workspace's projects in the all view.
+ * Affects: ws-scoped tabs only; proj tabs and the unscoped all/global/ws/proj filters are unchanged. */
 function visible() {
+  if (SC && SC.kind === "ws") {
+    const members = S.members[SC.id] || [];
+    return S.notes.filter((n) => sameScope(n.scope, SC) || (S.filter === "all" && n.scope.kind === "proj" && members.includes(n.scope.id)));
+  }
   return S.notes.filter((n) => (SC ? sameScope(n.scope, SC) : S.filter === "all" || n.scope.kind === S.filter));
 }
 function renderList() {
@@ -58,8 +73,20 @@ function renderList() {
       el("div", { class: "meta" }, chip(scopeLabel(n.scope)), el("span", {}, tr("메모 {0}개", n.count)), el("span", {}, ago(new Date(n.mtime).toISOString()))))))
     : el("div", { class: "empty" }, tr("노트가 없어요.")));
 }
+/* Workspace membership for the ws "전체" view, read from Muxy's state file. The command text is identical to the
+ * sidebar's refreshMembers (sidebar/core.js) so the same remembered exec approval applies — keep the two in sync. */
+async function readMembers() {
+  try {
+    const r = await muxy.exec({ shell: 'f="$HOME/Library/Application Support/Muxy 2/desktop-state.json"; [ -f "$f" ] || f="$HOME/Library/Application Support/Muxy/desktop-state.json"; plutil -extract workspaces json -o - "$f"; echo; plutil -extract window.focus_history json -o - "$f" 2>/dev/null || echo "[]"; echo; echo "$HOME"' });
+    if (r.exitCode !== 0) return {};
+    const lines = r.stdout.trimEnd().split("\n").filter((l) => l.trim() !== "");
+    lines.pop(); lines.pop(); // $HOME and focus_history; only the workspaces line is needed here
+    return Object.fromEntries(JSON.parse(lines.join("\n")).map((w) => [w.id, w.projects || []]));
+  } catch (e) { return {}; }
+}
 async function refreshList() {
   S.notes = await NS.list();
+  if (SC && SC.kind === "ws") S.members = await readMembers();
   renderList();
 }
 
@@ -114,14 +141,18 @@ function memoRow(e) {
     acts);
 }
 
+/* With no note open the detail pane still has to host a panel: "새 노트" sets S.panel and calls this, and the slot is
+ * only built further down, past the early return.
+ * Before: no note selected meant an early return with just the empty hint, so the new-note form (and the issue-project
+ *         picker) had nowhere to attach — the button looked dead.
+ * Now: the empty state carries the same panel slot, and a pending panel is appended to it.
+ * Why: the owner pressed 새 노트 on an empty note list and nothing happened.
+ * Affects: every panel opened while no note is selected. */
 function renderNote() {
   if (S.view === "settings") return renderSettings();
   const note = S.cur;
   const detail = $("#detail");
   if (!note) {
-    /* "새 노트" sets S.panel and calls this, but the panel slot is only built further down, past this return.
-     * Before: with no note open the form had nowhere to attach, so the button looked dead.
-     * Now: the empty state carries the same slot. Affects every panel opened with no note selected. */
     const slot = el("div", { class: "pp-slot", id: "slot" });
     detail.replaceChildren(el("div", { class: "empty" }, tr("왼쪽에서 노트를 고르거나 새 노트를 만드세요.")), slot);
     if (S.panel) slot.append(S.panel());
@@ -300,10 +331,12 @@ async function startHelper(agent, entry, withNote) {
   await NS.writeThread(entry.id, entry.thread.summary || "");
   const noteAbs = await NS.abs(note.file);
   await muxy.exec({ shell: `rm -f ${HELPER_SID_FILE}`, timeoutMs: 5000 });
-  await muxy.exec({ shell: `cat > ${AGENT_FILE}`, stdin: helperPrompt(agent.name, entry, draftPath, withNote, noteAbs), timeoutMs: 10000 });
   const proj = note.scope.kind === "proj" ? S.projects.find((p) => p.id === note.scope.id) : null;
   const dir = proj ? shellQuote(proj.path) : '"$HOME"';
-  const command = `cd ${dir} && echo "$MUXY_SESSION_ID" > ${HELPER_SID_FILE} && ${HELPER_WATCHDOG} ` + agent.command.split("{file}").join(AGENT_FILE).split("{dir}").join(dir);
+  // same prompt file and saved model / effort as every other agent launch (see tab/agents.js)
+  let command;
+  try { command = `cd ${dir} && echo "$MUXY_SESSION_ID" > ${HELPER_SID_FILE} && ${HELPER_WATCHDOG} ` + await agentCommand(agent, helperPrompt(agent.name, entry, draftPath, withNote, noteAbs), dir); }
+  catch (e) { entry.thread.state = "dead"; await persist(note).catch(() => {}); renderNote(); throw e; } // nothing was started
   S.mode = "helper";
   H = { note, entry, agent, sid: null, tabId: null, screen: "", miss: 0, busy: false, dirty: false, lastRaw: 0, tries: 0, err: null };
   renderNote();
@@ -329,11 +362,12 @@ async function tick() {
   let changed = false;
   try {
     const t = h.entry.thread;
-    const d = await NS.readThread(h.entry.id, h.sid ? `/tmp/workdeck-hb-${h.sid}` : "");
+    const d = await NS.readThread(h.entry.id, h.sid || "");
     if (d != null && d.trim() !== (t.summary || "").trim()) { t.summary = d.trim(); h.dirty = true; changed = true; }
     if (!h.sid) {
       const r = await muxy.exec({ shell: `cat ${HELPER_SID_FILE} 2>/dev/null`, timeoutMs: 5000 });
-      h.sid = r.stdout.trim() || null;
+      const sid = r.stdout.trim();
+      h.sid = SID_OK.test(sid) ? sid : null;
       if (!h.sid && ++h.tries > 10) h.err = tr("에이전트 세션을 찾지 못했어요. 터미널 탭에서 에이전트가 시작됐는지 확인해 주세요.");
     }
     if (h.sid) {
@@ -373,7 +407,7 @@ async function sendToAgent(text) {
 async function closeHelperTab(h) {
   if (h.sid) {
     await muxyCLI(["session", "end", h.sid, "--yes"], { timeoutMs: 15000 }).catch(() => {});
-    await muxy.exec({ shell: `rm -f /tmp/workdeck-hb-${h.sid}`, timeoutMs: 5000 }).catch(() => {});
+    await muxy.exec({ shell: 'rm -f "$HOME/.local/share/workdeck/run/hb-$HB_SID"', env: { HB_SID: h.sid }, timeoutMs: 5000 }).catch(() => {});
   }
   if (h.tabId) await Promise.resolve(muxy.tabs.close(h.tabId)).catch(() => {}); // already closed by the user is fine
 }
@@ -415,7 +449,13 @@ try {
 /* ---------- boot ---------- */
 const myTitle = SC ? `${tr("노트")} · ${SC.name || tr("전역")}` : tr("노트");
 $("#title").textContent = SC ? myTitle : tr("노트");
-$("#scopes").hidden = !!SC;
+/* A ws tab offers 전체 (ws + member projects) / 워크스페이스 (ws only); a proj tab has no sub-scopes. */
+if (SC && SC.kind === "ws") {
+  $("#scopes").replaceChildren(el("button", { "data-s": "all", class: "on" }, tr("전체")), el("button", { "data-s": "ws" }, tr("워크스페이스")));
+  $("#scopes").hidden = false;
+} else {
+  $("#scopes").hidden = !!SC;
+}
 $("#scopes").addEventListener("click", (e) => {
   const b = e.target.closest("button");
   if (!b) return;
@@ -428,6 +468,13 @@ $("#scopes").addEventListener("click", (e) => {
 });
 $("#new").addEventListener("click", () => { S.view = "note"; S.panel = newNoteForm; renderNote(); });
 $("#settings").addEventListener("click", () => { if (S.view === "settings") { S.view = "note"; renderNote(); } else renderSettings(); });
+/* Explicit reload: re-read the list (and membership), then the open note from disk — never over a draft or a running helper. */
+$("#refresh").addEventListener("click", guard(async () => {
+  await refreshList();
+  if (H || S.draft || S.editId || S.view !== "note" || !S.cur) return;
+  const note = await NS.load(S.cur.file).catch(() => null);
+  if (note) { S.cur = note; S.known = new Set(note.entries.map((x) => x.id)); renderNote(); }
+}));
 window.addEventListener("focus", guard(async () => {
   if (H || S.editId || S.view === "settings") return;
   await refreshList();

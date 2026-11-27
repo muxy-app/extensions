@@ -87,17 +87,36 @@ for d in "$HOME"/.xita/sessions/*/; do
   esac
   printf 'S|%s|%s|%s|%s|%s|%s|%s\\n' "$(basename "$p")" "$cwd" "$state" "$m" "$title" "$inum" "$ititle"
 done`;
-async function scanXita() {
-  const r = await muxy.exec({ shell: XITA_SCAN, timeoutMs: 20000 });
-  if (r.exitCode !== 0) return null;
+function parseXitaScan(stdout) {
   const clean = (s) => String(s || "").replace(/\\[nrt]/g, " ").replace(/\s+/g, " ").trim();
   const procs = [], sessions = [];
-  for (const line of r.stdout.split("\n")) {
+  for (const line of String(stdout || "").split("\n")) {
     const f = line.split("|");
     if (f[0] === "P" && f[1] && f[2]) procs.push({ pid: f[1], cwd: f[2], session: f[3] || null });
     else if (f[0] === "S" && f[1] && f[2]) sessions.push({ sess: f[1], cwd: f[2], state: f[3] === "working" ? "working" : "idle", mtime: Number(f[4]) || 0, title: clipText(clean(f[5]), 80), issueNum: clean(f[6]), issueTitle: clipText(clean(f[7]), 80) });
   }
   return { procs, sessions };
+}
+/* Runs wherever `muxy.exec` runs: on the server of the project Muxy is showing (this Mac, or a remote connection
+ * while one of its projects is selected). */
+async function scanXita() {
+  const r = await muxy.exec({ shell: XITA_SCAN, timeoutMs: 20000 });
+  if (r.exitCode !== 0) return null;
+  return parseXitaScan(r.stdout);
+}
+/* The same scan on one named server.
+ * Before: the scan could only run where `muxy.exec` runs, so with a remote server selected this Mac was not scanned.
+ * Now: `muxy exec <project> --json -- /bin/sh -c <script>` — without --host for this Mac, with --host for a remote
+ *      connection — addresses one server whatever is selected.
+ * Why: the local agents must not disappear when a remote server is selected, and a remote server must be readable on
+ *      demand rather than by polling.
+ * Affects: where the scan runs; the script and its output are unchanged. Each address is one command text, so Muxy
+ *          asks for approval once per address. Returns null when the run fails. */
+async function scanXitaOn(server, projectID) {
+  if (!projectID) return null;
+  const r = await muxyCLI([...(server ? ["--host", server.ssh] : []), "exec", projectID, "--json", "--timeout-ms", "20000", "--", "/bin/sh", "-c", XITA_SCAN]);
+  if (r.exitCode !== 0) return null;
+  try { const res = JSON.parse(r.stdout); return res.exit_code === 0 ? parseXitaScan(res.stdout) : null; } catch { return null; }
 }
 
 /* Issue runs work in ~/.local/share/workdeck/worktrees/<repo folder>-<hash>/<branch> (0.2.0 test builds: without the
@@ -140,7 +159,7 @@ function xitaAsAgents(scan, projects, worktrees, panes, paneScreen) {
   const row = (o, cwd, s, paneID, matched, pr) => ({
     where: o.where, projectID: o.p.id, worktreeID: o.w ? o.w.id : o.p.id, paneID, paneMatched: matched, pid: pr ? pr.pid : null,
     session: pr ? pr.session : null, // the Muxy terminal session, used by the control room
-    providerID: "xita", status: s ? s.state : "idle", external: true, cwd, sess: s ? s.sess : null,
+    providerID: "xita", status: s ? s.state : "idle", external: true, cwd, sess: s ? s.sess : null, mtime: s ? s.mtime : 0,
     title: s ? s.title : "", issueNum: s ? s.issueNum : "", issueTitle: s ? s.issueTitle : "",
   });
   const out = [];
@@ -241,6 +260,78 @@ async function readSubagent(parent, child) {
   return { description: task.description || "", kind: task.kind || "", prompt: task.prompt || "", state: state === "working" ? "working" : "idle", done: done === "1", report };
 }
 
+/* The agent never holds the tracker key. It appends what it wants posted to an outbox file; the extension reads that
+ * file, checks it against what this run is allowed to do, and makes the API call itself.
+ * Before: the issue prompt told the agent to call Linear with $LINEAR_API_KEY. The issue body comes from a tracker, so it
+ *         can carry instructions aimed at the agent — an agent holding the key could be talked into misusing it.
+ * Now: the prompt gives a file path and a line format instead of a key. Only comments and a state change on the issues
+ *      this run was started for are accepted, and only the review state id the extension looked up.
+ * Why: least privilege — the component that reads untrusted text must not hold the credential (confused deputy).
+ * Affects: issue runs. The key stays in the user's shell, so an agent could still read it there; taking it out of the
+ *          shell is a separate change to the user's environment. */
+const OUTBOX_SUBDIR = ".local/share/workdeck/run";
+const outboxName = (key) => "outbox-" + String(key).replace(/[^A-Za-z0-9._-]/g, "-") + ".jsonl";
+
+/* Same call as tab/lib.js's linear(); the sidebar does not load that file, and this codebase already keeps such small
+ * helpers per page (see norm). The stored key rides stdin's first line into `curl -H @-`, so it stays out of argv and the
+ * environment; with no stored key it falls back to the shell profile. The command text is constant. */
+const LINEAR_RELAY_SHELL = `IN=$(cat); K=$(printf '%s\\n' "$IN" | head -1); Q=$(printf '%s\\n' "$IN" | tail -n +2)
+if [ -n "$K" ]; then
+  printf 'Authorization: %s' "$K" | curl -sS --max-time 25 https://api.linear.app/graphql -H @- -H 'Content-Type: application/json' --data "$Q"
+else
+  printf '%s' "$Q" | zsh -ic 'curl -sS --max-time 25 https://api.linear.app/graphql -H "Authorization: $LINEAR_API_KEY" -H "Content-Type: application/json" --data @-'
+fi`;
+async function linearCall(query, variables = {}) {
+  let key = "";
+  try { key = String((await muxy.storage.get("trackerKeys"))?.linear || ""); } catch { key = ""; }
+  const r = await muxy.exec({ shell: LINEAR_RELAY_SHELL, stdin: key + "\n" + JSON.stringify({ query, variables }), timeoutMs: 40000 });
+  const i = r.stdout.indexOf("{");
+  if (i < 0) throw new Error((r.stderr || "empty Linear response").trim().slice(0, 300));
+  const body = JSON.parse(r.stdout.slice(i));
+  if (body.errors && body.errors.length) throw new Error(body.errors.map((e) => e.message).join("; "));
+  return body.data;
+}
+
+/* Reads one run's outbox and posts what it is allowed to post. `run` is { key, issues: [{id, identifier}], stateId }.
+ * Handled lines are skipped by byte offset, kept in storage per run. A bad line is counted and skipped, not retried
+ * forever. Returns { posted, skipped, error }. */
+const OUTBOX_READ = `f="$HOME/${OUTBOX_SUBDIR}/$WD_OUTBOX"
+[ -f "$f" ] || exit 0
+tail -c +$((WD_OFFSET + 1)) "$f" | head -c 200000
+printf '\\n@@SIZE@@%s' "$(stat -f %z "$f" 2>/dev/null || echo 0)"`;
+async function relayIssueOutbox(run) {
+  const marks = (await safe(() => muxy.storage.get("issueOutbox"), {})) || {};
+  const offset = Number(marks[run.key]) || 0;
+  const r = await safe(() => muxy.exec({ shell: OUTBOX_READ, env: { WD_OUTBOX: outboxName(run.key), WD_OFFSET: String(offset) }, timeoutMs: 15000 }), null);
+  if (!r || r.exitCode !== 0) return { posted: 0, skipped: 0 };
+  const at = r.stdout.lastIndexOf("\n@@SIZE@@");
+  const text = at < 0 ? r.stdout : r.stdout.slice(0, at);
+  const allowed = new Map((run.issues || []).map((x) => [String(x.identifier).toUpperCase(), x.id]));
+  let posted = 0, skipped = 0, error = null;
+  const lines = text.split("\n");
+  let consumed = offset;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (i === lines.length - 1 && !line.trim()) break; // a partial line: leave it for the next pass
+    consumed += line.length + 1;
+    if (!line.trim()) continue;
+    let req = null;
+    try { req = JSON.parse(line); } catch { skipped++; continue; }
+    const id = allowed.get(String(req.issue || "").toUpperCase());
+    if (!id) { skipped++; continue; }
+    try {
+      if (req.kind === "comment" && typeof req.body === "string" && req.body.trim()) {
+        await linearCall(`mutation($id: String!, $b: String!) { commentCreate(input: { issueId: $id, body: $b }) { success } }`, { id, b: req.body.trim().slice(0, 20000) });
+        posted++;
+      } else if (req.kind === "state" && run.stateId && String(req.stateId || "") === run.stateId) {
+        await linearCall(`mutation($id: String!, $s: String!) { issueUpdate(id: $id, input: { stateId: $s }) { success } }`, { id, s: run.stateId });
+        posted++;
+      } else skipped++;
+    } catch (e) { error = String((e && e.message) || e).slice(0, 200); skipped++; }
+  }
+  if (consumed > offset) { marks[run.key] = consumed; await safe(() => muxy.storage.set("issueOutbox", marks), null); }
+  return { posted, skipped, error };
+}
 
 /* Cuts by characters, not bytes (a shell `cut` would split a Korean letter in the middle). Array.from also keeps
  * surrogate pairs such as emoji whole. */

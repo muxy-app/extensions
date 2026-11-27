@@ -29,14 +29,11 @@ shot() { # name, query string, minimum size in bytes (smaller means the page was
   done
   echo "FAILED $1.png"
 }
+# Only the six shots the listing declares. The others (02, 04, 05, 07, 09) were dropped from
+# marketplace.screenshots and their PNGs deleted; capturing them again would put unused files back in the folder.
 shot 01-sidebar-issues   "right=tab/issues.html&rscenario=issues-gh&tabs=npm%20run%20dev,Checkout%20flow,Issues"
-shot 02-linear-groups    "right=tab/issues.html&rscenario=issues-linear&tabs=npm%20run%20dev,Checkout%20flow,Issues"
 shot 03-pr-review        "right=tab/deploys.html&rscenario=deploys-pr&tabs=npm%20run%20dev,Checkout%20flow,Deploys"
-shot 04-actions          "right=tab/deploys.html&rscenario=deploys-actions&tabs=npm%20run%20dev,Checkout%20flow,Deploys"
-shot 05-branch-cleanup   "right=tab/cleanup.html&tabs=npm%20run%20dev,Checkout%20flow,Branch%20cleanup"
 shot 06-agent-board      "right=tab/board.html&rscenario=board-alert&tabs=npm%20run%20dev,Checkout%20flow,Agent%20control%20room"
-shot 07-new-issue-linear "right=tab/board.html&modal=modal/create.html&mscenario=modal-linear&tabs=npm%20run%20dev,Checkout%20flow,Agent%20control%20room" 150000
 shot 08-chat-to-issue    "right=tab/board.html&modal=modal/create.html&mscenario=modal-chat&tabs=npm%20run%20dev,Checkout%20flow,Agent%20control%20room" 150000
 shot 11-issue-agent      "right=tab/issues.html&rscenario=issues-agent&tabs=npm%20run%20dev,Checkout%20flow,Issues"
 shot 10-notes            "right=notes/notes.html&tabs=npm%20run%20dev,Checkout%20flow,Notes"
-shot 09-chat-draft       "right=tab/board.html&modal=modal/create.html&mscenario=modal-draft&tabs=npm%20run%20dev,Checkout%20flow,Agent%20control%20room" 150000

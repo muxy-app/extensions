@@ -48,7 +48,7 @@ select, input[type=text] { font: inherit; padding: 5px 8px; border-radius: 6px; 
 .actions .ghost { background: transparent; border: 1px solid var(--muxy-border); border-radius: 6px; padding: 5px 14px; }
 
 /* header / footer */
-.bar { display: flex; align-items: center; gap: 6px; padding: 10px 10px 8px; border-bottom: 1px solid var(--muxy-border); }
+.bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 10px 10px 8px; border-bottom: 1px solid var(--muxy-border); }
 .spacer { flex: 1; }
 .seg { display: inline-flex; border: 1px solid var(--muxy-border); border-radius: 7px; overflow: hidden; }
 .seg button { background: transparent; border: 0; padding: 2px 10px; color: var(--muxy-foreground-muted); }
@@ -111,6 +111,14 @@ body.dragging .row, body.dragging .group-head { cursor: grabbing; }
 .foot-btn:hover { background: var(--muxy-hover); color: var(--muxy-foreground); }
 
 .ws-active { width: 7px; height: 7px; border-radius: 50%; background: var(--muxy-accent); flex: none; }
+/* a remote connection's group (sidebar-only) is told apart from a workspace by its globe icon and a blue name */
+.group-head.remote .group-name { color: #4aa8e0; }
+/* the rows under it: a lighter blue name and a small globe mark, so they read as remote once the group is unfolded */
+.row.remote .name { color: #79bde8; }
+.ico.remote-mark { color: #4aa8e0; opacity: .85; width: 13px; height: 13px; }
+.ico.remote-mark svg { width: 12px; height: 12px; }
+/* Agents section: a remote row is only as fresh as its connection's last read */
+.agent-row.stale { opacity: .65; }
 .hint { padding: 6px 12px 6px 26px; font-size: 11px; color: var(--muxy-foreground-muted); opacity: .8; }
 .notice { margin: 6px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--muxy-border); font-size: 12px; color: var(--muxy-foreground-muted); }
 .row.folder { color: var(--muxy-foreground-muted); font-weight: 600; font-size: 12px; }
@@ -249,7 +257,7 @@ body.dragging .row, body.dragging .group-head { cursor: grabbing; }
 
 /* ---- v8: search field in the header ---- */
 .bar { gap: 6px; }
-.search { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 6px 0 8px; border: 1px solid var(--muxy-border); border-radius: 7px; background: transparent; color: var(--muxy-foreground-muted); }
+.search { flex: 1 1 100%; min-width: 0; display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 6px 0 8px; border: 1px solid var(--muxy-border); border-radius: 7px; background: transparent; color: var(--muxy-foreground-muted); }
 .search:focus-within { border-color: var(--muxy-accent); color: var(--muxy-foreground); }
 .search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--muxy-foreground); font: inherit; user-select: text; -webkit-user-select: text; }
 .search input::placeholder { color: var(--muxy-foreground-muted); }
@@ -295,6 +303,7 @@ body.compact .splitter { display: none; }
 /* rows: icon only, centered; the agent status dot sits on the icon's corner */
 body.compact .row { position: relative; justify-content: center; padding: 7px 0; gap: 0; }
 body.compact .row .text, body.compact .row .chev-r, body.compact .row .row-plus, body.compact .row .badge, body.compact .row .count, body.compact .row .srv { display: none; }
+body.compact .remote-mark { display: none; }
 body.compact .row .agent { position: absolute; top: 4px; right: 6px; }
 body.compact .agent-row .agent { top: 3px; right: 5px; }
 body.compact .agent-badge { width: 22px; height: 22px; }
