@@ -214,10 +214,13 @@ async function refreshAgents() {
 async function attachIssueRuns() {
   const saved = (await safe(() => muxy.storage.get("issueRuns"), null)) || {};
   const runs = new Map();
+  const relays = new Map();
   for (const [k, r] of Object.entries(saved)) {
     runs.set(r.tabId, { num: k.slice(k.indexOf("#") + 1), title: r.title, branch: r.branch, projectPath: r.projectPath, dir: r.dir });
+    if (r.relay && r.relay.key) relays.set(r.relay.key, r.relay);
   }
   data.issueRuns = runs;
+  data.issueRelays = [...relays.values()];
   for (const r of runs.values()) {
     const proj = data.projects.find((x) => r.projectPath && norm(x.path) === norm(r.projectPath)) || (issueWorktreeOwner(r.dir, data.projects) || {}).project;
     if (!proj) continue;
@@ -294,8 +297,23 @@ async function pairXitaByScreen() {
   if (changed) { mergeAgents(); render(); }
 }
 
+/* Posts what running issue agents have put in their outbox. The agent holds no tracker key; this is the only path from
+ * an agent's words to the tracker, and it checks each line against the issues and the review state of that run.
+ * Runs on the sidebar's timer so it works with the Issues tab closed. Silent until the shell calls are allowed. */
+async function relayIssueOutboxes() {
+  const relays = data.issueRelays || [];
+  if (!relays.length) return;
+  let posted = 0;
+  for (const run of relays) {
+    const r = await safe(() => relayIssueOutbox(run), null, true);
+    if (r && r.posted) posted += r.posted;
+  }
+  if (posted) { await attachIssueRuns(); render(); }
+}
+
 /* XITA does not emit Muxy events, so this runs on a timer (see main.js). Silent when the scan is not allowed yet. */
 async function refreshXita() {
+  relayIssueOutboxes();
   const found = await safe(() => scanXita(), null, true);
   if (found === null) return;
   const kids = await safe(() => scanXitaChildren(), [], true);

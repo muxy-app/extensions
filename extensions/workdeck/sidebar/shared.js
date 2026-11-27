@@ -241,6 +241,78 @@ async function readSubagent(parent, child) {
   return { description: task.description || "", kind: task.kind || "", prompt: task.prompt || "", state: state === "working" ? "working" : "idle", done: done === "1", report };
 }
 
+/* The agent never holds the tracker key. It appends what it wants posted to an outbox file; the extension reads that
+ * file, checks it against what this run is allowed to do, and makes the API call itself.
+ * Before: the issue prompt told the agent to call Linear with $LINEAR_API_KEY. The issue body comes from a tracker, so it
+ *         can carry instructions aimed at the agent — an agent holding the key could be talked into misusing it.
+ * Now: the prompt gives a file path and a line format instead of a key. Only comments and a state change on the issues
+ *      this run was started for are accepted, and only the review state id the extension looked up.
+ * Why: least privilege — the component that reads untrusted text must not hold the credential (confused deputy).
+ * Affects: issue runs. The key stays in the user's shell, so an agent could still read it there; taking it out of the
+ *          shell is a separate change to the user's environment. */
+const OUTBOX_SUBDIR = ".local/share/workdeck/run";
+const outboxName = (key) => "outbox-" + String(key).replace(/[^A-Za-z0-9._-]/g, "-") + ".jsonl";
+
+/* Same call as tab/lib.js's linear(); the sidebar does not load that file, and this codebase already keeps such small
+ * helpers per page (see norm). The stored key rides stdin's first line into `curl -H @-`, so it stays out of argv and the
+ * environment; with no stored key it falls back to the shell profile. The command text is constant. */
+const LINEAR_RELAY_SHELL = `IN=$(cat); K=$(printf '%s\\n' "$IN" | head -1); Q=$(printf '%s\\n' "$IN" | tail -n +2)
+if [ -n "$K" ]; then
+  printf 'Authorization: %s' "$K" | curl -sS --max-time 25 https://api.linear.app/graphql -H @- -H 'Content-Type: application/json' --data "$Q"
+else
+  printf '%s' "$Q" | zsh -ic 'curl -sS --max-time 25 https://api.linear.app/graphql -H "Authorization: $LINEAR_API_KEY" -H "Content-Type: application/json" --data @-'
+fi`;
+async function linearCall(query, variables = {}) {
+  let key = "";
+  try { key = String((await muxy.storage.get("trackerKeys"))?.linear || ""); } catch { key = ""; }
+  const r = await muxy.exec({ shell: LINEAR_RELAY_SHELL, stdin: key + "\n" + JSON.stringify({ query, variables }), timeoutMs: 40000 });
+  const i = r.stdout.indexOf("{");
+  if (i < 0) throw new Error((r.stderr || "empty Linear response").trim().slice(0, 300));
+  const body = JSON.parse(r.stdout.slice(i));
+  if (body.errors && body.errors.length) throw new Error(body.errors.map((e) => e.message).join("; "));
+  return body.data;
+}
+
+/* Reads one run's outbox and posts what it is allowed to post. `run` is { key, issues: [{id, identifier}], stateId }.
+ * Handled lines are skipped by byte offset, kept in storage per run. A bad line is counted and skipped, not retried
+ * forever. Returns { posted, skipped, error }. */
+const OUTBOX_READ = `f="$HOME/${OUTBOX_SUBDIR}/$WD_OUTBOX"
+[ -f "$f" ] || exit 0
+tail -c +$((WD_OFFSET + 1)) "$f" | head -c 200000
+printf '\\n@@SIZE@@%s' "$(stat -f %z "$f" 2>/dev/null || echo 0)"`;
+async function relayIssueOutbox(run) {
+  const marks = (await safe(() => muxy.storage.get("issueOutbox"), {})) || {};
+  const offset = Number(marks[run.key]) || 0;
+  const r = await safe(() => muxy.exec({ shell: OUTBOX_READ, env: { WD_OUTBOX: outboxName(run.key), WD_OFFSET: String(offset) }, timeoutMs: 15000 }), null);
+  if (!r || r.exitCode !== 0) return { posted: 0, skipped: 0 };
+  const at = r.stdout.lastIndexOf("\n@@SIZE@@");
+  const text = at < 0 ? r.stdout : r.stdout.slice(0, at);
+  const allowed = new Map((run.issues || []).map((x) => [String(x.identifier).toUpperCase(), x.id]));
+  let posted = 0, skipped = 0, error = null;
+  const lines = text.split("\n");
+  let consumed = offset;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (i === lines.length - 1 && !line.trim()) break; // a partial line: leave it for the next pass
+    consumed += line.length + 1;
+    if (!line.trim()) continue;
+    let req = null;
+    try { req = JSON.parse(line); } catch { skipped++; continue; }
+    const id = allowed.get(String(req.issue || "").toUpperCase());
+    if (!id) { skipped++; continue; }
+    try {
+      if (req.kind === "comment" && typeof req.body === "string" && req.body.trim()) {
+        await linearCall(`mutation($id: String!, $b: String!) { commentCreate(input: { issueId: $id, body: $b }) { success } }`, { id, b: req.body.trim().slice(0, 20000) });
+        posted++;
+      } else if (req.kind === "state" && run.stateId && String(req.stateId || "") === run.stateId) {
+        await linearCall(`mutation($id: String!, $s: String!) { issueUpdate(id: $id, input: { stateId: $s }) { success } }`, { id, s: run.stateId });
+        posted++;
+      } else skipped++;
+    } catch (e) { error = String((e && e.message) || e).slice(0, 200); skipped++; }
+  }
+  if (consumed > offset) { marks[run.key] = consumed; await safe(() => muxy.storage.set("issueOutbox", marks), null); }
+  return { posted, skipped, error };
+}
 
 /* Cuts by characters, not bytes (a shell `cut` would split a Korean letter in the middle). Array.from also keeps
  * surrogate pairs such as emoji whole. */
