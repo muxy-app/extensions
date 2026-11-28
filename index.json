@@ -330,7 +330,7 @@
         "explorer"
       ],
       "official": true,
-      "downloads": 2,
+      "downloads": 4,
       "published_at": "2026-11-26T20:24:29Z",
       "sha256": "f9580702c87eaa4e0d25cba2c37b9d0ac5c71ba1112f868dba2856d797181918",
       "size": 28108543,
@@ -407,7 +407,7 @@
         "source-control"
       ],
       "official": true,
-      "downloads": 3,
+      "downloads": 5,
       "published_at": "2026-11-26T20:24:41Z",
       "sha256": "9f1323ed2611dc2afe28b2f66d3ef3c42a78a46d992ac91f252d7cb67b61bdc1",
       "size": 12074452,
@@ -634,7 +634,7 @@
         "localization"
       ],
       "official": false,
-      "downloads": 2,
+      "downloads": 3,
       "published_at": "2026-11-26T20:25:05Z",
       "sha256": "e220f60b9e03f54467a3e4444d1adf423c5855c38274fd50f72a5226c98560ef",
       "size": 1106337,
